@@ -2,9 +2,9 @@
 
 | Area               | Foundation choice                                                  |
 | ------------------ | ------------------------------------------------------------------ |
-| Runtime/tooling    | Node.js 20+, npm 10+, npm workspaces                               |
+| Runtime/tooling    | Node.js 22.12+, npm 10+, npm workspaces                            |
 | Language           | TypeScript 5, strict compiler options                              |
-| Web                | React 18, Vite 5, React Router 6                                   |
+| Web                | React 18, Vite 7, React Router 7                                   |
 | Styling/UI         | Tailwind CSS 3, shadcn/ui-compatible component conventions, Lucide |
 | Browser state/data | Zustand, TanStack Query, TanStack Table, TanStack Virtual          |
 | Forms/charts       | React Hook Form, Zod, Recharts                                     |

@@ -18,6 +18,10 @@ port = 54323
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:4175"
-additional_redirect_urls = ["http://localhost:4175"]
+additional_redirect_urls = ["http://localhost:4175/**", "http://127.0.0.1:4175/**"]
 jwt_expiry = 3600
 
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+secure_password_change = true
