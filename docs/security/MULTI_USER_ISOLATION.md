@@ -12,7 +12,13 @@ The authenticated user's verified bearer token is forwarded to PostgREST with th
 key, so `auth.uid()` is populated for the database policies. Service-role access bypasses this
 boundary and is forbidden for normal user requests.
 
-## Adding a user-owned table
+Demat accounts use `demat_accounts.user_id`; imports use the same owner key and import rows inherit
+ownership through their `account_imports` parent. Account and import API filters include the
+verified owner as defense in depth, and forced PostgreSQL RLS remains authoritative. The active
+capacity trigger atomically updates a private counter row for the verified owner; clients cannot
+read or modify that counter directly.
+
+## Adding another user-owned table
 
 1. Add a non-null `user_id uuid references auth.users(id) on delete cascade` (or use the auth ID as
    the primary key for a one-to-one table).

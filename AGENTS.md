@@ -2,8 +2,9 @@
 
 ## Phase boundary
 
-Phase 2 implements authentication and multi-user security only. Do not add IPO workflows,
-investment advice, or fabricated market data without an approved later-phase task.
+Phase 3 implements demat account management only. Do not add IPO applications, the IPO quota
+engine, investment advice, or fabricated market data until this module's verification gate passes
+and a later-phase task is approved.
 
 ## Engineering conventions
 

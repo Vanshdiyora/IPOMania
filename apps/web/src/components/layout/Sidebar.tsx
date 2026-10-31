@@ -1,4 +1,4 @@
-import { LayoutDashboard, LogOut, UserRound } from "lucide-react";
+import { BriefcaseBusiness, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../../auth/useAuth";
@@ -33,17 +33,64 @@ export function Sidebar() {
           <span className="hidden sm:inline">Overview</span>
         </NavLink>
         {user ? (
-          <NavLink
-            to="/profile"
-            className={({ isActive }) =>
-              `mt-2 flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
-                isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
-              }`
-            }
-          >
-            <UserRound aria-hidden="true" size={20} />
-            <span className="hidden sm:inline">Profile</span>
-          </NavLink>
+          <>
+            <NavLink
+              to="/accounts"
+              end
+              aria-label="Demat account dashboard"
+              className={({ isActive }) =>
+                `mt-2 flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
+                  isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                }`
+              }
+            >
+              <BriefcaseBusiness aria-hidden="true" size={20} />
+              <span className="hidden sm:inline">Demat accounts</span>
+            </NavLink>
+            <div className="hidden pl-5 sm:block">
+              <NavLink
+                to="/accounts/list"
+                className={({ isActive }) =>
+                  `mt-1 flex min-h-touch items-center rounded-lg px-3 text-sm font-semibold ${
+                    isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                  }`
+                }
+              >
+                Account list
+              </NavLink>
+              <NavLink
+                to="/accounts/import"
+                className={({ isActive }) =>
+                  `mt-1 flex min-h-touch items-center rounded-lg px-3 text-sm font-semibold ${
+                    isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                  }`
+                }
+              >
+                Bulk import
+              </NavLink>
+              <NavLink
+                to="/accounts/import-history"
+                className={({ isActive }) =>
+                  `mt-1 flex min-h-touch items-center rounded-lg px-3 text-sm font-semibold ${
+                    isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                  }`
+                }
+              >
+                Import history
+              </NavLink>
+            </div>
+            <NavLink
+              to="/profile"
+              className={({ isActive }) =>
+                `mt-2 flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
+                  isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                }`
+              }
+            >
+              <UserRound aria-hidden="true" size={20} />
+              <span className="hidden sm:inline">Profile</span>
+            </NavLink>
+          </>
         ) : (
           <div className="mt-2 space-y-1">
             <NavLink

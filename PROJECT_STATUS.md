@@ -73,6 +73,36 @@ reported 39 advisories, including 14 high and 2 critical). Remediation upgraded 
 Hono to 4.13, `@hono/zod-validator` to 0.9, Wrangler to 4.156, React Router to 7, Vite to 7,
 Vitest to 4, and moved the toolchain to Node.js 22.12+, which Wrangler 4 requires.
 
-Do not proceed to Phase 3 until the current branch passes GitHub Actions and the production
-Supabase email/redirect configuration and deployed Worker are separately verified. Purge and rotate
-the tracked local Supabase credentials before pushing this branch.
+The hosted email/redirect configuration, deployed Worker, current-branch GitHub Actions run, and
+tracked local Supabase credentials still require the Phase 2 follow-up described above. No hosted
+project was changed for Phase 3. Do not publish this branch until its existing secret-history and
+production configuration follow-ups are resolved.
+
+## Phase 3 — Demat account management
+
+**Status: Implemented; application checks pass, but local database/RLS/concurrency verification
+remains open.**
+
+The implementation adds user-owned `demat_accounts`, import history/staging tables, forced RLS,
+caller-JWT API routes, a database-serialized 500-active-account cap, responsive account pages, and
+CSV/XLSX import with row reports and retry-safe confirmation. The active limit counts only records
+whose `account_status` is `active` and `archived_at` is null. Archived, inactive, and closed
+accounts do not consume capacity.
+
+Direct SQL coverage seeds 499 test accounts and exercises the 500th/501st account, owner
+isolation, account lifecycle, duplicates, and import retry/reversal. A separate disposable
+loopback-only PostgreSQL test is provided for truly simultaneous account creation; it creates 500
+fixture accounts and cleans its fixture user up afterward. These database tests are not verified
+until run against a local Supabase/PostgreSQL test environment. The integration test is opt-in via
+`DEMAT_TEST_DATABASE_URL` and is skipped when that variable is unset.
+
+The system Node.js is 20.20.2, below the repository's 22.12+ requirement. For local verification,
+a temporary Node.js 22 runtime obtained through npm was used. `npm run lint`, `npm run typecheck`,
+`npm test` (26 passed, 1 skipped), `npm run build:web`, and `npm run build:api` passed.
+Both account browser tests passed at desktop and mobile viewport sizes. Prettier passed for every
+changed/new supported source and documentation file; repository-wide `npm run format:check`
+remains blocked by 32 pre-existing unformatted files. The web build reports a large JavaScript
+chunk warning.
+
+Production Supabase, hosted CI, and all database/integration checks remain separate verification
+gates. Do not begin the IPO quota engine until the account module passes these checks.

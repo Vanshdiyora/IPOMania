@@ -2,7 +2,7 @@
 
 ```text
 apps/
-  web/                 React/Vite app, Supabase Auth state, and accessible UI
+  web/                 React/Vite app, Supabase Auth, demat account pages, and accessible UI
 workers/
   api/                 Hono routes, JWT verification, environment, and DB adapters
 packages/
@@ -11,13 +11,13 @@ packages/
   financial-engine/    Isolated future package boundary
 supabase/
   migrations/          PostgreSQL schema and RLS migrations
-  tests/               Direct pgTAP policy and isolation tests
+  tests/               Direct pgTAP policy, isolation, account-capacity, and import tests
   config.toml          Local Supabase CLI project configuration
   seed.sql             Seed entry point; no Phase 1 records
 tests/
-  unit/                 Fast isolated tests
-  integration/          Service/database boundary tests
-  security/             API authentication and ownership regressions
+  unit/                 Fast schema and logic tests
+  integration/          Service/database boundary and opt-in capacity race tests
+  security/             API authentication, ownership, and import regressions
   e2e/                  Playwright browser tests
 scripts/                Local development and database utilities
 docs/

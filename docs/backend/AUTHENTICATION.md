@@ -10,8 +10,10 @@ Worker binding for the isolated account-deletion operation. Never expose it to V
 
 Set `WEB_APP_ORIGIN` to the exact production web origin to allow API CORS requests. Add the web
 origin and `/auth/confirm` and `/reset-password` callback paths to the Supabase Auth URL allowlist.
-For local development, set the public variables in `.env.local` and Worker bindings in
-`workers/api/.dev.vars`; do not commit either file.
+For local development, set the public `VITE_` variables and Worker bindings in the repository-root
+`.env`; Vite exposes only `VITE_` variables, and the local Wrangler command loads the file for the
+API. Do not commit the file. Use hosted Supabase credentials to connect to the hosted project, or
+the values reported by `supabase status` to use the local Supabase stack.
 
 ## User flows
 

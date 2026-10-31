@@ -26,7 +26,9 @@ export async function apiRequest<T>(
     ...init,
     headers: {
       Authorization: `Bearer ${session.access_token}`,
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...(init.body && !(init.body instanceof FormData)
+        ? { "Content-Type": "application/json" }
+        : {}),
       ...init.headers,
     },
   });

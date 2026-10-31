@@ -35,7 +35,7 @@ the database. The Phase 1 scaffold does not implement authentication or data ope
 **Decision:** Add database tooling and migration locations without inventing domain tables or seed
 records.
 
-**Reasoning:** Product requirements and policy need to define the business model in a later phase.
+**Reasoning:** Product requirements and policy define each business model in its approved phase.
 
 ## ADR 006 — Supabase Auth and caller-context RLS
 
@@ -46,3 +46,20 @@ user-scoped PostgREST operations.
 **Reasoning:** Server-side Auth verification provides the authoritative user identity, and
 PostgreSQL RLS remains the final owner-isolation boundary. Service-role access is isolated to the
 verified account-deletion operation.
+
+## ADR 007 — database-enforced active demat-account capacity
+
+**Decision:** Limit each user's unarchived active demat accounts to 500 with a private per-user
+counter row and a PostgreSQL trigger that atomically increments/decrements it.
+
+**Reasoning:** API preflight counts are racy under concurrent requests. A guarded atomic counter
+update locks the user's capacity row and protects creation, restoration, status changes, and
+imports regardless of caller path.
+
+## ADR 008 — staged and idempotent account imports
+
+**Decision:** Persist each mapped import row and report before confirmation; use one caller-scoped
+database transaction to confirm, and archive unchanged rows for reversal.
+
+**Reasoning:** A durable preview preserves invalid/duplicate row reports, a transaction avoids
+partial imports, and an idempotent state transition makes retries safe without service-role access.

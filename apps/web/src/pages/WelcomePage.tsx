@@ -11,7 +11,8 @@ export function WelcomePage() {
         <p className="text-sm font-bold uppercase tracking-wide text-action">IPO Mania</p>
         <h1 className="mt-2 text-3xl font-bold text-navy">Welcome to IPO Mania</h1>
         <p className="mt-3 max-w-3xl text-lg leading-7 text-muted">
-          Your account is ready. IPO research features will be introduced in later phases.
+          Manage your profile and demat accounts. IPO application workflows remain out of scope for
+          this phase.
         </p>
       </div>
       <Card>
@@ -20,8 +21,12 @@ export function WelcomePage() {
           {user ? (
             <>
               Signed in as {user.email}.{" "}
+              <Link className="font-semibold text-action underline" to="/accounts">
+                Open demat account dashboard
+              </Link>{" "}
+              or{" "}
               <Link className="font-semibold text-action underline" to="/profile">
-                Manage your profile
+                manage your profile
               </Link>
               .
             </>
