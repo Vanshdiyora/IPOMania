@@ -127,14 +127,17 @@ export type MandateStatus =
   | "APPROVED"
   | "REJECTED"
   | "FAILED"
-  | "NOT_REQUIRED";
+  | "NOT_REQUIRED"
+  | "REVOKED"
+  | "EXPIRED"
+  | "RELEASED";
 export type AllotmentStatus =
   | "UNKNOWN"
   | "PENDING"
   | "ALLOTTED"
   | "PARTIALLY_ALLOTTED"
-  | "NOT_ALLOTTED";
-
+  | "NOT_ALLOTTED"
+  | "PARTIAL_ALLOTMENT";
 export interface IpoApplication {
   id: string;
   user_id: string;
@@ -156,6 +159,102 @@ export interface IpoApplication {
   created_at: string;
   updated_at: string;
   archived_at: string | null;
+}
+
+export interface CapitalApplication {
+  id: string;
+  user_id: string;
+  ipo_id: string;
+  demat_account_id: string;
+  category_configuration_id: string;
+  quota_calculation_id: string;
+  category: IpoCategoryCode;
+  rule_version: number;
+  lot_size: number;
+  issue_price_min: string;
+  issue_price_max: string;
+  cut_off_price: string | null;
+  lots: number;
+  shares: number;
+  price_type: "BID" | "CUT_OFF";
+  price: string;
+  application_amount: string;
+  currency: string;
+  created_at: string;
+}
+
+export interface IpoMandate {
+  id: string;
+  user_id: string;
+  application_id: string;
+  mandate_reference: string;
+  mandate_amount: string;
+  mandate_status: MandateStatus;
+  blocked_at: string | null;
+  released_at: string | null;
+  updated_at: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export type RefundStatus = "NOT_REQUIRED" | "PENDING" | "COMPLETED";
+
+export interface IpoAllotment {
+  id: string;
+  user_id: string;
+  application_id: string;
+  allotment_status: AllotmentStatus;
+  allotted_lots: number;
+  allotted_shares: number;
+  allotment_price: string | null;
+  refund_amount: string;
+  refund_status: RefundStatus;
+  allotment_date: string | null;
+  updated_at: string;
+  created_at: string;
+}
+
+export type CapitalTransactionType =
+  | "APPLICATION_RECORDED"
+  | "MANDATE_APPROVED"
+  | "CAPITAL_BLOCKED"
+  | "CAPITAL_RELEASED"
+  | "ACTUAL_DEBIT"
+  | "ALLOTMENT_DEBIT"
+  | "REFUND_RECEIVED"
+  | "LISTING_SALE"
+  | "LISTING_PRICE_UPDATE"
+  | "ADJUSTMENT";
+
+export interface CapitalLedgerEntry {
+  id: string;
+  user_id: string;
+  application_id: string | null;
+  transaction_type: CapitalTransactionType;
+  amount: string;
+  currency: string;
+  effective_at: string;
+  created_at: string;
+  source: "MANUAL" | "SYSTEM" | "AUTHORIZED_INTEGRATION";
+  audit_reference: string;
+  idempotency_key: string;
+  quantity: number | null;
+  unit_price: string | null;
+  adjustment_direction: "DEBIT" | "CREDIT" | null;
+  blocked_consumed: string;
+}
+
+export interface CapitalSummary {
+  currency: string;
+  total_application_value: string;
+  approved_mandate_value: string;
+  currently_blocked_capital: string;
+  released_capital: string;
+  actually_invested_capital: string;
+  refunds_received: string;
+  outstanding_refunds: string;
+  realized_pnl: string;
+  unrealized_pnl: string | null;
 }
 
 export interface ApplicationImportRow {

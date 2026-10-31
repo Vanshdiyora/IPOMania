@@ -169,3 +169,29 @@ duplicate warnings, and formula-safe export. The loopback-only two-transaction r
 (1/1) via `npm run test:integration:applications`; browser/E2E coverage remains outstanding. The
 repository-wide format check still reports pre-existing unformatted files, and the broader Phase 3
 local database/RLS and concurrency gates remain open.
+
+## Phase 6 — Mandates, allotments, and capital management
+
+**Status: Implementation complete; workspace tests and builds pass. Direct PostgreSQL/RLS
+verification remains open.**
+
+Phase 6 adds owner-scoped mandate state management, allotment and refund tracking, an append-only
+capital ledger, per-currency decimal-safe summaries, API routes, and management pages. Application
+records retain the issue lot size and price bounds used by the calculation so allotment checks do
+not rely on later-edited IPO configuration. No application is submitted externally, no payment is
+initiated, and mandates are never approved automatically.
+
+Automated unit and API tests cover mandate validation, allotment and refund rules, blocked versus
+debited capital, duplicate events, idempotency, and financial reconciliation. The migration also
+contains direct two-user pgTAP coverage; it has not been run in this workspace because the
+Supabase CLI and `psql` are unavailable.
+
+### Phase 6 verification in this workspace
+
+- Passed before merging Phase 5: `npm run lint`, `npm run typecheck`, `npm test` (69 passed, 1
+  skipped), `npm run build:web`, and `npm run build:api`.
+- Repository-wide `npm run format:check` remains blocked by unformatted files, including
+  pre-existing formatting debt outside Phase 6. Targeted Prettier checks passed for changed source
+  and feature documentation.
+- Not run: `npm run test:security:db` (requires the unavailable Supabase CLI and local PostgreSQL).
+- The Phase 3 local RLS/concurrency and repository-wide formatting gates remain open.

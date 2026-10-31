@@ -1,4 +1,5 @@
 import DecimalJs from "decimal.js";
+export * from "./capital.js";
 
 const ExactDecimal = DecimalJs.clone({
   precision: 40,

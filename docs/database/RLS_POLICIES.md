@@ -36,6 +36,14 @@ its owner. Composite foreign keys bind category versions and calculation snapsho
 owner as their IPO and demat account. Authenticated users can archive IPOs but cannot mutate
 historical rule versions or calculation results. See [IPO_SCHEMA.md](./IPO_SCHEMA.md).
 
+The `20261031160000_capital_management.sql` migration adds owner-scoped application records,
+mandates, allotments, allotment change history, and an append-only capital ledger. Applications
+reference only the same owner's saved eligible calculation, IPO, account, and issue-rule version.
+Mandate and allotment foreign keys bind to that owner's application. Ledger inserts are manual-only
+for authenticated clients, and clients cannot update/delete history or set the internal
+blocked-capital consumption field. See [CAPITAL_LEDGER.md](./CAPITAL_LEDGER.md) and the direct
+two-user test `supabase/tests/capital_management.test.sql`.
+
 ## Database verification
 
 Run `supabase start` followed by `npm run test:security:db`. The pgTAP suites execute as the

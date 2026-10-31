@@ -15,6 +15,17 @@ Responses use `{ data }` or `{ error: { code, message } }`.
 | `POST /api/ipos/:ipoId/categories` | Add a validated issue-specific rule version. The database assigns its version.      |
 | `POST /api/quota/validate`         | Validate a calculation without saving an audit record.                              |
 | `POST /api/quota/calculate`        | Calculate and save a reproducibility snapshot.                                      |
+| `POST /api/capital/applications`   | Record an owned application from an eligible saved calculation; does not submit it. |
+| `GET /api/capital/applications`    | List capital-tracked applications with IPO/account/date filters.                    |
+| `GET /api/mandates`                | List owned mandates with IPO/account/broker/category/date/status filters.           |
+| `POST /api/mandates`               | Record a pending UPI mandate; never initiates or approves a payment.                |
+| `PATCH /api/mandates/:mandateId`   | Manually update a mandate using validated state transitions.                        |
+| `GET /api/allotments`              | List owned allotments and refund state with issue/account/date filters.             |
+| `POST /api/allotments`             | Record a full, partial, or no-allotment result against an application.              |
+| `PATCH /api/allotments/:id`        | Update current allotment data; prior values are retained in audit history.          |
+| `GET /api/capital/summary`         | Read reconciled per-currency financial summaries.                                   |
+| `GET /api/capital/ledger`          | List immutable financial events with filters and pagination.                        |
+| `POST /api/capital/ledger`         | Record a manual, idempotent financial event with an audit reference.                |
 
 IPO list filters include company search (or exact symbol), status, exchange, opening-date bounds,
 and archive inclusion. Category POST bodies are strict structured objects; unknown fields and
@@ -28,3 +39,11 @@ Important errors include `VALIDATION_ERROR` (400), `IPO_NOT_FOUND` and
 `DEMAT_ACCOUNT_NOT_FOUND` (404), `DUPLICATE_IPO` (409), and validation codes in the calculation
 result. Missing issue-specific category configuration returns a clear `CATEGORY_RULES_NOT_FOUND`
 result rather than applying a default.
+
+Application records can be created only from the caller's saved, eligible quota calculation.
+Mandate approval is manual and informational; it does not imply a cash debit. Ledger event
+replays with an identical idempotency key return the existing event; conflicting repeats return
+`409`. Database constraints enforce allotment quantities, issue prices, refund limits, and ledger
+balances. See [mandate management](../product/MANDATE_MANAGEMENT.md),
+[allotment management](../product/ALLOTMENT_MANAGEMENT.md), and
+[capital management](../product/CAPITAL_MANAGEMENT.md).

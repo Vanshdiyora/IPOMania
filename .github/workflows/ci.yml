@@ -21,7 +21,7 @@ jobs:
         with:
           version: latest
 
-      - name: Start local Supabase
+      - name: Start local Supabase database
         run: supabase db start
 
       - name: Test database row-level security
