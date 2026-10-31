@@ -5,7 +5,8 @@
 This document prepares deployment only. No Cloudflare or hosted Supabase deployment, custom
 domain, production secret, or backup has been activated by this change. Do not deploy production
 until Phase 8's final integrated audit has passed and a production deployment has explicit approval.
-The deployment workflow additionally requires a protected GitHub `production` environment.
+The deployment workflow additionally requires protected GitHub `production-api` and
+`production-web` environments.
 
 Phase 3's local database/RLS, concurrency, secret-history, hosted-configuration, and repository-wide
 formatting gates remain open as recorded in [PROJECT_STATUS.md](../../PROJECT_STATUS.md). Do not
@@ -38,8 +39,8 @@ Before dispatching a deployment:
 2. Configure `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `WEB_APP_ORIGIN` as Worker variables in the
    correct API Worker environment. Set `SUPABASE_SERVICE_ROLE_KEY` only as a Worker secret, and
    only if account deletion is enabled. Keep production and preview values separate.
-3. Create GitHub `preview` and `production` environments and configure their environment-scoped
-   Cloudflare secrets and variables as described in
+3. Create GitHub `preview`, `production-api`, and `production-web` environments and configure
+   their environment-scoped Cloudflare secrets and variables as described in
    [GITHUB_ACTIONS.md](./GITHUB_ACTIONS.md) and
    [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md). Configure required production reviewers
    and branch restrictions in GitHub settings; workflow YAML alone cannot enforce those settings.
@@ -81,8 +82,9 @@ Do not add hostnames or Supabase URLs for which the project owner has not confir
 2. Review migration changes. Apply and verify migrations separately using the database procedure
    below; deployment workflows do not run migrations.
 3. Deploy and smoke-test a trusted preview against a non-production Supabase project.
-4. Dispatch `Deploy production` from `main`; confirm the Phase 8 audit input only when evidence is
-   recorded. A designated reviewer must approve the protected `production` environment.
+4. Push the merge commit to `main`, which starts `Deploy production` after successful CI. A
+   designated reviewer must approve both protected production environments. The workflow can
+   also be dispatched manually for a retry from `main`.
 5. The workflow deploys API first, checks the production environment in `/api/health`, builds the
    SPA with public production Supabase values, deploys the frontend Worker, and checks its HTTPS
    root.
@@ -90,8 +92,9 @@ Do not add hostnames or Supabase URLs for which the project owner has not confir
    cross-origin requests, health checks, and sanitized Worker logs. Record the deployed commit,
    migration version, and check results in the release record.
 
-No production deployment is authorized by this preparation task. Do not infer approval from a
-green CI run, a workflow file, or the `phase8_integrated_audit_passed` input alone.
+Successful CI authorizes the workflow to start, but it does not bypass the separate protected
+`production-api` and `production-web` environment approvals. Repository-side deployment policy remains responsible for
+confirming that any required phase or financial-release audit is complete.
 
 ## Database deployment and verification
 

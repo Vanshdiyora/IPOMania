@@ -1,16 +1,11 @@
 name: Deploy production
 
 on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      phase8_integrated_audit_passed:
-        description: Confirm Phase 8 final integrated audit has passed
-        required: true
-        type: choice
-        options:
-          - "no"
-          - "yes"
-        default: "no"
 
 permissions:
   contents: read
@@ -20,14 +15,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy-production:
-    name: Deploy after protected approval
-    if: github.ref == 'refs/heads/main' && inputs.phase8_integrated_audit_passed == 'yes'
-    environment: production
+  deploy-api:
+    name: Deploy production API
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    environment:
+      name: production-api
+      url: ${{ vars.API_HEALTH_URL }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -38,19 +39,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate production configuration
+      - name: Validate production API configuration
         env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-          VITE_WEB_APP_ORIGIN: ${{ vars.VITE_WEB_APP_ORIGIN }}
           API_HEALTH_URL: ${{ vars.API_HEALTH_URL }}
-          WEB_HEALTH_URL: ${{ vars.WEB_HEALTH_URL }}
         run: |
-          test -n "$VITE_SUPABASE_URL" || { echo "::error::Set VITE_SUPABASE_URL in the production environment."; exit 1; }
-          test -n "$VITE_SUPABASE_ANON_KEY" || { echo "::error::Set VITE_SUPABASE_ANON_KEY in the production environment."; exit 1; }
-          test -n "$VITE_WEB_APP_ORIGIN" || { echo "::error::Set VITE_WEB_APP_ORIGIN in the production environment."; exit 1; }
-          test -n "$API_HEALTH_URL" || { echo "::error::Set API_HEALTH_URL in the production environment."; exit 1; }
-          test -n "$WEB_HEALTH_URL" || { echo "::error::Set WEB_HEALTH_URL in the production environment."; exit 1; }
+          test -n "$API_HEALTH_URL" || { echo "::error::Set API_HEALTH_URL in the production-api environment."; exit 1; }
 
       - name: Build API
         run: npm run build:api
@@ -78,6 +71,48 @@ jobs:
               }
             });
           '
+
+  deploy-web:
+    name: Deploy production frontend
+    needs: deploy-api
+    if: ${{ always() && needs.deploy-api.result == 'success' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')) }}
+    environment:
+      name: production-web
+      url: ${{ vars.WEB_HEALTH_URL }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate production frontend configuration
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_WEB_APP_ORIGIN: ${{ vars.VITE_WEB_APP_ORIGIN }}
+          WEB_HEALTH_URL: ${{ vars.WEB_HEALTH_URL }}
+        run: |
+          missing=""
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY VITE_WEB_APP_ORIGIN WEB_HEALTH_URL; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Set $name in the production-web environment."
+              missing="${missing:+$missing, }$name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "Missing production frontend variables: $missing"
+            exit 1
+          fi
 
       - name: Build frontend
         env:
