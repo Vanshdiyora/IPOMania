@@ -1,41 +1,85 @@
 # GitHub Actions
 
-`.github/workflows/ci.yml` runs for pushes to `main` and all pull requests. The quality job uses
-Ubuntu and Node.js 22 with npm caching, then runs `npm ci`, formatting, lint, TypeScript checks,
-Vitest, frontend production build, Worker dry-run bundle, and `npm audit --audit-level=high`.
+## Workflows
 
-On pushes to `main`, after both the quality and database-security jobs pass, the workflow deploys
-`workers/api/` to the `ipo-mania-api` Worker and then deploys the frontend to the `ipo-mania-web`
-Worker. Pull requests do not deploy. Both jobs use the project-pinned Wrangler version. The API
-deployment sets `RUNTIME_ENV` to `production` and preserves variables configured in the Cloudflare
-dashboard.
+- `ci.yml` validates pull requests and pushes to `main` and `feature/phase-9-preparation`.
+  It runs formatting, lint, type checking, Vitest, web/API builds, `npm audit`, Supabase RLS
+  tests, and loopback-only database concurrency tests.
+- `codeql.yml` runs CodeQL for TypeScript on `main`, same-repository pull requests, and a weekly
+  schedule. Fork pull requests receive no write-scoped token or deployment credentials; dependency
+  audit and regular CI still run for them.
+- `deploy-preview.yml` is `workflow_dispatch` only. It accepts a selected, trusted non-`main`
+  branch and deploys to the isolated `preview` Cloudflare environment.
+- `deploy-production.yml` is `workflow_dispatch` only, refuses non-`main` refs, and requires a
+  manual confirmation that Phase 8's final integrated audit passed. Its `production` GitHub
+  environment must also require reviewer approval before the job can access environment secrets.
 
-Before the first deployment, add these repository (or production environment) Actions secrets and
-variables in GitHub:
+CI is intentionally not a deployment workflow. A `main` push must never deploy production
+automatically. Do not dispatch production until the Phase 8 audit has passed and a production
+deployment has been explicitly approved. This workflow does not apply database migrations.
 
-- `CLOUDFLARE_API_TOKEN`: an account-scoped Cloudflare API token with the **Edit Cloudflare Workers**
-  permission, limited to the account that hosts this Worker.
-- `CLOUDFLARE_ACCOUNT_ID`: the ID of that Cloudflare account.
-- `VITE_SUPABASE_URL`: the Supabase project base URL used by the frontend (for example,
-  `https://<project-ref>.supabase.co`); do not append `/rest/v1` or `/auth/v1`.
-- `VITE_SUPABASE_ANON_KEY`: the Supabase publishable/anon key used by the frontend. This is
-  intentionally public in browser code; never use the service-role key here.
+## GitHub environment setup
 
-Do not commit or paste the API token into the repository. The workflow retains read-only repository
-contents permission; Cloudflare access is provided only through these Actions secrets. Set the
-frontend values as GitHub Actions **variables**. The build fails before deployment if either is
-missing.
+Create GitHub environments named `preview` and `production` under **Settings → Environments**.
 
-The frontend Worker serves the Vite SPA from Workers Static Assets and forwards `/api/*` requests
-through a Cloudflare service binding to `ipo-mania-api`. This keeps API calls same-origin and avoids
-needing a custom domain or frontend/API URL variables. The first successful frontend deployment is
-available on the Worker's `workers.dev` URL; add that URL to Supabase Auth's allowed site and
-redirect URLs before using hosted authentication.
+For `production`:
 
-Configure `SUPABASE_URL` and `SUPABASE_ANON_KEY` as Worker variables for `ipo-mania-api`, and
-`SUPABASE_SERVICE_ROLE_KEY` as a Worker secret if account deletion is enabled. The deploy command
-preserves these dashboard-configured values. Never expose the service-role key to the frontend.
+1. Require one or more designated reviewers; disallow self-review and administrator bypass where
+   the repository plan/settings permit it.
+2. Limit deployment branches to `main`.
+3. Add environment-scoped secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Use a
+   production-specific Cloudflare API token.
+4. Add the environment variables listed in
+   [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md), including production Supabase public
+   values and the exact production health-check URLs.
 
-The database-security job starts only the local Supabase database (`supabase db start`) before
-running pgTAP tests; startup output remains visible in Actions logs for troubleshooting. Integration
-and Playwright E2E jobs are intentionally prepared for future phases and are not yet CI jobs.
+Also protect `main` in repository rulesets: require pull requests, block force pushes, and require
+the `Quality and build`, `Supabase RLS tests`, and `Analyze TypeScript` checks before merge. These
+repository-side rules are not enabled by workflow files and must be configured by an authorized
+maintainer. Confirm check names against the Actions UI after the first run.
+
+For `preview`, use a separate Cloudflare API token and preview-only Supabase project/keys. Add
+preview-scoped variables and health-check URLs. Restrict who can approve/use this environment.
+Cloudflare Worker edit permissions are account-scoped; a token with Worker edit access may be able
+to modify other Workers in that account. Prefer a separate Cloudflare account for preview if
+stronger blast-radius isolation is needed.
+
+Never put production tokens or service-role credentials in repository-wide secrets, pull-request
+workflows, artifacts, build logs, or `VITE_` variables. Fork pull requests do not receive Actions
+secrets. Do not change these workflows to `pull_request_target` or check out untrusted PR code in a
+privileged workflow.
+
+## Validation and deployment sequence
+
+Before creating or approving a production release:
+
+1. Confirm required CI, database/RLS, security, financial, and Phase 8 integrated-audit checks
+   passed on the exact commit.
+2. Confirm migrations were reviewed and applied separately under the procedure in
+   [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md).
+3. Dispatch the preview workflow from a trusted branch and verify the preview health endpoints,
+   authentication redirects, CORS, and core smoke tests.
+4. Dispatch production from `main`, select `yes` only after verifying the Phase 8 audit evidence,
+   and obtain the independent `production` environment approval.
+5. Confirm the API health response reports `production`, the website responds over HTTPS, and
+   browser authentication uses the intended production Supabase project.
+6. If verification fails, stop further changes and use
+   [BACKUP_RECOVERY.md](./BACKUP_RECOVERY.md) and the incident steps in
+   [MONITORING.md](./MONITORING.md). Do not assume a Worker rollback restores database state.
+
+Set health check variables to full HTTPS URLs. `API_HEALTH_URL` must address the deployed API
+Worker's `/api/health`; `WEB_HEALTH_URL` must address the website root. These values are public
+URLs, not secrets.
+
+## Actions billing and restrictions
+
+Standard GitHub-hosted runners are free for public repositories. For private repositories, runner
+minutes/compute and artifact/cache storage are subject to the repository owner's plan allowances
+and overage billing; usage is shared with other eligible GitHub products. Check the current billing
+dashboard and [GitHub Actions billing documentation](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
+before enabling high-frequency CI, retention-heavy artifacts, or larger runners. Fork workflows
+may require maintainer approval, and repository settings can restrict Actions or secret access.
+
+This repository does not currently configure artifact uploads, deployment previews on every PR, or
+paid GitHub services. Availability of CodeQL, environment protection rules, and billing controls
+depends on repository visibility and the GitHub plan.

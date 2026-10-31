@@ -6,3 +6,16 @@ workers_dev = true
 [vars]
 RUNTIME_ENV = "development"
 
+[env.preview]
+name = "ipo-mania-api-preview"
+workers_dev = true
+
+[env.preview.vars]
+RUNTIME_ENV = "test"
+
+[env.production]
+name = "ipo-mania-api"
+workers_dev = true
+
+[env.production.vars]
+RUNTIME_ENV = "production"
