@@ -7,7 +7,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useAuth } from "../../auth/useAuth";
 
 const applicationNavClass = ({ isActive }: { isActive: boolean }) =>
@@ -15,31 +15,87 @@ const applicationNavClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
   }`;
 
-export function Sidebar() {
+export function Sidebar({
+  mobileOpen,
+  onNavigate,
+  onClose,
+}: {
+  mobileOpen: boolean;
+  onNavigate: () => void;
+  onClose: () => void;
+}) {
   const { user, signOut } = useAuth();
   const [signOutError, setSignOutError] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (mobileOpen) closeButtonRef.current?.focus();
+  }, [mobileOpen]);
+
+  function keepFocusInDrawer(event: KeyboardEvent<HTMLElement>) {
+    if (!mobileOpen || event.key !== "Tab" || !sidebarRef.current) return;
+
+    const focusable = sidebarRef.current.querySelectorAll<HTMLElement>(
+      "a[href], button:not([disabled])",
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first || !last) return;
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 
   return (
-    <aside className="flex w-20 shrink-0 flex-col border-r border-border bg-white px-2 py-5 sm:w-64 sm:px-4">
-      <a
-        className="mb-8 flex min-h-touch items-center justify-center gap-3 rounded-lg px-2 text-center text-lg font-bold text-navy sm:justify-start sm:px-3"
-        href="/"
-      >
-        <span className="text-xl">IPO</span>
-        <span className="hidden sm:inline">Mania</span>
-      </a>
-      <nav aria-label="Main navigation">
+    <aside
+      ref={sidebarRef}
+      role={mobileOpen ? "dialog" : undefined}
+      aria-modal={mobileOpen ? true : undefined}
+      aria-label={mobileOpen ? "Mobile navigation" : undefined}
+      onKeyDown={keepFocusInDrawer}
+      className={`${
+        mobileOpen ? "fixed inset-y-0 left-0 z-50 flex w-[min(20rem,85vw)]" : "hidden"
+      } min-w-0 shrink-0 flex-col overflow-y-auto border-r border-border bg-white px-4 py-4 md:static md:z-auto md:flex md:w-64 md:overflow-visible md:px-4 md:py-5`}
+    >
+      <div className="mb-5 flex min-h-touch items-center rounded-lg px-2 md:mb-8 md:px-3">
+        <a
+          className="flex min-h-touch min-w-0 flex-1 items-center gap-3 text-lg font-bold text-navy"
+          href="/"
+          aria-label="IPO Mania home"
+        >
+          <span aria-hidden="true" className="text-xl">
+            IPO
+          </span>{" "}
+          <span>Mania</span>
+        </a>
+        <button
+          ref={closeButtonRef}
+          type="button"
+          className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-lg text-muted hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy md:hidden"
+          aria-label="Close navigation"
+          onClick={onClose}
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+      <nav id="main-navigation" aria-label="Main navigation" onClick={onNavigate}>
         <NavLink
           to="/"
           end
           className={({ isActive }) =>
-            `flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
+            `flex min-h-touch items-center gap-3 rounded-lg px-3 text-base font-semibold ${
               isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
             }`
           }
         >
           <LayoutDashboard aria-hidden="true" size={20} />
-          <span className="hidden sm:inline">Dashboard</span>
+          <span>Dashboard</span>
         </NavLink>
         {user ? (
           <>
@@ -47,15 +103,15 @@ export function Sidebar() {
               to="/accounts"
               end
               className={({ isActive }) =>
-                `mt-2 flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
+                `mt-2 flex min-h-touch items-center gap-3 rounded-lg px-3 text-base font-semibold ${
                   isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
                 }`
               }
             >
               <BriefcaseBusiness aria-hidden="true" size={20} />
-              <span className="sr-only sm:not-sr-only">Demat accounts</span>
+              <span>Demat accounts</span>
             </NavLink>
-            <div className="hidden pl-5 sm:block">
+            <div className="pl-5">
               <NavLink
                 to="/accounts/list"
                 className={({ isActive }) =>
@@ -90,15 +146,15 @@ export function Sidebar() {
             <NavLink
               to="/applications"
               className={({ isActive }) =>
-                `mt-2 flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
+                `mt-2 flex min-h-touch items-center gap-3 rounded-lg px-3 text-base font-semibold ${
                   isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
                 }`
               }
             >
               <ClipboardList aria-hidden="true" size={20} />
-              <span className="sr-only sm:not-sr-only">Applications</span>
+              <span>Applications</span>
             </NavLink>
-            <div className="hidden pl-5 sm:block">
+            <div className="pl-5">
               <NavLink to="/applications/list" className={applicationNavClass}>
                 Application table
               </NavLink>
@@ -115,15 +171,15 @@ export function Sidebar() {
             <NavLink
               to="/ipos"
               className={({ isActive }) =>
-                `mt-2 flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
+                `mt-2 flex min-h-touch items-center gap-3 rounded-lg px-3 text-base font-semibold ${
                   isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
                 }`
               }
             >
               <CalendarDays aria-hidden="true" size={20} />
-              <span className="sr-only sm:not-sr-only">IPOs</span>
+              <span>IPOs</span>
             </NavLink>
-            <div className="hidden pl-5 sm:block">
+            <div className="pl-5">
               <NavLink
                 to="/ipo-calendar"
                 className={({ isActive }) =>
@@ -198,25 +254,25 @@ export function Sidebar() {
             <NavLink
               to="/profile"
               className={({ isActive }) =>
-                `mt-2 flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
+                `mt-2 flex min-h-touch items-center gap-3 rounded-lg px-3 text-base font-semibold ${
                   isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
                 }`
               }
             >
               <UserRound aria-hidden="true" size={20} />
-              <span className="hidden sm:inline">Profile</span>
+              <span>Profile</span>
             </NavLink>
           </>
         ) : (
           <div className="mt-2 space-y-1">
             <NavLink
-              className="flex min-h-touch items-center justify-center rounded-lg px-3 font-semibold text-muted hover:bg-canvas sm:justify-start"
+              className="flex min-h-touch items-center rounded-lg px-3 font-semibold text-muted hover:bg-canvas"
               to="/login"
             >
               <span>Sign in</span>
             </NavLink>
             <NavLink
-              className="flex min-h-touch items-center justify-center rounded-lg px-3 font-semibold text-muted hover:bg-canvas sm:justify-start"
+              className="flex min-h-touch items-center rounded-lg px-3 font-semibold text-muted hover:bg-canvas"
               to="/register"
             >
               <span>Create account</span>
@@ -227,14 +283,15 @@ export function Sidebar() {
       {user ? (
         <button
           type="button"
-          className="mt-auto flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-sm font-semibold text-muted hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy sm:justify-start"
+          className="mt-auto flex min-h-touch items-center gap-3 rounded-lg px-3 text-sm font-semibold text-muted hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
           onClick={() => {
+            onNavigate();
             setSignOutError(false);
             void signOut().catch(() => setSignOutError(true));
           }}
         >
           <LogOut aria-hidden="true" size={20} />
-          <span className="hidden sm:inline">Sign out</span>
+          <span>Sign out</span>
         </button>
       ) : null}
       {signOutError ? (

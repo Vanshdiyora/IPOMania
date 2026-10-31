@@ -212,22 +212,38 @@ test("dashboard exposes analytics, filters and downloadable reports", async ({ p
   await expect(page.getByLabel("Category filter")).toHaveValue("RETAIL");
 });
 
-test("dashboard remains usable on a narrow viewport with accessible filters", async ({ page }) => {
+test("dashboard remains usable across responsive viewports with accessible filters", async ({
+  page,
+}, testInfo) => {
   await prepareDashboard(page);
-  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Dashboard & analytics" })).toBeVisible();
-  await expect(page.getByLabel("From date")).toBeVisible();
-  await expect(page.getByLabel("To date")).toBeVisible();
-  await expect(page.getByLabel("IPO filter")).toBeVisible();
-  await expect(page.getByLabel("Category filter")).toBeVisible();
-  await expect(page.getByLabel("Demat account filter")).toBeVisible();
-  const widths = await page.evaluate(() => ({
-    viewport: document.documentElement.clientWidth,
-    document: document.documentElement.scrollWidth,
-  }));
-  expect(widths.document).toBeLessThanOrEqual(widths.viewport);
+  for (const viewport of [
+    { width: 320, height: 720 },
+    { width: 375, height: 812 },
+    { width: 430, height: 932 },
+    { width: 768, height: 1024 },
+    { width: 1366, height: 768 },
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await expect(page.getByRole("heading", { name: "Dashboard & analytics" })).toBeVisible();
+    await expect(page.getByLabel("From date")).toBeVisible();
+    await expect(page.getByLabel("To date")).toBeVisible();
+    await expect(page.getByLabel("IPO filter")).toBeVisible();
+    await expect(page.getByLabel("Category filter")).toBeVisible();
+    await expect(page.getByLabel("Demat account filter")).toBeVisible();
+    const widths = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      document: document.documentElement.scrollWidth,
+    }));
+    expect(widths.document).toBeLessThanOrEqual(widths.viewport);
+    await testInfo.attach(`dashboard-${viewport.width}.png`, {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
+  }
 });
 
 test("dashboard marks aggregate metrics unavailable when analytics fails", async ({ page }) => {
