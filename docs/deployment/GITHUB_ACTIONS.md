@@ -16,7 +16,8 @@ variables in GitHub:
 - `CLOUDFLARE_API_TOKEN`: an account-scoped Cloudflare API token with the **Edit Cloudflare Workers**
   permission, limited to the account that hosts this Worker.
 - `CLOUDFLARE_ACCOUNT_ID`: the ID of that Cloudflare account.
-- `VITE_SUPABASE_URL`: the Supabase project URL used by the frontend.
+- `VITE_SUPABASE_URL`: the Supabase project base URL used by the frontend (for example,
+  `https://<project-ref>.supabase.co`); do not append `/rest/v1` or `/auth/v1`.
 - `VITE_SUPABASE_ANON_KEY`: the Supabase publishable/anon key used by the frontend. This is
   intentionally public in browser code; never use the service-role key here.
 
