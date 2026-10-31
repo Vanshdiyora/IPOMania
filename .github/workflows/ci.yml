@@ -21,8 +21,8 @@ jobs:
         with:
           version: latest
 
-      - name: Start local Supabase
-        run: supabase start
+      - name: Start local Supabase database
+        run: supabase db start
 
       - name: Test database row-level security
         run: supabase test db
@@ -63,3 +63,67 @@ jobs:
 
       - name: Audit dependencies
         run: npm audit --audit-level=high
+
+  deploy-worker:
+    name: Deploy API Worker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [database-security, quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy API Worker
+        working-directory: workers/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm exec -- wrangler deploy --keep-vars --var RUNTIME_ENV:production
+
+  deploy-frontend:
+    name: Deploy frontend
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [deploy-worker]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate frontend configuration
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$VITE_SUPABASE_URL" || { echo "::error::Set the VITE_SUPABASE_URL Actions variable."; exit 1; }
+          test -n "$VITE_SUPABASE_ANON_KEY" || { echo "::error::Set the VITE_SUPABASE_ANON_KEY Actions variable."; exit 1; }
+
+      - name: Build frontend
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build:web
+
+      - name: Deploy frontend Worker
+        working-directory: workers/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm exec -- wrangler deploy --config ../../apps/web/wrangler.toml
