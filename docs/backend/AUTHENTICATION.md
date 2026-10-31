@@ -2,8 +2,8 @@
 
 ## Provider and configuration
 
-Supabase Auth owns credentials, email verification, password recovery, sessions, refresh, and user
-deletion. The browser uses the public project URL and anon key (`VITE_SUPABASE_URL` and
+Supabase Auth owns credentials, password recovery, sessions, refresh, and user deletion. The
+browser uses the public project URL and anon key (`VITE_SUPABASE_URL` and
 `VITE_SUPABASE_ANON_KEY`); these values are intended to be public. The Worker uses
 `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Configure `SUPABASE_SERVICE_ROLE_KEY` only as a secret
 Worker binding for the isolated account-deletion operation. Never expose it to Vite or a browser.
@@ -12,10 +12,11 @@ Both URL variables must be the Supabase project base URL (for example,
 their own API paths.
 
 Set `WEB_APP_ORIGIN` to the exact production web origin to allow API CORS requests, and
-`VITE_WEB_APP_ORIGIN` to the exact production web origin for auth email redirects. In the hosted
-Supabase project's **Authentication → URL Configuration**, set the Site URL to the production web
-origin and add `/auth/confirm` and `/reset-password` callback URLs to the Redirect URLs allowlist.
-The deployment environment is independent of the local Supabase CLI configuration.
+`VITE_WEB_APP_ORIGIN` to the exact production web origin for password-reset redirects. In the
+hosted Supabase project's **Authentication → URL Configuration**, set the Site URL to the
+production web origin and add `/reset-password` to the Redirect URLs allowlist. Email
+confirmation is disabled for this app, so `/auth/confirm` is not required. The deployment
+environment is independent of the local Supabase CLI configuration.
 For local development, set the public `VITE_` variables and Worker bindings in the repository-root
 `.env`; Vite exposes only `VITE_` variables, and the local Wrangler command loads the file for the
 API. Do not commit the file. Use hosted Supabase credentials to connect to the hosted project, or
@@ -23,8 +24,9 @@ the values reported by `supabase status` to use the local Supabase stack.
 
 ## User flows
 
-- Registration uses email and password, requires a 12-character minimum, and sends a PKCE email
-  verification link. A database trigger provisions the profile and preferences.
+- Registration uses email and password, requires a 12-character minimum, and creates the account
+  immediately without email confirmation. A database trigger provisions the profile and
+  preferences.
 - Login uses Supabase `signInWithPassword`. Supabase persists the browser session and refreshes
   tokens; protected routes wait for initial session restoration.
 - Forgot password returns a non-enumerating success message and sends a recovery link. Reset
