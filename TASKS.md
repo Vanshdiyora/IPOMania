@@ -146,7 +146,40 @@ Phase 7 does not include application submission/allotment workflows or changes t
 business logic. The Phase 3 database/RLS, concurrency, secret-history, hosted-configuration, and CI
 gates remain open.
 
-## Phase 8 — Final integrated audit
+## Phase 8 — Parallel QA, security, and testing infrastructure
+
+- [x] Read `AGENTS.md`, `PROJECT_STATUS.md`, and `TASKS.md`; create and work on the isolated
+      `feature/phase-8` branch.
+- [x] Fast-forward the Phase 8 branch to the latest shared main, including integrated Phase 7,
+      without editing Phase 5/6/7 business logic or shared migrations.
+- [x] Add React Testing Library, user-event, jsdom, axe-core, Vitest setup/coverage, and Playwright
+      browser CI execution.
+- [x] Add synthetic financial factories, reusable mocked Supabase API helpers, and explicit
+      loopback-only database URL safeguards for opt-in integration tests.
+- [x] Add or extend tests for keyboard/axe accessibility, React text escaping, auth boundaries,
+      owner scoping, SQL-like filter values, file upload size/type, caller-JWT/anon-key forwarding,
+      and decimal capital reconciliation through the existing financial engine.
+- [x] Create/update the requested strategy, unit, integration, E2E, security, performance, and test
+      coverage documentation.
+- [x] Run full Vitest (111 passed, 2 skipped), local pgTAP (144/144), Playwright (13/13 including
+      four WCAG-tagged axe scans), coverage, lint, typecheck, and both production builds.
+- [x] Run targeted Prettier on touched supported source/docs; repository-wide format check remains
+      blocked by 117 files of baseline formatting debt.
+- [x] Run dependency audit: no high/critical findings; 20 moderate advisories remain in existing
+      toolchain dependency trees.
+- [ ] Resolve the existing dependency advisories without introducing a breaking toolchain change.
+- [ ] Add workload benchmarks for 1,000/5,000 applications and dashboard queries; record only
+      measurements actually obtained against an isolated test database.
+- [ ] Run opt-in two-transaction account-capacity and application-reference concurrency tests
+      against a disposable loopback database; both currently skip without `DEMAT_TEST_DATABASE_URL`.
+- [ ] Complete the final integrated security and accessibility audit after all parallel changes
+      are merged; do not certify production readiness in this preparation stage.
+
+Phase 8 remains in preparation until the open checks and integrated audit are complete. The Phase 3
+database/concurrency/format gates and hosted/CI gates remain open. Local Phase 6 capital pgTAP has
+now passed as part of the full 144-assertion database run.
+
+### Phase 8 final integrated audit gate
 
 - [ ] Pass and record the final integrated audit; this remains a mandatory production-deployment
       gate and is not completed by Phase 9 preparation.

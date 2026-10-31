@@ -71,8 +71,8 @@ export function Sidebar({
         >
           <span aria-hidden="true" className="text-xl">
             IPO
-          </span>
-          <span>IPO Mania</span>
+          </span>{" "}
+          <span>Mania</span>
         </a>
         <button
           ref={closeButtonRef}
@@ -102,7 +102,6 @@ export function Sidebar({
             <NavLink
               to="/accounts"
               end
-              aria-label="Demat account dashboard"
               className={({ isActive }) =>
                 `mt-2 flex min-h-touch items-center gap-3 rounded-lg px-3 text-base font-semibold ${
                   isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
@@ -146,7 +145,6 @@ export function Sidebar({
             </div>
             <NavLink
               to="/applications"
-              aria-label="IPO application manager"
               className={({ isActive }) =>
                 `mt-2 flex min-h-touch items-center gap-3 rounded-lg px-3 text-base font-semibold ${
                   isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
@@ -172,7 +170,6 @@ export function Sidebar({
             </div>
             <NavLink
               to="/ipos"
-              aria-label="IPO management"
               className={({ isActive }) =>
                 `mt-2 flex min-h-touch items-center gap-3 rounded-lg px-3 text-base font-semibold ${
                   isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"

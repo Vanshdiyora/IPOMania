@@ -1,24 +1,14 @@
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getLoopbackTestDatabaseUrl } from "../helpers/database";
 
-const databaseUrl = process.env.DEMAT_TEST_DATABASE_URL;
-const isLoopbackDatabase = (() => {
-  if (!databaseUrl) return false;
-  const hostname = new URL(databaseUrl).hostname;
-  return ["localhost", "127.0.0.1", "::1"].includes(hostname);
-})();
+const databaseUrl = getLoopbackTestDatabaseUrl("DEMAT_TEST_DATABASE_URL");
 
 describe.skipIf(!databaseUrl)("demat account capacity concurrency", () => {
   let sql: ReturnType<typeof postgres>;
   let userId: string;
 
   beforeAll(async () => {
-    if (!isLoopbackDatabase) {
-      throw new Error(
-        "DEMAT_TEST_DATABASE_URL must point to a loopback-only isolated test database.",
-      );
-    }
-
     sql = postgres(databaseUrl!, { max: 2, connect_timeout: 5 });
     const [user] = await sql<{ id: string }[]>`
       insert into auth.users (

@@ -23,6 +23,23 @@ afterEach(() => {
 });
 
 describe("protected API authentication", () => {
+  it.each([
+    "/api/me/profile",
+    "/api/me/preferences",
+    "/api/accounts",
+    "/api/ipos",
+    "/api/applications",
+    "/api/capital/summary",
+  ])("rejects an unauthenticated request to %s", async (path) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await createApp().request(path, undefined, bindings);
+
+    expect(response.status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("rejects a missing bearer token without contacting Supabase", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -123,9 +140,12 @@ describe("protected API authentication", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ data: { id: userId } });
+    const body = await response.text();
+    expect(JSON.parse(body)).toMatchObject({ data: { id: userId } });
     expect(requestedUrls.some((url) => url.includes(`id=eq.${userId}`))).toBe(true);
     expect(requestedUrls.some((url) => url.includes(otherUserId))).toBe(false);
+    expect(body).not.toContain("service_role");
+    expect(body).not.toContain("secret");
   });
 
   it("rejects a forged user_id in profile updates before database access", async () => {

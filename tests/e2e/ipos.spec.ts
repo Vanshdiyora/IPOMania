@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { auditAccessibility } from "./accessibility";
 
 const userId = "11111111-1111-4111-8111-111111111111";
 const ipoId = "88888888-8888-4888-8888-888888888888";
@@ -103,6 +104,12 @@ test("IPO list and details show user-entered provenance and rule setup links", a
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Configure categories" })).toBeVisible();
   await expect(page.getByText("Rules not configured").first()).toBeVisible();
+});
+
+test("IPO list passes automated WCAG 2.2 AA checks", async ({ page }) => {
+  await prepareAuthenticatedPage(page);
+  await page.goto("/ipos");
+  expect(await auditAccessibility(page)).toEqual([]);
 });
 
 test("category configuration keeps unknown rules explicit", async ({ page }) => {

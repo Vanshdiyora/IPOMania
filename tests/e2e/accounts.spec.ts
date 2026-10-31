@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { auditAccessibility } from "./accessibility";
 
 const account = {
   id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -88,4 +89,11 @@ test("account list renders the TanStack table on desktop", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Account list" })).toBeVisible();
   await expect(page.getByRole("table").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Asha Mehta" })).toBeVisible();
+});
+
+test("account list passes automated WCAG 2.2 AA checks", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await prepareAccountPage(page);
+  await page.goto("/accounts/list");
+  expect(await auditAccessibility(page)).toEqual([]);
 });
