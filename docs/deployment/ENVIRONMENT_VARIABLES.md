@@ -8,9 +8,9 @@ with `VITE_` to browser code. Never put secrets in `VITE_` variables.
 | --------------------------- | ------------------------------ | ---------------------- | ----------------------------------------------------------------- |
 | `RUNTIME_ENV`               | Worker                         | No                     | `development`, `test`, or `production`; defaults to `development` |
 | `VITE_API_BASE_URL`         | Web                            | No                     | Worker API base URL                                               |
-| `VITE_SUPABASE_URL`         | Web                            | Yes for authentication | Public Supabase project URL                                       |
+| `VITE_SUPABASE_URL`         | Web                            | Yes for authentication | Public project base URL; do not append `/rest/v1` or `/auth/v1`   |
 | `VITE_SUPABASE_ANON_KEY`    | Web                            | Yes for authentication | Public anon key, intended for browser use                         |
-| `SUPABASE_URL`              | Worker/database tooling        | Yes for authentication | Supabase project URL; validate before use                         |
+| `SUPABASE_URL`              | Worker/database tooling        | Yes for authentication | Project base URL; do not append `/rest/v1` or `/auth/v1`           |
 | `SUPABASE_ANON_KEY`         | Worker/database tooling        | Yes for authentication | Public key for user-scoped operations                             |
 | `SUPABASE_SERVICE_ROLE_KEY` | Worker                         | Account deletion only  | Secret binding isolated to verified account deletion              |
 | `WEB_APP_ORIGIN`            | Worker                         | Production             | Exact web origin permitted by API CORS                            |

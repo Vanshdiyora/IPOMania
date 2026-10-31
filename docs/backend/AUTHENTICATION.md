@@ -7,6 +7,9 @@ deletion. The browser uses the public project URL and anon key (`VITE_SUPABASE_U
 `VITE_SUPABASE_ANON_KEY`); these values are intended to be public. The Worker uses
 `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Configure `SUPABASE_SERVICE_ROLE_KEY` only as a secret
 Worker binding for the isolated account-deletion operation. Never expose it to Vite or a browser.
+Both URL variables must be the Supabase project base URL (for example,
+`https://<project-ref>.supabase.co`), with no `/rest/v1` or `/auth/v1` path. Supabase clients add
+their own API paths.
 
 Set `WEB_APP_ORIGIN` to the exact production web origin to allow API CORS requests. Add the web
 origin and `/auth/confirm` and `/reset-password` callback paths to the Supabase Auth URL allowlist.
