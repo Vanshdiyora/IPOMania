@@ -355,7 +355,7 @@ begin
   select a.application_amount into application_amount
   from public.applications a
   where a.id = new.application_id and a.user_id = new.user_id;
-  if not found or new.mandate_amount > application_amount then
+  if found and new.mandate_amount > application_amount then
     raise exception using errcode = '23514', message = 'Mandate amount must not exceed the application value.';
   end if;
 
@@ -839,9 +839,16 @@ revoke all on public.applications, public.mandates, public.allotments,
   public.allotment_history, public.capital_ledger from public, anon, authenticated;
 grant select, insert (user_id, ipo_id, demat_account_id, category_configuration_id,
   quota_calculation_id, category, rule_version, lot_size, issue_price_min, issue_price_max,
-  cut_off_price, lots, shares, price_type, price, application_amount, currency)
+  cut_off_price, category_id, lots, shares, total_shares, price_type, price,
+  application_amount, application_number, external_reference, submission_date,
+  application_status, mandate_status, allotment_status, notes, calculation_snapshot,
+  currency)
   on public.applications to authenticated;
 grant select on public.applications to authenticated;
+grant update (
+  application_number, external_reference, submission_date, application_status, mandate_status,
+  allotment_status, notes, archived_at
+) on public.applications to authenticated;
 grant select on public.mandates to authenticated;
 grant insert (user_id, application_id, mandate_reference, mandate_amount, mandate_status, notes)
   on public.mandates to authenticated;
