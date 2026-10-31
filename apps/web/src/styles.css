@@ -37,6 +37,33 @@ body {
 }
 
 button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+img,
+svg,
+canvas {
+  max-width: 100%;
+}
+
+main,
+section,
+article {
+  min-width: 0;
+}
+
+@media (max-width: 639px) {
+  h1 {
+    overflow-wrap: anywhere;
+    font-size: clamp(1.5rem, 7vw, 1.875rem);
+    line-height: 1.2;
+  }
+}
+
+button,
 a {
   -webkit-tap-highlight-color: transparent;
 }
