@@ -156,12 +156,22 @@ for (const viewport of viewports.filter(({ width }) => width < 768)) {
     await expect(menuButton).toHaveAttribute("aria-expanded", "false");
     await menuButton.click();
     await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Create account" })).toBeVisible();
     await expect(
-      page.getByRole("complementary").getByRole("button", { name: "Close navigation" }),
+      page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", {
+        name: "Dashboard",
+      }),
     ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Create account" })).toBeVisible();
+    const drawerCloseButton = page
+      .getByRole("dialog", { name: "Mobile navigation" })
+      .getByRole("button", {
+        name: "Close navigation",
+      });
+    await expect(drawerCloseButton).toBeVisible();
+    await expect(drawerCloseButton).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("navigation", { name: "Main navigation" })).not.toBeVisible();
+    await expect(page.getByRole("button", { name: "Open navigation" })).toBeFocused();
 
     await page.getByRole("button", { name: "Open navigation" }).click();
     await page

@@ -7,7 +7,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useAuth } from "../../auth/useAuth";
 
 const applicationNavClass = ({ isActive }: { isActive: boolean }) =>
@@ -26,9 +26,39 @@ export function Sidebar({
 }) {
   const { user, signOut } = useAuth();
   const [signOutError, setSignOutError] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (mobileOpen) closeButtonRef.current?.focus();
+  }, [mobileOpen]);
+
+  function keepFocusInDrawer(event: KeyboardEvent<HTMLElement>) {
+    if (!mobileOpen || event.key !== "Tab" || !sidebarRef.current) return;
+
+    const focusable = sidebarRef.current.querySelectorAll<HTMLElement>(
+      "a[href], button:not([disabled])",
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first || !last) return;
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 
   return (
     <aside
+      ref={sidebarRef}
+      role={mobileOpen ? "dialog" : undefined}
+      aria-modal={mobileOpen ? true : undefined}
+      aria-label={mobileOpen ? "Mobile navigation" : undefined}
+      onKeyDown={keepFocusInDrawer}
       className={`${
         mobileOpen ? "fixed inset-y-0 left-0 z-50 flex w-[min(20rem,85vw)]" : "hidden"
       } min-w-0 shrink-0 flex-col overflow-y-auto border-r border-border bg-white px-4 py-4 md:static md:z-auto md:flex md:w-64 md:overflow-visible md:px-4 md:py-5`}
@@ -45,6 +75,7 @@ export function Sidebar({
           <span>IPO Mania</span>
         </a>
         <button
+          ref={closeButtonRef}
           type="button"
           className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-lg text-muted hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy md:hidden"
           aria-label="Close navigation"
@@ -64,7 +95,7 @@ export function Sidebar({
           }
         >
           <LayoutDashboard aria-hidden="true" size={20} />
-          <span className="hidden sm:inline">Dashboard</span>
+          <span>Dashboard</span>
         </NavLink>
         {user ? (
           <>

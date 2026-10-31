@@ -1,13 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 
 export function AppLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuWasOpen = useRef(false);
+  const pageContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!mobileMenuOpen) return;
+    if (mobileMenuOpen) {
+      pageContentRef.current?.setAttribute("inert", "");
+    } else {
+      pageContentRef.current?.removeAttribute("inert");
+    }
+
+    if (!mobileMenuOpen) {
+      if (menuWasOpen.current) menuButtonRef.current?.focus();
+      menuWasOpen.current = false;
+      return;
+    }
+
+    menuWasOpen.current = true;
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") setMobileMenuOpen(false);
@@ -32,9 +47,10 @@ export function AppLayout() {
         onNavigate={() => setMobileMenuOpen(false)}
         onClose={() => setMobileMenuOpen(false)}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div ref={pageContentRef} className="flex min-w-0 flex-1 flex-col">
         <Header
           mobileMenuOpen={mobileMenuOpen}
+          menuButtonRef={menuButtonRef}
           onMenuToggle={() => setMobileMenuOpen((open) => !open)}
         />
         <main
