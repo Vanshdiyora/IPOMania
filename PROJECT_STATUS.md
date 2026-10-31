@@ -247,3 +247,36 @@ concurrency runs, performance measurements, and final integrated CI/security aud
 The dependency audit reports 20 moderate advisories and no high/critical findings. See
 [`docs/testing/TESTING_STRATEGY.md`](docs/testing/TESTING_STRATEGY.md) and
 [`docs/testing/TEST_COVERAGE.md`](docs/testing/TEST_COVERAGE.md).
+
+### Phase 8 final integrated audit gate
+
+**Status: Not passed; production deployment remains blocked.**
+
+The final integrated audit has not been recorded as passed in this repository. Phase 9 deployment
+preparation does not substitute for that audit or clear the Phase 3 database/RLS, concurrency,
+secret-history, hosted-configuration, or formatting gates. Production deployment also requires
+explicit approval through the protected GitHub `production` environment.
+
+## Phase 9 — Parallel deployment preparation
+
+**Status: Deployment-only preparation drafted; provider configuration and release gates remain
+unverified.**
+
+The deployment configuration now separates preview and production Cloudflare Workers for the
+Hono API and Workers Static Assets frontend. Pull-request CI has no deployment secrets, automatic
+deployment on pushes to `main` has been removed, preview deployment requires manual dispatch, and
+production deployment is restricted to `main`, requires Phase 8 confirmation, and must use a
+reviewer-protected GitHub environment. CodeQL and dependency scanning are configured. Deployment,
+environment, migration, free-tier, backup/recovery, and monitoring procedures are documented.
+
+The selected hosting design continues to use Workers Static Assets and a same-origin API service
+binding; a separate Cloudflare Pages runtime was not added because it would change the approved
+architecture. No production deployment, hosted Supabase migration, custom domain, monitoring
+provider, or backup/restore has been activated or verified.
+
+Provider-side GitHub environment protections, Cloudflare variables/secrets, Supabase settings,
+custom domains, health checks, and backup/restore verification still require authorized setup and
+independent verification. The workflows have not been dispatched against Cloudflare. Do not mark
+Phase 9 complete or deploy production until the Phase 8 final integrated audit has passed and
+production deployment is explicitly approved. No Phase 5–8 business logic or shared migration was
+changed for this preparation.

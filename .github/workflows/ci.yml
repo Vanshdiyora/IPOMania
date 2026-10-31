@@ -27,6 +27,27 @@ jobs:
       - name: Test database row-level security
         run: supabase test db
 
+      - name: Set up Node.js for integration tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies for integration tests
+        run: npm ci
+
+      - name: Run loopback-only database concurrency tests
+        shell: bash
+        run: |
+          db_url="$(supabase status -o env | sed -n 's/^DB_URL=//p' | tr -d '"')"
+          test -n "$db_url" || { echo "::error::Could not obtain the local Supabase DB_URL."; exit 1; }
+          case "$db_url" in
+            *127.0.0.1*|*localhost*) ;;
+            *) echo "::error::Refusing to run database tests against a non-loopback host."; exit 1 ;;
+          esac
+          DEMAT_TEST_DATABASE_URL="$db_url" npm run test:integration:accounts
+          DEMAT_TEST_DATABASE_URL="$db_url" npm run test:integration:applications
+
   quality:
     name: Quality and build
     runs-on: ubuntu-latest
@@ -63,7 +84,6 @@ jobs:
 
       - name: Audit dependencies
         run: npm audit --audit-level=high
-
   browser-tests:
     name: Browser and accessibility tests
     runs-on: ubuntu-latest
@@ -87,70 +107,3 @@ jobs:
         run: npm run test:e2e
         env:
           CI: "true"
-
-  deploy-worker:
-    name: Deploy API Worker
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [database-security, quality, browser-tests]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Cloudflare Worker
-        run: npm run build:api
-
-      - name: Deploy API Worker
-        working-directory: workers/api
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npm exec -- wrangler deploy --keep-vars --var RUNTIME_ENV:production
-
-  deploy-frontend:
-    name: Deploy frontend
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [deploy-worker]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate frontend configuration
-        env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-        run: |
-          test -n "$VITE_SUPABASE_URL" || { echo "::error::Set the VITE_SUPABASE_URL Actions variable."; exit 1; }
-          test -n "$VITE_SUPABASE_ANON_KEY" || { echo "::error::Set the VITE_SUPABASE_ANON_KEY Actions variable."; exit 1; }
-
-      - name: Build frontend
-        env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-        run: npm run build:web
-
-      - name: Deploy frontend Worker
-        working-directory: workers/api
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npm exec -- wrangler deploy --config ../../apps/web/wrangler.toml

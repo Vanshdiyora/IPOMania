@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --ip 127.0.0.1 --port 8787 --env-file ../../.env",
-    "build": "wrangler deploy --dry-run --outdir dist"
+    "build": "wrangler deploy --dry-run --outdir dist --env=\"\""
   },
   "dependencies": {
     "@hono/zod-validator": "0.9.1",
