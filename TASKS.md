@@ -145,3 +145,38 @@ expectation mismatch, and import fixture/grant issues; these remain outside the 
 Phase 7 does not include application submission/allotment workflows or changes to Phase 5/6
 business logic. The Phase 3 database/RLS, concurrency, secret-history, hosted-configuration, and CI
 gates remain open.
+
+## Phase 8 — Final integrated audit
+
+- [ ] Pass and record the final integrated audit; this remains a mandatory production-deployment
+      gate and is not completed by Phase 9 preparation.
+
+## Phase 9 — Parallel deployment preparation
+
+- [x] Read repository guidance, architecture, existing deployment workflows, environment docs,
+      Supabase configuration, and migration guidance.
+- [x] Preserve the Workers Static Assets frontend and Hono API service-binding architecture with
+      separate preview and production Worker environments.
+- [x] Remove automatic production deployment from pushes to `main`.
+- [x] Add secret-free pull-request CI, manual trusted preview deployment, and manually dispatched
+      production deployment gated to `main`, Phase 8 confirmation, and a protected GitHub
+      environment.
+- [x] Add TypeScript CodeQL and dependency audit scanning; add local Supabase RLS and loopback-only
+      integration concurrency test jobs.
+- [x] Document environment variables and secret handling, CORS, domains/HTTPS, health checks,
+      migration rollout, RLS/index validation, cost limits, backup/recovery, and incident response.
+- [ ] Configure and verify GitHub preview/production environment protections and environment-scoped
+      secrets/variables with authorized maintainers.
+- [ ] Verify Cloudflare preview/production Worker bindings, environment variables, domains,
+      certificates, and health endpoints without deploying production.
+- [ ] Verify the actual Supabase plan, hosted Auth configuration, migration state, backup settings,
+      and an isolated restore drill.
+- [ ] Pass Phase 8's final integrated audit and obtain explicit production deployment approval
+      before any production workflow dispatch.
+- [ ] Run and record every repository-mandated format, lint, type, test, and build check. Do not
+      claim the existing Phase 3 repository-wide formatting or database/RLS/concurrency gates pass
+      unless independently verified.
+
+Phase 9 is deployment preparation only. No production deployment, hosted migration, active
+monitoring, or verified backup is claimed. No Phase 5–8 business logic or shared migration is in
+scope.

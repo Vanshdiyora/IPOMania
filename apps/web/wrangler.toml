@@ -12,3 +12,19 @@ run_worker_first = ["/api/*"]
 [[services]]
 binding = "API"
 service = "ipo-mania-api"
+
+[env.preview]
+name = "ipo-mania-web-preview"
+workers_dev = true
+
+[[env.preview.services]]
+binding = "API"
+service = "ipo-mania-api-preview"
+
+[env.production]
+name = "ipo-mania-web"
+workers_dev = true
+
+[[env.production.services]]
+binding = "API"
+service = "ipo-mania-api"
