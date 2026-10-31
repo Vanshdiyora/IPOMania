@@ -227,3 +227,21 @@ test("dashboard remains usable on a narrow viewport with accessible filters", as
   }));
   expect(widths.document).toBeLessThanOrEqual(widths.viewport);
 });
+
+test("dashboard marks aggregate metrics unavailable when analytics fails", async ({ page }) => {
+  await prepareDashboard(page);
+  await page.unroute(/\/api\/analytics(?:\?.*)?$/);
+  await page.route(/\/api\/analytics(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "INTERNAL_ERROR", message: "Analytics unavailable" } }),
+    }),
+  );
+  await page.goto("/");
+
+  await expect(page.getByRole("alert")).toContainText("Analytics unavailable");
+  await expect(
+    page.getByRole("region", { name: "Dashboard totals" }).getByText("Unavailable").first(),
+  ).toBeVisible();
+});

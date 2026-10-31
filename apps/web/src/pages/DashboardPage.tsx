@@ -161,6 +161,12 @@ export function DashboardPage() {
     accountOptionsQuery.isLoading;
   const optionsError = ipoOptionsQuery.error ?? accountOptionsQuery.error;
 
+  function analyticsCount(value: number | undefined): string {
+    if (analyticsQuery.isLoading) return "Loading…";
+    if (analyticsQuery.error || value === undefined) return "Unavailable";
+    return String(value);
+  }
+
   function updateFilter(key: keyof Filters, value: string) {
     setFilters((current) => ({ ...current, [key]: value }));
   }
@@ -317,22 +323,22 @@ export function DashboardPage() {
       >
         <MetricCard
           label="IPO applications"
-          value={loading ? "Loading…" : String(analytics?.totals.applications ?? 0)}
+          value={analyticsCount(analytics?.totals.applications)}
           detail="Active, non-archived records"
         />
         <MetricCard
           label="Active demat accounts"
-          value={loading ? "Loading…" : String(analytics?.totals.active_demat_accounts ?? 0)}
+          value={analyticsCount(analytics?.totals.active_demat_accounts)}
           detail="Current active accounts"
         />
         <MetricCard
           label="IPOs tracked"
-          value={loading ? "Loading…" : String(analytics?.totals.tracked_ipos ?? 0)}
+          value={analyticsCount(analytics?.totals.tracked_ipos)}
           detail="Active, non-archived records"
         />
         <MetricCard
           label="Allotments"
-          value={loading ? "Loading…" : String(analytics?.allotment_performance.total ?? 0)}
+          value={analyticsCount(analytics?.allotment_performance.total)}
           detail="Recorded outcomes"
         />
         <MetricCard
@@ -353,7 +359,7 @@ export function DashboardPage() {
         />
         <MetricCard
           label="Pending refunds"
-          value={loading ? "Loading…" : String(analytics?.refund_performance.pending ?? 0)}
+          value={analyticsCount(analytics?.refund_performance.pending)}
           detail="Recorded allotments awaiting refund"
         />
       </section>
@@ -419,7 +425,9 @@ export function DashboardPage() {
             <p className="mt-2 text-muted">
               {capitalQuery.isLoading
                 ? "Loading capital summary…"
-                : "Unavailable: no capital records."}
+                : capitalQuery.error
+                  ? "Unavailable: capital summary could not be loaded."
+                  : "Unavailable: no capital records."}
             </p>
           </Card>
         )}

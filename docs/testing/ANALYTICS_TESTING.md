@@ -39,14 +39,16 @@ npm run test:e2e -- --grep dashboard
 ```
 
 The browser tests cover authenticated dashboard rendering, filters, report download, accessible
-labels/chart descriptions, and narrow-screen horizontal overflow. Existing UI tests and checks are
-listed in `docs/testing/FINANCIAL_TESTING.md` and `docs/testing/SECURITY_TESTING.md`.
+labels/chart descriptions, analytics-error handling, unavailable metric display, and narrow-screen
+horizontal overflow. Existing UI tests and checks are listed in
+`docs/testing/FINANCIAL_TESTING.md` and `docs/testing/SECURITY_TESTING.md`.
 
 ## Performance and known verification limits
 
 Dashboard totals and groupings are produced by one bounded PostgreSQL aggregation RPC rather than
 loading application rows into the browser. The existing indexes on owner/date/status dimensions
 are reused; this migration adds no index. The capital summary intentionally reuses the established
-Phase 6 decimal reconciliation endpoint and its canonical financial engine. No query plan or
-production-scale latency benchmark is claimed until the local PostgreSQL test environment is
-available and measured with representative data.
+Phase 6 decimal reconciliation endpoint and its canonical financial engine. The latest local
+5,000-row pgTAP run completed in 3 wall-clock seconds for the entire test file, including fixture
+setup; this is not isolated RPC latency. No query-plan or production-scale latency benchmark is
+claimed.

@@ -183,8 +183,7 @@ initiated, and mandates are never approved automatically.
 
 Automated unit and API tests cover mandate validation, allotment and refund rules, blocked versus
 debited capital, duplicate events, idempotency, and financial reconciliation. The migration also
-contains direct two-user pgTAP coverage; it has not been run in this workspace because the
-Supabase CLI and `psql` are unavailable.
+contains direct two-user pgTAP coverage; that test was not run as part of Phase 6 verification.
 
 ### Phase 6 verification in this workspace
 
@@ -193,5 +192,39 @@ Supabase CLI and `psql` are unavailable.
 - Repository-wide `npm run format:check` remains blocked by unformatted files, including
   pre-existing formatting debt outside Phase 6. Targeted Prettier checks passed for changed source
   and feature documentation.
-- Not run: `npm run test:security:db` (requires the unavailable Supabase CLI and local PostgreSQL).
+- Not run as Phase 6 verification: `supabase/tests/capital_management.test.sql`.
 - The Phase 3 local RLS/concurrency and repository-wide formatting gates remain open.
+
+## Phase 7 — Dashboard and analytics
+
+**Status: Implementation complete; focused, browser, PostgreSQL, unit, lint, type, and build
+checks pass. Repository-wide formatting and production-scale performance verification remain open.**
+
+The authenticated home dashboard now reports caller-owned IPO applications, account and IPO
+inventory, status/category/IPO/account/broker counts, trends, allotment/refund performance, recent
+activity, and upcoming closing dates. PostgreSQL aggregates the data through a bounded,
+invoker-rights RPC with explicit caller scoping and forced RLS. Capital-ledger totals remain
+separate by currency and event type; blocked capital, actual debits, allotment debits, refunds, and
+the canonical Phase 6 reconciled capital/P&L summaries are not combined or double-counted.
+Application groupings are counts only to avoid summing monetary values across currencies.
+Authenticated CSV and Excel exports use the active filters and escape formula-leading text.
+
+Phase 7 depends on the existing Phase 5 application/IPO/account/category records and Phase 6
+capital-ledger, refund, allotment, and capital-summary APIs. Phase 5 and Phase 6 business logic was
+not changed. No table or index was added; Phase 7 adds one analytics migration/function.
+
+### Phase 7 verification in this workspace
+
+- Passed: focused analytics validation/API tests (7/7), dashboard Playwright tests (3/3), and
+  direct local PostgreSQL/pgTAP analytics tests (11/11), including two-user isolation, date
+  boundaries, exact `NUMERIC` capital aggregation, empty data, and 5,000 application rows.
+- Passed: `npm run typecheck`, `npm run lint`, `npm test` (93 passed, 2 skipped),
+  `npm run build:api`, and `npm run build:web`.
+- Passed targeted Prettier checks for the changed/new feature source and feature documentation.
+  `PROJECT_STATUS.md` and `TASKS.md` remain among the files flagged by the repository-wide check,
+  which still fails on 128 files, primarily pre-existing files.
+- The 5,000-row pgTAP test completed as part of a 3-second local test-file run, including fixture
+  setup; this is not an isolated RPC latency or query-plan benchmark. The web build also reports
+  a 1.3 MB minified JavaScript bundle warning.
+- The Phase 3 local database/RLS, concurrency, secret-history, hosted configuration, and GitHub CI
+  gates remain open and are not represented as passed.

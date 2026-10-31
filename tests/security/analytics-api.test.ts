@@ -35,7 +35,19 @@ const analytics = {
   applications_by_broker: [],
   monthly_application_trends: [],
   capital_utilization_trends: [],
-  capital_event_totals: [],
+  capital_event_totals: [
+    {
+      currency: "INR",
+      capital_blocked: "123456789012345678901234.567891",
+      actual_debit: "0",
+      refund_received: "0",
+      capital_block_events: 1,
+      actual_debit_events: 0,
+      refund_receipt_events: 0,
+      listing_sales: 0,
+      listing_price_updates: 0,
+    },
+  ],
   allotment_performance: {
     total: 0,
     successful: 0,
@@ -176,9 +188,13 @@ describe("dashboard analytics API", () => {
     expect(summary).toContainEqual({ metric: "Allotment success rate (%)", value: "Unavailable" });
     const ipoRows = XLSX.utils.sheet_to_json(workbook.Sheets.IPO) as Array<{
       company_name: string;
-      count: string;
+      count: number;
     }>;
-    expect(ipoRows[0]?.company_name).toBe("'=Formula (FORMULA)");
-    expect(ipoRows[0]?.count).toBe("1");
+    expect(ipoRows[0]?.company_name).toBe("'=Formula");
+    expect(ipoRows[0]?.count).toBe(1);
+    const capitalRows = XLSX.utils.sheet_to_json(workbook.Sheets["Capital totals"]) as Array<{
+      capital_blocked: string;
+    }>;
+    expect(capitalRows[0]?.capital_blocked).toBe("123456789012345678901234.567891");
   });
 });
