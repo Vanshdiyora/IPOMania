@@ -6,7 +6,6 @@ import { registerSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
 import { AuthPage, FieldError } from "../auth/AuthPage";
 import { Button } from "../components/ui/Button";
-import { getAuthRedirectUrl } from "../lib/authRedirect";
 import { getSupabaseClient } from "../lib/supabase";
 
 type RegisterValues = z.infer<typeof registerSchema>;
@@ -29,11 +28,10 @@ export function RegisterPage() {
         password: values.password,
         options: {
           data: { full_name: values.fullName },
-          emailRedirectTo: getAuthRedirectUrl("/auth/confirm", window.location.origin),
         },
       });
       if (error) throw error;
-      setMessage("Check your email for a verification link to finish creating your account.");
+      setMessage("Account created successfully. You can now sign in.");
     } catch {
       setErrorMessage("We could not create your account. Check the details and try again.");
     }
