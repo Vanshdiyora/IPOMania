@@ -44,6 +44,11 @@ for authenticated clients, and clients cannot update/delete history or set the i
 blocked-capital consumption field. See [CAPITAL_LEDGER.md](./CAPITAL_LEDGER.md) and the direct
 two-user test `supabase/tests/capital_management.test.sql`.
 
+The Phase 7 migration adds no user-owned table. Its analytics RPC is `SECURITY INVOKER`, checks
+`auth.uid()`, is executable only by `authenticated`, and queries the forced-RLS tables using the
+caller's JWT context. It accepts no owner ID and is covered by the two-user
+`supabase/tests/dashboard_analytics.test.sql` test.
+
 ## Database verification
 
 Run `supabase start` followed by `npm run test:security:db`. The pgTAP suites execute as the

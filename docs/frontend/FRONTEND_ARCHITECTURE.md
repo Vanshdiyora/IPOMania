@@ -23,5 +23,13 @@ immutable category-rule configuration, and quota calculator. Category forms expo
 unknown/unpublished/configured states rather than applying defaults. Calculator results show
 validation reasons, source/rule version, calculation inputs, and a clear notice that self-reported
 shareholder conditions are not independently verified.
+
+The authenticated home route shows the responsive dashboard and analytics page. TanStack Query
+loads bounded PostgreSQL aggregates, the canonical Phase 6 capital summary, and paginated IPO and
+account filter options. Recharts visualizes status, category, IPO, account, monthly application,
+and per-currency ledger-event trends. Date, IPO, category, and account filters update the queries;
+CSV and Excel exports use the same filter selection. Signed-out users retain the public welcome
+page. Monetary totals remain decimal strings in cards and exports; chart-only number conversion is
+for approximate visual scale and is explicitly labeled.
 Routing errors and unmatched paths render the not-found page. Unhandled React rendering errors are
 logged locally and replaced by an accessible recovery view.

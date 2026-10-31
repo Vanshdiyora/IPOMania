@@ -116,3 +116,32 @@ expectation mismatch, and import fixture/grant issues; these remain outside the 
 - [x] Run full tests (67 passed, 2 skipped), lint, typecheck, and both production builds. The
       required repository-wide format check still fails on pre-existing unformatted files; Phase 3
       local database/RLS and concurrency gates remain open.
+
+## Phase 7 — Dashboard and analytics
+
+- [x] Review the existing Phase 1–6 implementation, architecture, database, backend, and product
+      documentation before implementation.
+- [x] Add an authenticated, validated analytics API backed by bounded PostgreSQL aggregation,
+      caller-JWT access, explicit owner scoping, and existing forced RLS.
+- [x] Add date, IPO, category, and demat-account filters; count-based IPO/category/account/broker
+      groupings; monthly trends; allotment/refund metrics; recent activity; and upcoming IPO dates.
+- [x] Add the responsive, fixed-light dashboard with accessible charts, loading/empty/error states,
+      paginated filter options, and formula-safe CSV/XLSX exports.
+- [x] Reuse the Phase 6 capital summary and decimal reconciliation engine. Keep application
+      breakdowns count-only and capital event totals separate by currency and event type.
+- [x] Add unit/API/export, responsive browser, and direct two-user PostgreSQL tests, including
+      exact decimal aggregation and a 5,000-application database aggregation case.
+- [x] Update the Phase 7 API, frontend, product, database/RLS, architecture, testing, changelog,
+      project-status, and task documentation.
+- [x] Apply the pending Phase 6 and Phase 7 migrations to the local database and run the Phase 7
+      pgTAP test file (11/11 passed).
+- [x] Run focused analytics tests (7/7), dashboard E2E tests (3/3), the full suite (93 passed,
+      2 skipped), lint, typecheck, and both production builds.
+- [ ] Run an isolated query-plan and production-scale latency benchmark; the 5,000-row pgTAP case
+      is a functional large-set check, not a latency benchmark.
+- [ ] Pass repository-wide `npm run format:check`; it currently reports 128 files, while targeted
+      formatting checks pass for changed/new supported source and feature documentation.
+
+Phase 7 does not include application submission/allotment workflows or changes to Phase 5/6
+business logic. The Phase 3 database/RLS, concurrency, secret-history, hosted-configuration, and CI
+gates remain open.

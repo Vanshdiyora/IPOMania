@@ -789,3 +789,49 @@ export const applicationListQuerySchema = z
       query.submission_from <= query.submission_to,
     { message: "submission_from must not be after submission_to.", path: ["submission_from"] },
   );
+
+const dashboardFilterFields = {
+  date_from: z.iso.date().optional(),
+  date_to: z.iso.date().optional(),
+  ipo_id: z.uuid().optional(),
+  category: ipoCategorySchema.optional(),
+  account_id: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+};
+
+function validateDashboardDateRange(
+  query: { date_from?: string; date_to?: string },
+  context: z.RefinementCtx,
+) {
+  if (query.date_from && query.date_to && query.date_from > query.date_to) {
+    context.addIssue({
+      code: "custom",
+      message: "date_from must not be after date_to.",
+      path: ["date_from"],
+    });
+  }
+  if (
+    query.date_from &&
+    query.date_to &&
+    Date.parse(query.date_to) - Date.parse(query.date_from) > 3650 * 24 * 60 * 60 * 1000
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "The dashboard date range cannot exceed 10 years.",
+      path: ["date_to"],
+    });
+  }
+}
+
+export const dashboardAnalyticsQuerySchema = z
+  .object(dashboardFilterFields)
+  .strict()
+  .superRefine(validateDashboardDateRange);
+
+export const dashboardAnalyticsExportQuerySchema = z
+  .object({
+    ...dashboardFilterFields,
+    format: z.enum(["csv", "xlsx"]).default("csv"),
+  })
+  .strict()
+  .superRefine(validateDashboardDateRange);

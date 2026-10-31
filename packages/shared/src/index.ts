@@ -257,6 +257,96 @@ export interface CapitalSummary {
   unrealized_pnl: string | null;
 }
 
+export interface DashboardAnalytics {
+  totals: {
+    applications: number;
+    active_demat_accounts: number;
+    tracked_ipos: number;
+  };
+  applications_by_status: Array<{ status: ApplicationStatus; count: number }>;
+  applications_by_ipo: Array<{
+    ipo_id: string;
+    company_name: string;
+    symbol: string;
+    count: number;
+  }>;
+  applications_by_category: Array<{
+    category: IpoCategoryCode;
+    count: number;
+  }>;
+  applications_by_account: Array<{
+    account_id: string;
+    holder_name: string;
+    masked_demat_identifier: string;
+    broker_name: string;
+    count: number;
+  }>;
+  applications_by_broker: Array<{
+    broker_name: string;
+    count: number;
+  }>;
+  monthly_application_trends: Array<{
+    month: string;
+    count: number;
+  }>;
+  capital_utilization_trends: Array<{
+    month: string;
+    currency: string;
+    capital_blocked: string;
+    capital_released: string;
+    actual_debit: string;
+    refund_received: string;
+    listing_sales: number;
+    listing_price_updates: number;
+  }>;
+  capital_event_totals: Array<{
+    currency: string;
+    capital_blocked: string;
+    actual_debit: string;
+    refund_received: string;
+    capital_block_events: number;
+    actual_debit_events: number;
+    refund_receipt_events: number;
+    listing_sales: number;
+    listing_price_updates: number;
+  }>;
+  allotment_performance: {
+    total: number;
+    successful: number;
+    success_rate_percent: string | null;
+    full: number;
+    partial: number;
+    none: number;
+  };
+  refund_performance: {
+    total: number;
+    pending: number;
+    completed: number;
+    pending_expected_amount: string;
+    completed_expected_amount: string;
+  };
+  recent_applications: Array<{
+    application_id: string;
+    ipo_id: string;
+    company_name: string;
+    symbol: string;
+    account_id: string;
+    holder_name: string;
+    masked_demat_identifier: string;
+    category: IpoCategoryCode;
+    status: ApplicationStatus;
+    created_at: string;
+  }>;
+  upcoming_ipos: Array<{
+    ipo_id: string;
+    company_name: string;
+    symbol: string;
+    status: IpoStatus;
+    closing_date: string;
+    data_source: "MANUAL" | "PUBLISHED_SOURCE";
+  }>;
+}
+
 export interface ApplicationImportRow {
   row_number: number;
   record: Record<string, unknown>;

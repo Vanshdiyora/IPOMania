@@ -42,7 +42,7 @@ export function Sidebar() {
           }
         >
           <LayoutDashboard aria-hidden="true" size={20} />
-          <span className="hidden sm:inline">Overview</span>
+          <span className="hidden sm:inline">Dashboard</span>
         </NavLink>
         {user ? (
           <>

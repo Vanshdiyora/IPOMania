@@ -17,6 +17,7 @@ export default defineConfig({
     cwd: "apps/web",
     env: {
       ...process.env,
+      VITE_API_BASE_URL: "",
       VITE_SUPABASE_URL: "http://127.0.0.1:54321",
       VITE_SUPABASE_ANON_KEY: "test-anon-key",
     },

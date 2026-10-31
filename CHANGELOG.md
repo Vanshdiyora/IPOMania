@@ -22,6 +22,15 @@ Notable project changes are recorded here.
 - Added synthetic unit/API/E2E fixtures and two-user IPO database-policy tests; no test fixture is
   presented as an official market rule.
 
+### Phase 7 — Dashboard and analytics
+
+- Added caller-scoped PostgreSQL dashboard aggregation, application/category/account/broker
+  breakdowns, monthly trends, allotment/refund performance, recent activity, and upcoming IPO dates.
+- Added responsive Recharts dashboard filters and exact-decimal financial cards that reuse the
+  Phase 6 capital summary, plus formula-safe CSV and multi-sheet Excel exports.
+- Added an invoker-rights analytics function and direct two-user/large-dataset SQL test; no tables
+  or indexes were added.
+
 ### Not included
 
 - IPO application submission/allotment workflows, investment advice, shared-market data, and

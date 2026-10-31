@@ -11,8 +11,8 @@ export function WelcomePage() {
         <p className="text-sm font-bold uppercase tracking-wide text-action">IPO Mania</p>
         <h1 className="mt-2 text-3xl font-bold text-navy">Welcome to IPO Mania</h1>
         <p className="mt-3 max-w-3xl text-lg leading-7 text-muted">
-          Manage your profile and demat accounts. IPO application workflows remain out of scope for
-          this phase.
+          Track your IPO applications, demat accounts, allotments, and capital activity in one
+          private dashboard.
         </p>
       </div>
       <Card>

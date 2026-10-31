@@ -53,10 +53,16 @@ from apps or workers, preventing circular dependencies.
 ## API and errors
 
 `GET /api/health` returns a typed status payload with the API version and validated runtime
-environment. Protected profile, demat-account, IPO, quota, mandate, allotment, application, and capital routes verify the bearer token
+environment. Protected profile, demat-account, IPO, quota, mandate, allotment, application, capital, and analytics routes verify the bearer token
 through Supabase Auth before forwarding it as the PostgREST authorization context. Auth-user
 deletion is the only service-role operation and receives only the verified caller's user ID. Errors
 are structured; logs do not include tokens or request bodies.
+
+Dashboard application and ledger aggregations run in the authenticated PostgreSQL
+`get_dashboard_analytics` function with invoker rights and explicit owner filtering. Financial
+reconciliation is reused from the Phase 6 capital summary and decimal engine; analytics does not
+reimplement blocked-capital, refund, or listing P&L rules. See
+[ANALYTICS_API.md](../backend/ANALYTICS_API.md).
 
 ## Database and RLS
 
