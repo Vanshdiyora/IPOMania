@@ -10,13 +10,11 @@
   audit and regular CI still run for them.
 - `deploy-preview.yml` is `workflow_dispatch` only. It accepts a selected, trusted non-`main`
   branch and deploys to the isolated `preview` Cloudflare environment.
-- `deploy-production.yml` is `workflow_dispatch` only, refuses non-`main` refs, and requires a
-  manual confirmation that Phase 8's final integrated audit passed. Its `production` GitHub
-  environment must also require reviewer approval before the job can access environment secrets.
-
-CI is intentionally not a deployment workflow. A `main` push must never deploy production
-automatically. Do not dispatch production until the Phase 8 audit has passed and a production
-deployment has been explicitly approved. This workflow does not apply database migrations.
+- `deploy-production.yml` runs automatically after the `CI` workflow completes successfully for
+  a push to `main` (including the push created when a pull request is merged). It can also be
+  dispatched manually from `main`. Its `production` GitHub environment must require
+  reviewer approval before the job can access environment secrets. This workflow does not apply
+  database migrations.
 
 ## GitHub environment setup
 
@@ -59,8 +57,9 @@ Before creating or approving a production release:
    [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md).
 3. Dispatch the preview workflow from a trusted branch and verify the preview health endpoints,
    authentication redirects, CORS, and core smoke tests.
-4. Dispatch production from `main`, select `yes` only after verifying the Phase 8 audit evidence,
-   and obtain the independent `production` environment approval.
+4. A push of the exact commit to `main` starts production automatically after successful CI, or
+   dispatch production manually from `main`; obtain the independent `production` environment
+   approval before deployment.
 5. Confirm the API health response reports `production`, the website responds over HTTPS, and
    browser authentication uses the intended production Supabase project.
 6. If verification fails, stop further changes and use
