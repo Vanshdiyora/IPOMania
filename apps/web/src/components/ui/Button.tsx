@@ -2,7 +2,7 @@ import { cloneElement, isValidElement, type ButtonHTMLAttributes, type ReactElem
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/utils";
 
-export const buttonStyles = cva(
+const buttonStyles = cva(
   [
     "inline-flex min-h-touch items-center justify-center gap-2 rounded-lg px-5 py-2",
     "text-base font-semibold tracking-tight",
