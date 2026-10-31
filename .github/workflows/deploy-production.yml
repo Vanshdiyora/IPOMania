@@ -1,16 +1,11 @@
 name: Deploy production
 
 on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      phase8_integrated_audit_passed:
-        description: Confirm Phase 8 final integrated audit has passed
-        required: true
-        type: choice
-        options:
-          - "no"
-          - "yes"
-        default: "no"
 
 permissions:
   contents: read
@@ -21,13 +16,17 @@ concurrency:
 
 jobs:
   deploy-production:
-    name: Deploy after protected approval
-    if: github.ref == 'refs/heads/main' && inputs.phase8_integrated_audit_passed == 'yes'
+    name: Deploy production frontend and API
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     environment: production
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

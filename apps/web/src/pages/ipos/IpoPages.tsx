@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { SlidersHorizontal } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type {
@@ -15,6 +16,8 @@ import type { z } from "@ipo-mania/validation";
 import { useAuth } from "../../auth/useAuth";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
+import { ActiveFilterChips } from "../../components/filters/ActiveFilterChips";
+import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
 import { ApiRequestError, apiRequest } from "../../lib/api";
 
 type IpoListResponse = {
@@ -71,6 +74,8 @@ export function IpoListPage({ calendar = false }: { calendar?: boolean }) {
   const { session } = useAuth();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [draftStatus, setDraftStatus] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const params = new URLSearchParams({
     page: String(page),
@@ -110,11 +115,12 @@ export function IpoListPage({ calendar = false }: { calendar?: boolean }) {
           ) : null}
         </div>
       </header>
-      <Card>
-        <div className="grid gap-4 sm:grid-cols-[1fr_16rem]">
-          <label className="block text-sm font-semibold text-ink">
+      <Card className="overflow-hidden">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="block min-w-0 flex-1 text-sm font-semibold text-ink">
             Search company or exact symbol
             <input
+              aria-label="Search company or exact symbol"
               className={inputClass}
               value={search}
               onChange={(event) => {
@@ -123,26 +129,104 @@ export function IpoListPage({ calendar = false }: { calendar?: boolean }) {
               }}
             />
           </label>
-          <label className="block text-sm font-semibold text-ink">
-            Status
-            <select
-              className={inputClass}
-              value={status}
-              onChange={(event) => {
-                setPage(1);
-                setStatus(event.target.value);
-              }}
-            >
-              <option value="">All statuses</option>
-              {statuses.map((value) => (
-                <option key={value} value={value}>
-                  {label(value)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Button
+            variant="outline"
+            className="w-full shrink-0 gap-2 sm:w-auto"
+            aria-haspopup="dialog"
+            onClick={() => {
+              setDraftStatus(status);
+              setFiltersOpen(true);
+            }}
+          >
+            <SlidersHorizontal size={18} aria-hidden="true" /> Filters
+            {status ? (
+              <span className="rounded-full bg-action px-2 py-0.5 text-xs text-white">1</span>
+            ) : null}
+          </Button>
+        </div>
+        <div
+          className="mt-3 flex max-w-full gap-2 overflow-x-auto pb-1"
+          aria-label="Quick IPO status filters"
+        >
+          {["", ...statuses].map((value) => {
+            const selected = status === value;
+            return (
+              <button
+                key={value || "all"}
+                type="button"
+                aria-pressed={selected}
+                className={`min-h-touch shrink-0 rounded-full px-4 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy ${selected ? "bg-action text-white" : "border border-border bg-white text-navy hover:bg-canvas"}`}
+                onClick={() => {
+                  setPage(1);
+                  setStatus(value);
+                }}
+              >
+                {value ? label(value) : "All IPOs"}
+              </button>
+            );
+          })}
         </div>
       </Card>
+      <ActiveFilterChips
+        filters={status ? [{ key: "status", label: `Status: ${label(status)}` }] : []}
+        onRemove={() => {
+          setPage(1);
+          setStatus("");
+        }}
+        onClear={() => {
+          setPage(1);
+          setStatus("");
+        }}
+      />
+      <FilterDrawer
+        open={filtersOpen}
+        title="IPO filters"
+        activeCount={status ? 1 : 0}
+        onClose={() => setFiltersOpen(false)}
+        onReset={() => {
+          setDraftStatus("");
+          setStatus("");
+          setPage(1);
+          setFiltersOpen(false);
+        }}
+        onApply={() => {
+          setStatus(draftStatus);
+          setPage(1);
+          setFiltersOpen(false);
+        }}
+      >
+        <FilterSection title="IPO status">
+          <div className="grid grid-cols-2 gap-2">
+            <label
+              className={`flex min-h-touch cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${!draftStatus ? "border-action bg-[#EAF0F6] text-navy" : "border-border text-ink"}`}
+            >
+              <input
+                className="accent-action"
+                type="radio"
+                name="ipo-status"
+                checked={!draftStatus}
+                onChange={() => setDraftStatus("")}
+              />{" "}
+              All statuses
+            </label>
+            {statuses.map((value) => (
+              <label
+                key={value}
+                className={`flex min-h-touch cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${draftStatus === value ? "border-action bg-[#EAF0F6] text-navy" : "border-border text-ink"}`}
+              >
+                <input
+                  className="accent-action"
+                  type="radio"
+                  name="ipo-status"
+                  checked={draftStatus === value}
+                  onChange={() => setDraftStatus(value)}
+                />{" "}
+                {label(value)}
+              </label>
+            ))}
+          </div>
+        </FilterSection>
+      </FilterDrawer>
       {error ? <ErrorNotice error={error} /> : null}
       {isLoading ? <p role="status">Loading IPO records…</p> : null}
       {!isLoading && ipos.length === 0 ? (
