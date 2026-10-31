@@ -161,12 +161,20 @@ gates remain open.
       and decimal capital reconciliation through the existing financial engine.
 - [x] Create/update the requested strategy, unit, integration, E2E, security, performance, and test
       coverage documentation.
-- [ ] Run the complete test, local pgTAP/RLS, Playwright, accessibility, coverage, lint, typecheck,
-      formatting, dependency audit, and build checks on the latest integrated branch.
+- [x] Run full Vitest (111 passed, 2 skipped), local pgTAP (144/144), Playwright (13/13 including
+      four WCAG-tagged axe scans), coverage, lint, typecheck, and both production builds.
+- [x] Run targeted Prettier on touched supported source/docs; repository-wide format check remains
+      blocked by 117 files of baseline formatting debt.
+- [x] Run dependency audit: no high/critical findings; 20 moderate advisories remain in existing
+      toolchain dependency trees.
+- [ ] Resolve the existing dependency advisories without introducing a breaking toolchain change.
 - [ ] Add workload benchmarks for 1,000/5,000 applications and dashboard queries; record only
       measurements actually obtained against an isolated test database.
+- [ ] Run opt-in two-transaction account-capacity and application-reference concurrency tests
+      against a disposable loopback database; both currently skip without `DEMAT_TEST_DATABASE_URL`.
 - [ ] Complete the final integrated security and accessibility audit after all parallel changes
       are merged; do not certify production readiness in this preparation stage.
 
-Phase 8 remains in preparation until validation and the integrated audit are complete. Existing
-Phase 3 and Phase 6 database verification gaps remain open unless the relevant tests are run here.
+Phase 8 remains in preparation until the open checks and integrated audit are complete. The Phase 3
+database/concurrency/format gates and hosted/CI gates remain open. Local Phase 6 capital pgTAP has
+now passed as part of the full 144-assertion database run.

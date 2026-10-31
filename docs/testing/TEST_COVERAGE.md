@@ -2,6 +2,8 @@
 
 This is a test inventory, not a production-readiness certification. “Existing” means a test file
 is present on the Phase 8 branch; a passing result must also be recorded from an executed run.
+Latest recorded results: Vitest 111 passed / 2 skipped; local pgTAP 144 passed; Playwright 13 passed.
+V8 coverage is 24.55% statements and 26.58% lines for the configured source set, without a threshold.
 
 | Area                            | Test evidence on this branch                                                                                                                                    | Execution / limit                                              |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
@@ -18,7 +20,6 @@ is present on the Phase 8 branch; a passing result must also be recorded from an
 | 1k/5k applications              | `supabase/tests/dashboard_analytics.test.sql` exercises 5,000 application rows                                                                                  | Functional query check only; no latency benchmark              |
 | Phase 7 dashboard               | `tests/security/analytics-api.test.ts`, `tests/unit/dashboard-validation.test.ts`, `tests/e2e/dashboard.spec.ts`, `supabase/tests/dashboard_analytics.test.sql` | Integrated API/browser/DB tests; run in final integrated audit |
 
-Skipped opt-in integration tests are not counted as passed. Repository-wide line/branch coverage
-percentages are intentionally not claimed until `npm run test:coverage` has been run and a reviewed
-baseline/threshold is agreed. A final audit across the newly integrated Phase 5–7 baseline is still
-required.
+Skipped opt-in integration tests are not counted as passed. The recorded coverage percentages are
+an initial repository-wide baseline, not a quality threshold; agree on a reviewed target before
+using them as a gate. A final audit across the newly integrated Phase 5–7 baseline is still required.
