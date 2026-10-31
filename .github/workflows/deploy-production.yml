@@ -45,11 +45,17 @@ jobs:
           API_HEALTH_URL: ${{ vars.API_HEALTH_URL }}
           WEB_HEALTH_URL: ${{ vars.WEB_HEALTH_URL }}
         run: |
-          test -n "$VITE_SUPABASE_URL" || { echo "::error::Set VITE_SUPABASE_URL in the production environment."; exit 1; }
-          test -n "$VITE_SUPABASE_ANON_KEY" || { echo "::error::Set VITE_SUPABASE_ANON_KEY in the production environment."; exit 1; }
-          test -n "$VITE_WEB_APP_ORIGIN" || { echo "::error::Set VITE_WEB_APP_ORIGIN in the production environment."; exit 1; }
-          test -n "$API_HEALTH_URL" || { echo "::error::Set API_HEALTH_URL in the production environment."; exit 1; }
-          test -n "$WEB_HEALTH_URL" || { echo "::error::Set WEB_HEALTH_URL in the production environment."; exit 1; }
+          missing=""
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY VITE_WEB_APP_ORIGIN API_HEALTH_URL WEB_HEALTH_URL; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Set $name in the production environment."
+              missing="${missing:+$missing, }$name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "Missing production variables: $missing"
+            exit 1
+          fi
 
       - name: Build API
         run: npm run build:api
