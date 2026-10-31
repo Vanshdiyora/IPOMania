@@ -81,8 +81,9 @@ Do not add hostnames or Supabase URLs for which the project owner has not confir
 2. Review migration changes. Apply and verify migrations separately using the database procedure
    below; deployment workflows do not run migrations.
 3. Deploy and smoke-test a trusted preview against a non-production Supabase project.
-4. Dispatch `Deploy production` from `main`; confirm the Phase 8 audit input only when evidence is
-   recorded. A designated reviewer must approve the protected `production` environment.
+4. Push the merge commit to `main`, which starts `Deploy production` after successful CI. A
+   designated reviewer must approve the protected `production` environment. The workflow can also
+   be dispatched manually for a retry from `main`.
 5. The workflow deploys API first, checks the production environment in `/api/health`, builds the
    SPA with public production Supabase values, deploys the frontend Worker, and checks its HTTPS
    root.
@@ -90,8 +91,9 @@ Do not add hostnames or Supabase URLs for which the project owner has not confir
    cross-origin requests, health checks, and sanitized Worker logs. Record the deployed commit,
    migration version, and check results in the release record.
 
-No production deployment is authorized by this preparation task. Do not infer approval from a
-green CI run, a workflow file, or the `phase8_integrated_audit_passed` input alone.
+Successful CI authorizes the workflow to start, but it does not bypass the separate protected
+`production` environment approval. Repository-side deployment policy remains responsible for
+confirming that any required phase or financial-release audit is complete.
 
 ## Database deployment and verification
 
