@@ -191,7 +191,7 @@ create table public.capital_ledger (
       and unit_price is null
     )
   ),
-  constraint capital_ledger_adjustment_direction_check check (
+  constraint capital_ledger_adjustment_direction_required_check check (
     (transaction_type = 'ADJUSTMENT' and adjustment_direction is not null)
     or (transaction_type <> 'ADJUSTMENT' and adjustment_direction is null)
   )
