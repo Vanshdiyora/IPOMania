@@ -47,3 +47,35 @@ engine is deterministic for the same captured inputs and rule version.
 No official IPO rule example was available in the repository when this module was implemented.
 Automated tests use synthetic values solely to test arithmetic and validation boundaries; they are
 not represented as official or authoritative rule fixtures.
+
+## Capital calculations
+
+Capital summaries are calculated by `calculateCapitalSummaries` in
+`@ipo-mania/financial-engine`. All amounts use `decimal.js`; currencies are summarized separately
+without conversion.
+
+- **Total application value** = sum of saved application amounts.
+- **Approved mandate value** = sum of mandates whose current status is `APPROVED`. This is an
+  authorization value only and is not included in actual invested capital.
+- **Currently blocked capital** = `CAPITAL_BLOCKED` − `CAPITAL_RELEASED` − actual-debit amounts
+  consumed from a block. The database records the consumed amount once per debit.
+- **Released capital** = sum of explicit `CAPITAL_RELEASED` events. A debit consuming a block is
+  not also counted as a release.
+- **Net actually invested capital** = `ACTUAL_DEBIT` + adjustment debits − `REFUND_RECEIVED` −
+  adjustment credits. `ALLOTMENT_DEBIT` is an allocation audit event and is not added to cash
+  investment a second time.
+- **Refunds received** = sum of `REFUND_RECEIVED` events.
+- **Outstanding refunds** = sum, per application, of expected allotment refunds less received
+  refunds. A receipt must be supported by actual debit entries and cannot exceed expected refund
+  or actual debit above allocation cost.
+- **Realized P&L** = listing-sale proceeds − (shares sold × recorded allotment price).
+- **Unrealized P&L** = remaining allotted shares × (latest recorded listing price − allotment
+  price). If any open position lacks a listing price, the currency summary returns `null` rather
+  than implying zero profit or loss.
+
+Listing sale and valuation events require an allotment, positive quantity, and per-share price.
+Sales are limited to remaining allotted shares. A mandate approval does not create a debit;
+blocked capital changes only from ledger block/release/debit events. The database summary rejects
+inconsistent balances instead of clamping them. See
+[CAPITAL_MANAGEMENT.md](./CAPITAL_MANAGEMENT.md) and
+[CAPITAL_LEDGER.md](../database/CAPITAL_LEDGER.md).

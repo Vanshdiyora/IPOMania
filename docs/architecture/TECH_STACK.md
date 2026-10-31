@@ -17,5 +17,6 @@
 
 The choices are wired in the manifests and configuration. The demat-account management module
 uses the existing TanStack data/table/virtualization stack. The IPO manager stores user-owned
-manual records; quota computations use `decimal.js` and issue-specific rule versions. IPO
-application submission, market-data integrations, and allocation workflows are not implemented.
+manual records; quota and capital computations use `decimal.js` and issue-specific rule versions.
+Applications, mandates, allotments, refunds, and ledger events are manually tracked; application
+submission, payment initiation, and market-data integrations are not implemented.

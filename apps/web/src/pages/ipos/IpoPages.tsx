@@ -788,6 +788,7 @@ export function QuotaCalculatorPage() {
   const [answers, setAnswers] = useState<Record<string, boolean | null>>({});
   const [result, setResult] = useState<CalculationResponse["data"] | null>(null);
   const [requestError, setRequestError] = useState("");
+  const [applicationMessage, setApplicationMessage] = useState("");
   const iposQuery = useQuery({
     queryKey: ["ipos", "calculator"],
     enabled: Boolean(session),
@@ -820,6 +821,7 @@ export function QuotaCalculatorPage() {
   const submitCalculation = async (persist: boolean) => {
     if (!session) return;
     setRequestError("");
+    setApplicationMessage("");
     setResult(null);
     const request = {
       ipo_id: ipoId,
@@ -840,6 +842,24 @@ export function QuotaCalculatorPage() {
       setResult(response.data);
     } catch (error) {
       setRequestError(error instanceof Error ? error.message : "The calculation failed.");
+    }
+  };
+
+  const recordApplication = async () => {
+    if (!session || !result?.eligible || !result.calculation_id) return;
+    setRequestError("");
+    try {
+      const response = await apiRequest<{ data: { id: string } }>("/api/applications", session, {
+        method: "POST",
+        body: JSON.stringify({ calculation_id: result.calculation_id }),
+      });
+      setApplicationMessage(
+        `Application ${response.data.id} recorded for tracking. No application was submitted.`,
+      );
+    } catch (error) {
+      setRequestError(
+        error instanceof Error ? error.message : "The application record could not be saved.",
+      );
     }
   };
 
@@ -1056,6 +1076,16 @@ export function QuotaCalculatorPage() {
               {result.calculation_timestamp
                 ? ` at ${formatDateTime(result.calculation_timestamp)}`
                 : ""}
+            </p>
+          ) : null}
+          {result.eligible && result.calculation_id ? (
+            <Button className="mt-4" variant="secondary" onClick={() => void recordApplication()}>
+              Record application for tracking
+            </Button>
+          ) : null}
+          {applicationMessage ? (
+            <p role="status" className="mt-3 text-sm text-muted">
+              {applicationMessage}
             </p>
           ) : null}
         </Card>

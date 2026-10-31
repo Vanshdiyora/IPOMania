@@ -5,9 +5,10 @@
 The repository is a TypeScript npm-workspaces monorepo. The browser application is a React SPA
 served and built by Vite. Its HTTP boundary is a Hono application running on Cloudflare
 Workers. PostgreSQL is provided by Supabase. It stores authentication-linked profiles/preferences
-and user-owned demat accounts/import history, IPO records, issue-specific rules, and private
-calculation history with forced RLS. IPO application submission and allotment management remain out
-of scope until critical calculation tests pass.
+and user-owned demat accounts/import history, IPO records, issue-specific rules, private
+calculation history, manual application tracking, mandates, allotments, and capital history with
+forced RLS. Critical financial calculation tests gate application tracking. No application
+submission, payment initiation, or automatic mandate approval is implemented.
 
 ```text
 Browser
@@ -36,6 +37,10 @@ Shared packages: API types | validation exports | financial engine boundary
   and forwards the caller JWT for RLS-protected operations.
 - `workers/api` owns user-scoped IPO CRUD, append-only category rule creation, and quota API
   transport. It snapshots exact inputs/results and never substitutes the service-role key.
+- `workers/api` owns user-scoped application, mandate, allotment, and capital-ledger APIs; its
+  summary logic delegates decimal operations to the isolated financial engine.
+- `packages/financial-engine` owns transport-independent exact-decimal capital summary and P&L
+  calculations, in addition to issue-specific quota calculations.
 - IPO master data is per-user until the project defines a trusted shared-catalog publishing role.
 - `apps/web` provides IPO list/details/forms, a date-ordered calendar, category configuration, and
   a calculator with explicit eligibility explanations.
@@ -48,7 +53,7 @@ from apps or workers, preventing circular dependencies.
 ## API and errors
 
 `GET /api/health` returns a typed status payload with the API version and validated runtime
-environment. Protected profile, demat-account, IPO, and quota routes verify the bearer token
+environment. Protected profile, demat-account, IPO, quota, mandate, allotment, application, and capital routes verify the bearer token
 through Supabase Auth before forwarding it as the PostgREST authorization context. Auth-user
 deletion is the only service-role operation and receives only the verified caller's user ID. Errors
 are structured; logs do not include tokens or request bodies.
@@ -59,6 +64,7 @@ User-scoped database operations use Supabase's anon project key with the caller'
 forwarded as the request authorization context. This retains PostgreSQL RLS behavior. Account
 imports stage every row before atomic, idempotent confirmation; reversal archives unchanged
 import-created accounts. IPO rule versions and calculation snapshots are owner-scoped and protected
-by forced RLS. See [DATA_FLOW.md](./DATA_FLOW.md),
-[IPO_SCHEMA.md](../database/IPO_SCHEMA.md), and
+by forced RLS. Financial ledgers are append-only and use caller-scoped policies and database
+idempotency constraints. See [DATA_FLOW.md](./DATA_FLOW.md),
+[IPO_SCHEMA.md](../database/IPO_SCHEMA.md), [CAPITAL_LEDGER.md](../database/CAPITAL_LEDGER.md), and
 [QUOTA_ENGINE.md](../backend/QUOTA_ENGINE.md).

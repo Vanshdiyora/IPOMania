@@ -2,8 +2,9 @@
 
 IPO Mania is a TypeScript monorepo for an IPO research application. It includes the development
 foundation, Supabase authentication and multi-user security, user-owned demat account management,
-and user-specific IPO records with an issue-configured decimal quota calculator. IPO application
-submission/allotment workflows and market-data integrations are not implemented.
+user-specific IPO records with an issue-configured decimal quota calculator, and manual
+application, UPI mandate, allotment, refund, and capital tracking. It does not submit IPO
+applications, initiate payments, approve mandates automatically, or fetch market data.
 
 ## Requirements
 
@@ -82,5 +83,9 @@ IPO ownership, issue-specific configuration, calculation limits, and audit histo
 in [IPO_MANAGER_SPECIFICATION.md](./docs/product/IPO_MANAGER_SPECIFICATION.md),
 [IPO_QUOTA_RULES.md](./docs/product/IPO_QUOTA_RULES.md),
 [FINANCIAL_CALCULATIONS.md](./docs/product/FINANCIAL_CALCULATIONS.md),
-[IPO_API.md](./docs/backend/IPO_API.md), [QUOTA_ENGINE.md](./docs/backend/QUOTA_ENGINE.md), and
-[IPO_SCHEMA.md](./docs/database/IPO_SCHEMA.md).
+[IPO_API.md](./docs/backend/IPO_API.md), [QUOTA_ENGINE.md](./docs/backend/QUOTA_ENGINE.md),
+[IPO_SCHEMA.md](./docs/database/IPO_SCHEMA.md), [MANDATE_MANAGEMENT.md](./docs/product/MANDATE_MANAGEMENT.md),
+[ALLOTMENT_MANAGEMENT.md](./docs/product/ALLOTMENT_MANAGEMENT.md),
+[CAPITAL_MANAGEMENT.md](./docs/product/CAPITAL_MANAGEMENT.md),
+[CAPITAL_LEDGER.md](./docs/database/CAPITAL_LEDGER.md), and
+[FINANCIAL_TESTING.md](./docs/testing/FINANCIAL_TESTING.md).

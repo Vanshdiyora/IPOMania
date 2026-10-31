@@ -24,6 +24,17 @@ import {
   IpoListPage,
   QuotaCalculatorPage,
 } from "../pages/ipos/IpoPages";
+import {
+  AllotmentDashboardPage,
+  AllotmentDetailsPage,
+  CapitalTrackerPage,
+  CreateAllotmentPage,
+  CreateMandatePage,
+  FinancialTransactionHistoryPage,
+  MandateDashboardPage,
+  MandateDetailsPage,
+  RefundTrackerPage,
+} from "../pages/capital/CapitalPages";
 
 function protectedPage(element: React.ReactNode) {
   return <ProtectedRoute>{element}</ProtectedRoute>;
@@ -59,6 +70,18 @@ export const router = createBrowserRouter([
       { path: "ipos/:ipoId/categories", element: protectedPage(<IpoCategoryConfigurationPage />) },
       { path: "ipos/:ipoId", element: protectedPage(<IpoDetailsPage />) },
       { path: "quota-calculator", element: protectedPage(<QuotaCalculatorPage />) },
+      { path: "mandates", element: protectedPage(<MandateDashboardPage />) },
+      { path: "mandates/new", element: protectedPage(<CreateMandatePage />) },
+      { path: "mandates/:mandateId", element: protectedPage(<MandateDetailsPage />) },
+      { path: "allotments", element: protectedPage(<AllotmentDashboardPage />) },
+      { path: "allotments/new", element: protectedPage(<CreateAllotmentPage />) },
+      { path: "allotments/:allotmentId", element: protectedPage(<AllotmentDetailsPage />) },
+      { path: "capital", element: protectedPage(<CapitalTrackerPage />) },
+      {
+        path: "capital/transactions",
+        element: protectedPage(<FinancialTransactionHistoryPage />),
+      },
+      { path: "capital/refunds", element: protectedPage(<RefundTrackerPage />) },
       {
         path: "profile",
         element: (

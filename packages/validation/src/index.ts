@@ -427,3 +427,266 @@ export const ipoCalculationSchema = z
     eligibility_answers: z.record(z.string(), z.boolean().nullable()),
   })
   .strict();
+
+export const applicationRecordSchema = z
+  .object({
+    calculation_id: z.uuid(),
+  })
+  .strict();
+
+const financialAmountSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^\d{1,32}(?:\.\d{1,6})?$/,
+    "Enter an amount with at most 32 integer and 6 decimal digits.",
+  )
+  .refine((value) => /[1-9]/.test(value), "Enter an amount greater than zero.");
+const nonNegativeFinancialAmountSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^\d{1,32}(?:\.\d{1,6})?$/,
+    "Enter an amount with at most 32 integer and 6 decimal digits.",
+  );
+
+export const mandateStatusSchema = z.enum([
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+  "REVOKED",
+  "EXPIRED",
+  "RELEASED",
+]);
+export const allotmentStatusSchema = z.enum(["ALLOTTED", "NOT_ALLOTTED", "PARTIAL_ALLOTMENT"]);
+export const refundStatusSchema = z.enum(["NOT_REQUIRED", "PENDING", "COMPLETED"]);
+export const capitalTransactionTypeSchema = z.enum([
+  "CAPITAL_BLOCKED",
+  "CAPITAL_RELEASED",
+  "ACTUAL_DEBIT",
+  "ALLOTMENT_DEBIT",
+  "REFUND_RECEIVED",
+  "LISTING_SALE",
+  "LISTING_PRICE_UPDATE",
+  "ADJUSTMENT",
+]);
+
+export const mandateSchema = z
+  .object({
+    application_id: z.uuid(),
+    mandate_reference: z.string().trim().min(1).max(160),
+    mandate_amount: financialAmountSchema,
+    notes: z.string().trim().max(2000).nullable().optional(),
+  })
+  .strict();
+
+export const mandateUpdateSchema = z
+  .object({
+    mandate_reference: z.string().trim().min(1).max(160),
+    mandate_amount: financialAmountSchema,
+    mandate_status: mandateStatusSchema,
+    notes: z.string().trim().max(2000).nullable(),
+  })
+  .partial()
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, "Provide at least one mandate update.");
+
+export const allotmentSchema = z
+  .object({
+    application_id: z.uuid(),
+    allotment_status: allotmentStatusSchema,
+    allotted_lots: z.number().int().min(0).max(1_000_000),
+    allotted_shares: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+    allotment_price: priceDecimalSchema.nullable(),
+    refund_amount: nonNegativeFinancialAmountSchema,
+    allotment_date: optionalDateSchema.optional(),
+  })
+  .strict()
+  .superRefine(validateAllotmentShape);
+
+export const allotmentUpdateSchema = z
+  .object({
+    allotment_status: allotmentStatusSchema,
+    allotted_lots: z.number().int().min(0).max(1_000_000),
+    allotted_shares: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+    allotment_price: priceDecimalSchema.nullable(),
+    refund_amount: nonNegativeFinancialAmountSchema,
+    allotment_date: optionalDateSchema,
+  })
+  .partial()
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, "Provide at least one allotment update.")
+  .superRefine(validateAllotmentShape);
+
+function validateAllotmentShape(
+  allotment: {
+    allotment_status?: "ALLOTTED" | "NOT_ALLOTTED" | "PARTIAL_ALLOTMENT";
+    allotted_lots?: number;
+    allotted_shares?: number;
+    allotment_price?: string | null;
+  },
+  context: z.RefinementCtx,
+) {
+  if (
+    allotment.allotment_status === "NOT_ALLOTTED" &&
+    ((allotment.allotted_lots !== undefined && allotment.allotted_lots !== 0) ||
+      (allotment.allotted_shares !== undefined && allotment.allotted_shares !== 0) ||
+      (allotment.allotment_price !== undefined && allotment.allotment_price !== null))
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "A not-allotted application cannot have shares or an allotment price.",
+      path: ["allotment_status"],
+    });
+  }
+  if (
+    allotment.allotment_status !== undefined &&
+    allotment.allotment_status !== "NOT_ALLOTTED" &&
+    ((allotment.allotted_lots !== undefined && allotment.allotted_lots < 1) ||
+      (allotment.allotted_shares !== undefined && allotment.allotted_shares < 1) ||
+      allotment.allotment_price === null)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "An allotment requires positive lots, shares, and price.",
+      path: ["allotment_status"],
+    });
+  }
+}
+
+const managementFilterFields = {
+  ipo_id: z.uuid().optional(),
+  account_id: z.uuid().optional(),
+  broker: z.string().trim().min(1).max(120).optional(),
+  category: ipoCategorySchema.optional(),
+  date_from: z.iso.date().optional(),
+  date_to: z.iso.date().optional(),
+};
+const managementListQueryFields = {
+  page: z.coerce.number().int().min(1).default(1),
+  page_size: z.coerce.number().int().min(1).max(100).default(25),
+  ...managementFilterFields,
+};
+
+function validateDateRange(
+  query: { date_from?: string; date_to?: string },
+  context: z.RefinementCtx,
+) {
+  if (query.date_from && query.date_to && query.date_from > query.date_to) {
+    context.addIssue({
+      code: "custom",
+      message: "date_from must not be after date_to.",
+      path: ["date_from"],
+    });
+  }
+}
+
+export const mandateListQuerySchema = z
+  .object({
+    ...managementListQueryFields,
+    status: mandateStatusSchema.optional(),
+  })
+  .strict()
+  .superRefine(validateDateRange);
+
+export const allotmentListQuerySchema = z
+  .object({
+    ...managementListQueryFields,
+    status: allotmentStatusSchema.optional(),
+    refund_status: refundStatusSchema.optional(),
+  })
+  .strict()
+  .superRefine(validateDateRange);
+
+export const capitalLedgerListQuerySchema = z
+  .object({
+    ...managementListQueryFields,
+    transaction_type: capitalTransactionTypeSchema.optional(),
+  })
+  .strict()
+  .superRefine(validateDateRange);
+
+export const capitalSummaryQuerySchema = z
+  .object(managementFilterFields)
+  .strict()
+  .superRefine(validateDateRange);
+
+export const capitalLedgerEntrySchema = z
+  .object({
+    application_id: z.uuid().nullable().optional(),
+    transaction_type: capitalTransactionTypeSchema,
+    amount: financialAmountSchema,
+    currency: z.string().regex(/^[A-Z]{3}$/),
+    effective_at: z.iso.datetime(),
+    audit_reference: z.string().trim().min(1).max(200),
+    idempotency_key: z.string().trim().min(1).max(200),
+    quantity: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
+    unit_price: priceDecimalSchema.nullable().optional(),
+    adjustment_direction: z.enum(["DEBIT", "CREDIT"]).nullable().optional(),
+  })
+  .strict()
+  .superRefine((entry, context) => {
+    const listing = ["LISTING_SALE", "LISTING_PRICE_UPDATE"].includes(entry.transaction_type);
+    if (listing !== (entry.quantity !== undefined && entry.quantity !== null)) {
+      context.addIssue({
+        code: "custom",
+        message: "Listing events require a positive quantity.",
+        path: ["quantity"],
+      });
+    }
+    if (listing !== (entry.unit_price !== undefined && entry.unit_price !== null)) {
+      context.addIssue({
+        code: "custom",
+        message: "Listing events require a unit price.",
+        path: ["unit_price"],
+      });
+    }
+    if (entry.transaction_type === "ADJUSTMENT" && !entry.adjustment_direction) {
+      context.addIssue({
+        code: "custom",
+        message: "Adjustments must declare whether they are a debit or credit.",
+        path: ["adjustment_direction"],
+      });
+    }
+    if (entry.transaction_type !== "ADJUSTMENT" && entry.adjustment_direction) {
+      context.addIssue({
+        code: "custom",
+        message: "Adjustment direction is only valid for adjustment events.",
+        path: ["adjustment_direction"],
+      });
+    }
+    if (
+      listing &&
+      entry.quantity !== undefined &&
+      entry.quantity !== null &&
+      entry.unit_price &&
+      compareDecimalStrings(
+        entry.amount,
+        multiplyDecimalString(entry.unit_price, entry.quantity),
+      ) !== 0
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Listing amount must equal quantity multiplied by unit price.",
+        path: ["amount"],
+      });
+    }
+  });
+
+function multiplyDecimalString(value: string, quantity: number): string {
+  const [whole, fraction = ""] = value.split(".");
+  const digits = `${whole}${fraction}`.replace(/^0+(?=\d)/, "");
+  const product = (BigInt(digits) * BigInt(quantity)).toString();
+  const padded = product.padStart(fraction.length + 1, "0");
+  if (fraction.length === 0) return padded;
+  const wholePart = padded.slice(0, -fraction.length);
+  const fractionalPart = padded.slice(-fraction.length);
+  return `${wholePart}.${fractionalPart}`.replace(/\.?0+$/, "");
+}
+
+export const applicationListQuerySchema = z
+  .object({
+    ...managementListQueryFields,
+  })
+  .strict()
+  .superRefine(validateDateRange);

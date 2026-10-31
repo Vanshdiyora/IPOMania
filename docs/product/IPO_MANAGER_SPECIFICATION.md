@@ -9,9 +9,10 @@ catalog. RLS prevents another user from reading or changing the record. A future
 requires an explicit publishing and review design; it must not expose user-specific notes or
 calculation inputs.
 
-The manager stores manually entered IPO facts and issue-specific category rules. It does not create
-IPO applications, provide investment advice, promise allocation, or import fabricated market
-data.
+The manager stores manually entered IPO facts and issue-specific category rules. An eligible saved
+quota calculation may be recorded as a private application-tracking record; this does not submit
+an application to a broker, exchange, or issuer. The application does not provide investment
+advice, promise allocation, or import fabricated market data.
 
 ## IPO fields
 
@@ -42,6 +43,8 @@ timestamp automatically. Status is selected by the user and is not inferred from
 - **IPO calendar:** show records in opening-date order.
 - **Quota calculator:** select an owned IPO and demat account, enter category, lot count, price,
   shareholder inputs, and explicit answers to published conditions.
+- **Application tracking:** record an eligible saved calculation for private mandate, allotment, and
+  capital tracking. Application facts remain tied to their saved issue/rule snapshot.
 
 An archived IPO cannot be used for a new calculation. Existing calculation snapshots remain
 retained and owner-scoped.

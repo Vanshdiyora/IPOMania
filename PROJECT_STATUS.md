@@ -142,3 +142,30 @@ no application-submission or allotment workflow was added.
 - Passed: Prettier check for changed/new supported source and documentation files.
   Repository-wide `npm run format:check` remains blocked by 43 files outside this change.
 - The web build reports the existing large-chunk warning; both application builds completed.
+
+## Phase 6 — Mandates, allotments, and capital management
+
+**Status: Implementation complete; workspace tests and builds pass. Direct PostgreSQL/RLS
+verification remains open.**
+
+Phase 6 adds owner-scoped manual application tracking from saved eligible quota calculations,
+UPI mandate state management, allotment and refund tracking, an append-only capital ledger,
+per-currency decimal-safe summaries, API routes, and management pages. Application records retain
+the issue lot size and price bounds used by the calculation so allotment checks do not rely on
+later-edited IPO configuration. No application is submitted externally, no payment is initiated,
+and mandates are never approved automatically.
+
+Automated unit and API tests cover mandate validation, allotment and refund rules, blocked versus
+debited capital, duplicate events, idempotency, and financial reconciliation. The migration also
+contains direct two-user pgTAP coverage; it has not been run in this workspace because the
+Supabase CLI and `psql` are unavailable.
+
+### Phase 6 verification in this workspace
+
+- Passed: `npm run lint`, `npm run typecheck`, `npm test` (69 passed, 1 skipped),
+  `npm run build:web`, and `npm run build:api`.
+- Repository-wide `npm run format:check` remains blocked by 102 unformatted files, including
+  pre-existing formatting debt outside Phase 6. Targeted Prettier checks passed for the changed
+  source and feature documentation; this status file was not reformatted wholesale.
+- Not run: `npm run test:security:db` (requires the unavailable Supabase CLI and local PostgreSQL).
+- The Phase 3 local RLS/concurrency and repository-wide formatting gates remain open.

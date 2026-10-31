@@ -1,6 +1,7 @@
 # IPO schema
 
-Migration: `supabase/migrations/20261031140000_ipo_manager_quota_engine.sql`.
+Migrations: `supabase/migrations/20261031140000_ipo_manager_quota_engine.sql` and
+`supabase/migrations/20261031160000_capital_management.sql`.
 
 ## Ownership decision
 
@@ -41,6 +42,15 @@ timestamp, exact input snapshot, and result snapshot. Composite foreign keys ens
 category configuration, and demat account all belong to the same user. Calculation snapshots are
 readable and insertable only by their owner and cannot be changed through authenticated grants.
 `ON DELETE RESTRICT` preserves linked audit history.
+
+## Manual application records
+
+`public.applications` stores an immutable, user-owned record copied only from one of that user's
+eligible quota calculation snapshots. Composite foreign keys bind its IPO, demat account, category
+rule version, and calculation to the same owner. The database rechecks issue lot, price, rule, and
+amount constraints. Recording an application does not submit it to a broker, exchange, or issuer.
+Mandates, allotments, and the capital ledger link to this record using owner-bound foreign keys;
+their details and RLS are documented in [CAPITAL_LEDGER.md](./CAPITAL_LEDGER.md).
 
 ## RLS and privileges
 

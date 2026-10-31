@@ -7,6 +7,7 @@ import { accountRoutes } from "./routes/account";
 import { accountsRoutes } from "./routes/accounts";
 import { iposRoutes } from "./routes/ipos";
 import { quotaRoutes } from "./routes/quota";
+import { capitalRoutes } from "./routes/capital";
 
 const apiVersion = "1.0.0";
 
@@ -37,6 +38,7 @@ export function createApp() {
   app.route("/api/accounts", accountsRoutes);
   app.route("/api/ipos", iposRoutes);
   app.route("/api/quota", quotaRoutes);
+  app.route("/api", capitalRoutes);
 
   app.get("/api/health", (context) => {
     const environment = validateEnvironment(context.env ?? {});

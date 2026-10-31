@@ -112,6 +112,56 @@ export function Sidebar() {
               >
                 Quota calculator
               </NavLink>
+              <NavLink
+                to="/mandates"
+                className={({ isActive }) =>
+                  `mt-1 flex min-h-touch items-center rounded-lg px-3 text-sm font-semibold ${
+                    isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                  }`
+                }
+              >
+                Mandate dashboard
+              </NavLink>
+              <NavLink
+                to="/allotments"
+                className={({ isActive }) =>
+                  `mt-1 flex min-h-touch items-center rounded-lg px-3 text-sm font-semibold ${
+                    isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                  }`
+                }
+              >
+                Allotments
+              </NavLink>
+              <NavLink
+                to="/capital"
+                className={({ isActive }) =>
+                  `mt-1 flex min-h-touch items-center rounded-lg px-3 text-sm font-semibold ${
+                    isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                  }`
+                }
+              >
+                Capital tracker
+              </NavLink>
+              <NavLink
+                to="/capital/transactions"
+                className={({ isActive }) =>
+                  `mt-1 flex min-h-touch items-center rounded-lg px-3 text-sm font-semibold ${
+                    isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                  }`
+                }
+              >
+                Transaction history
+              </NavLink>
+              <NavLink
+                to="/capital/refunds"
+                className={({ isActive }) =>
+                  `mt-1 flex min-h-touch items-center rounded-lg px-3 text-sm font-semibold ${
+                    isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                  }`
+                }
+              >
+                Refund tracker
+              </NavLink>
             </div>
             <NavLink
               to="/profile"
