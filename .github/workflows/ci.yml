@@ -22,7 +22,7 @@ jobs:
           version: latest
 
       - name: Start local Supabase
-        run: supabase start > /dev/null 2>&1
+        run: supabase start
 
       - name: Test database row-level security
         run: supabase test db
