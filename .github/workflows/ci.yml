@@ -103,6 +103,11 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Build workspace packages
+        run: |
+          npm run build --workspace @ipo-mania/shared
+          npm run build --workspace @ipo-mania/validation
+
       - name: Run browser tests
         run: npm run test:e2e
         env:

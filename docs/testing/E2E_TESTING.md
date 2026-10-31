@@ -9,7 +9,8 @@ npm run test:e2e
 
 Playwright starts the Vite web app at `127.0.0.1:4176`, uses synthetic Supabase configuration,
 clears the API base URL to prevent remote requests, and does not reuse an unrelated dev server.
-The CI browser job installs Chromium and runs the same suite without credentials.
+The CI browser job installs Chromium, builds the `shared` and `validation` workspace packages (the web
+app imports their gitignored `dist` output), and runs the same suite without credentials.
 
 ## Test expectations
 
