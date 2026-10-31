@@ -24,6 +24,15 @@ import {
   IpoListPage,
   QuotaCalculatorPage,
 } from "../pages/ipos/IpoPages";
+import {
+  ApplicationDashboardPage,
+  ApplicationDetailsPage,
+  ApplicationFormPage,
+  ApplicationImportHistoryPage,
+  ApplicationImportPage,
+  ApplicationListPage,
+  BulkApplicationPage,
+} from "../pages/applications/ApplicationPages";
 
 function protectedPage(element: React.ReactNode) {
   return <ProtectedRoute>{element}</ProtectedRoute>;
@@ -59,6 +68,24 @@ export const router = createBrowserRouter([
       { path: "ipos/:ipoId/categories", element: protectedPage(<IpoCategoryConfigurationPage />) },
       { path: "ipos/:ipoId", element: protectedPage(<IpoDetailsPage />) },
       { path: "quota-calculator", element: protectedPage(<QuotaCalculatorPage />) },
+      { path: "applications", element: protectedPage(<ApplicationDashboardPage />) },
+      { path: "applications/list", element: protectedPage(<ApplicationListPage />) },
+      { path: "applications/new", element: protectedPage(<ApplicationFormPage />) },
+      { path: "applications/bulk", element: protectedPage(<BulkApplicationPage />) },
+      { path: "applications/import", element: protectedPage(<ApplicationImportPage />) },
+      {
+        path: "applications/import-history",
+        element: protectedPage(<ApplicationImportHistoryPage />),
+      },
+      {
+        path: "applications/import-history/:importId",
+        element: protectedPage(<ApplicationImportHistoryPage />),
+      },
+      {
+        path: "applications/:applicationId/edit",
+        element: protectedPage(<ApplicationFormPage editing />),
+      },
+      { path: "applications/:applicationId", element: protectedPage(<ApplicationDetailsPage />) },
       {
         path: "profile",
         element: (
