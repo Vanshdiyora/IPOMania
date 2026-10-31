@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@hono/zod-validator": "0.9.1",
+    "@ipo-mania/financial-engine": "0.1.0",
     "@ipo-mania/shared": "0.1.0",
     "@ipo-mania/validation": "0.1.0",
     "@supabase/supabase-js": "2.109.0",

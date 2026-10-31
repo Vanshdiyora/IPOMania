@@ -1,4 +1,10 @@
-import { BriefcaseBusiness, LayoutDashboard, LogOut, UserRound } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  CalendarDays,
+  LayoutDashboard,
+  LogOut,
+  UserRound,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../../auth/useAuth";
@@ -77,6 +83,40 @@ export function Sidebar() {
                 }
               >
                 Import history
+              </NavLink>
+            </div>
+            <NavLink
+              to="/ipos"
+              aria-label="IPO management"
+              className={({ isActive }) =>
+                `mt-2 flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
+                  isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                }`
+              }
+            >
+              <CalendarDays aria-hidden="true" size={20} />
+              <span className="hidden sm:inline">IPOs</span>
+            </NavLink>
+            <div className="hidden pl-5 sm:block">
+              <NavLink
+                to="/ipo-calendar"
+                className={({ isActive }) =>
+                  `mt-1 flex min-h-touch items-center rounded-lg px-3 text-sm font-semibold ${
+                    isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                  }`
+                }
+              >
+                IPO calendar
+              </NavLink>
+              <NavLink
+                to="/quota-calculator"
+                className={({ isActive }) =>
+                  `mt-1 flex min-h-touch items-center rounded-lg px-3 text-sm font-semibold ${
+                    isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                  }`
+                }
+              >
+                Quota calculator
               </NavLink>
             </div>
             <NavLink

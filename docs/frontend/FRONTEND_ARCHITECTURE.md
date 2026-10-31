@@ -17,5 +17,11 @@ forms, details, bulk import, and import history. TanStack Query handles API stat
 and Virtual render the desktop account list, with readable mobile account cards. The forms and
 import mapping use accessible labels and inline validation. The fixed light palette and minimum
 touch-target styles apply throughout.
+
+Protected IPO routes provide the user-owned IPO list, details, add/edit form, opening-date calendar,
+immutable category-rule configuration, and quota calculator. Category forms expose explicit
+unknown/unpublished/configured states rather than applying defaults. Calculator results show
+validation reasons, source/rule version, calculation inputs, and a clear notice that self-reported
+shareholder conditions are not independently verified.
 Routing errors and unmatched paths render the not-found page. Unhandled React rendering errors are
 logged locally and replaced by an accessible recovery view.

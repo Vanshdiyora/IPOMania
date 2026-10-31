@@ -11,9 +11,11 @@
 | API                | Hono on Cloudflare Workers, Wrangler                               |
 | Database           | Supabase PostgreSQL, Drizzle ORM and Drizzle Kit                   |
 | Validation         | Zod                                                                |
+| Financial math     | decimal.js (isolated `packages/financial-engine`)                  |
 | Tests              | Vitest and Playwright                                              |
 | Quality/CI         | ESLint, Prettier, GitHub Actions, npm audit                        |
 
 The choices are wired in the manifests and configuration. The demat-account management module
-uses the existing TanStack data/table/virtualization stack. IPO applications, market data, and the
-quota engine are not implemented.
+uses the existing TanStack data/table/virtualization stack. The IPO manager stores user-owned
+manual records; quota computations use `decimal.js` and issue-specific rule versions. IPO
+application submission, market-data integrations, and allocation workflows are not implemented.
