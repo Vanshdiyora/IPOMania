@@ -34,12 +34,12 @@ The database connectivity utility is configured in `scripts/check-db.ts` and req
 **Status: Implementation in progress; not accepted as complete.**
 
 Supabase Auth flows, protected Worker routes, profile/preferences schema and RLS policies,
-two-user SQL tests, and security documentation have been added. Phase 2 verification is pending.
-This environment has Docker but no Supabase CLI, Supabase URL/keys, or database URL. Consequently,
-registration/email verification/password recovery against a real Auth project, direct local RLS
-tests, hosted integration checks, and GitHub Actions status have not been verified here. Do not
-proceed to Phase 3 until all completion criteria in `TASKS.md` are independently verified and
-recorded.
+two-user SQL tests, and security documentation have been added. Direct local RLS tests now pass.
+This environment has Docker and the Supabase CLI (run through `npx supabase`) but no Supabase
+URL/keys or database URL. Consequently, registration/email verification/password recovery against
+a real Auth project, hosted integration checks, and GitHub Actions status have not been verified
+here. Do not proceed to Phase 3 until all completion criteria in `TASKS.md` are independently
+verified and recorded.
 
 The API auth tests use a stubbed Supabase Auth response and do not prove signature verification;
 the Worker delegates JWT verification to the Supabase Auth service. Production email delivery,
@@ -52,8 +52,9 @@ configuration requirements.
   `npm run build:api`, and `npm run test:e2e -- --project=chromium` (3 tests).
 - Passed: `npm run format:check`, `npm audit --audit-level=high`, and a dry-run `npm ci` against the
   updated lockfile. The Worker build was re-verified with Node.js 22 (Wrangler 4 requires it).
-- `npm run test:security:db` could not run: the Supabase CLI is missing and the Docker engine is
-  not running. The SQL test has not been verified against PostgreSQL.
+- Passed: `npm run test:security:db` against local Supabase (pgTAP `rls_isolation.test.sql`, 19/19
+  tests). The suite failed before this run because a data-modifying CTE was nested inside a scalar
+  subquery; the assertions now hoist each `WITH` to the statement's top level.
 - GitHub Actions has not run for these local, uncommitted changes.
 
 `npm audit --audit-level=high` now passes with no high or critical advisories (it previously

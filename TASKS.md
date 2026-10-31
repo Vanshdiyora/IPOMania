@@ -24,7 +24,7 @@
 - [x] Add requested backend, security, database, and testing documentation.
 - [ ] Configure a real Supabase project and verify registration, verification, login, logout,
       recovery/reset, profile updates, and account deletion.
-- [ ] Run `npm run test:security:db` against local Supabase and record passing direct RLS results.
+- [x] Run `npm run test:security:db` against local Supabase (19/19 pgTAP tests passed).
 - [x] Triage the npm audit findings, remediate high/critical advisories, and pass the CI dependency
       audit (upgraded Zod 4, Hono 4.13, Wrangler 4, React Router 7, Vite 7, Vitest 4, Node.js 22.12+).
 - [ ] Run all required quality/build checks and verify GitHub CI, including the database-security

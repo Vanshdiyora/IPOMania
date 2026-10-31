@@ -1,13 +1,16 @@
 import postgres from "postgres";
 
-const connectionString = process.env.DATABASE_URL;
+async function main() {
+  const connectionString = process.env.DATABASE_URL;
 
-if (!connectionString) {
-  console.error(
-    "DATABASE_URL is required. Set it to a local or Supabase PostgreSQL connection string.",
-  );
-  process.exitCode = 1;
-} else {
+  if (!connectionString) {
+    console.error(
+      "DATABASE_URL is required. Set it to a local or Supabase PostgreSQL connection string.",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   const sql = postgres(connectionString, { max: 1, connect_timeout: 5 });
   try {
     const result = await sql`select 1 as connected`;
@@ -22,3 +25,5 @@ if (!connectionString) {
     await sql.end();
   }
 }
+
+void main();

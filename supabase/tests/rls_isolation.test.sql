@@ -49,39 +49,43 @@ select is(
   0::bigint,
   'User A cannot read User B profile'
 );
+with changed as (
+  update public.profiles set full_name = 'User A updated'
+  where id = '11111111-1111-4111-8111-111111111111'
+  returning 1
+)
 select is(
-  (with changed as (
-    update public.profiles set full_name = 'User A updated'
-    where id = '11111111-1111-4111-8111-111111111111'
-    returning 1
-  ) select count(*) from changed),
+  (select count(*) from changed),
   1::bigint,
   'User A can update User A profile'
 );
+with changed as (
+  update public.profiles set full_name = 'Compromised'
+  where id = '22222222-2222-4222-8222-222222222222'
+  returning 1
+)
 select is(
-  (with changed as (
-    update public.profiles set full_name = 'Compromised'
-    where id = '22222222-2222-4222-8222-222222222222'
-    returning 1
-  ) select count(*) from changed),
+  (select count(*) from changed),
   0::bigint,
   'User A cannot update User B profile'
 );
+with removed as (
+  delete from public.profiles
+  where id = '22222222-2222-4222-8222-222222222222'
+  returning 1
+)
 select is(
-  (with removed as (
-    delete from public.profiles
-    where id = '22222222-2222-4222-8222-222222222222'
-    returning 1
-  ) select count(*) from removed),
+  (select count(*) from removed),
   0::bigint,
   'User A cannot delete User B profile'
 );
+with removed as (
+  delete from public.profiles
+  where id = '11111111-1111-4111-8111-111111111111'
+  returning 1
+)
 select is(
-  (with removed as (
-    delete from public.profiles
-    where id = '11111111-1111-4111-8111-111111111111'
-    returning 1
-  ) select count(*) from removed),
+  (select count(*) from removed),
   0::bigint,
   'Users cannot directly delete their own profile'
 );
@@ -95,21 +99,23 @@ select is(
   0::bigint,
   'User A cannot read User B preferences'
 );
+with changed as (
+  update public.user_preferences set timezone = 'Europe/London'
+  where user_id = '11111111-1111-4111-8111-111111111111'
+  returning 1
+)
 select is(
-  (with changed as (
-    update public.user_preferences set timezone = 'Europe/London'
-    where user_id = '11111111-1111-4111-8111-111111111111'
-    returning 1
-  ) select count(*) from changed),
+  (select count(*) from changed),
   1::bigint,
   'User A can update User A preferences'
 );
+with changed as (
+  update public.user_preferences set timezone = 'Europe/London'
+  where user_id = '22222222-2222-4222-8222-222222222222'
+  returning 1
+)
 select is(
-  (with changed as (
-    update public.user_preferences set timezone = 'Europe/London'
-    where user_id = '22222222-2222-4222-8222-222222222222'
-    returning 1
-  ) select count(*) from changed),
+  (select count(*) from changed),
   0::bigint,
   'User A cannot update User B preferences'
 );
