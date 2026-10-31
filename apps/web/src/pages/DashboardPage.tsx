@@ -640,6 +640,7 @@ export function DashboardPage() {
                       .map((row, index) => (
                         <Cell
                           key={row.status}
+                          aria-hidden="true"
                           fill={chartColors[index % chartColors.length]}
                           stroke="transparent"
                         />

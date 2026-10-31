@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { auditAccessibility } from "./accessibility";
 
 const ipoId = "88888888-8888-4888-8888-888888888888";
 const accountId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -200,6 +201,7 @@ test("dashboard exposes analytics, filters and downloadable reports", async ({ p
     page.getByRole("img", { name: "Applications grouped by application status" }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Dashboard Test IPO (DASH)" }).first()).toBeVisible();
+  expect(await auditAccessibility(page)).toEqual([]);
 
   const downloadWait = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export CSV" }).click();

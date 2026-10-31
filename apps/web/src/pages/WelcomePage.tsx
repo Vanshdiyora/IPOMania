@@ -47,22 +47,32 @@ export function WelcomePage() {
           {/* CTAs */}
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             {user ? (
-              <Button asChild size="lg">
-                <Link to="/accounts" className="gap-2">
-                  <span>Open Demat Dashboard</span>
-                  <ArrowRight size={18} />
-                </Link>
-              </Button>
+              <div className="space-y-4">
+                <p className="text-sm font-medium text-muted">
+                  Signed in as {user.email}.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                  <Button asChild size="lg">
+                    <Link to="/accounts" className="gap-2">
+                      <span>Open Demat Dashboard</span>
+                      <ArrowRight size={18} />
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="lg">
+                    <Link to="/profile">Manage Profile</Link>
+                  </Button>
+                </div>
+              </div>
             ) : (
               <>
                 <Button asChild size="lg" className="shadow-md">
                   <Link to="/register" className="gap-2">
-                    <span>Get Started Free</span>
+                    <span>Create an account</span>
                     <ArrowRight size={18} />
                   </Link>
                 </Button>
                 <Button asChild variant="outline" size="lg">
-                  <Link to="/login">Sign In</Link>
+                  <Link to="/login">Sign in</Link>
                 </Button>
               </>
             )}

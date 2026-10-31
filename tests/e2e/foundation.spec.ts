@@ -1,10 +1,16 @@
 import { expect, test } from "@playwright/test";
+import { auditAccessibility } from "./accessibility";
 
 test("renders the light application shell", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "Welcome to IPO Mania" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
+});
+
+test("public shell passes automated WCAG 2.2 AA checks", async ({ page }) => {
+  await page.goto("/");
+  expect(await auditAccessibility(page)).toEqual([]);
 });
 
 test("redirects unauthenticated users from the profile to sign in", async ({ page }) => {

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../workers/api/src/app";
+import { createSupabaseFetchMock } from "../helpers/supabase";
 
 const userId = "11111111-1111-4111-8111-111111111111";
 const otherUserId = "22222222-2222-4222-8222-222222222222";
@@ -36,21 +37,7 @@ function installSupabaseMock(
       JSON.stringify({ ...account, id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", user_id: userId }),
     ),
 ) {
-  const restRequests: Request[] = [];
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const request = input instanceof Request ? input : new Request(input, init);
-      if (new URL(request.url).pathname.endsWith("/auth/v1/user")) {
-        return new Response(JSON.stringify(user), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      restRequests.push(request.clone());
-      return handleRest(request);
-    }),
-  );
-  return restRequests;
+  return createSupabaseFetchMock(user, handleRest).restRequests;
 }
 
 function bearerHeaders() {
@@ -139,6 +126,26 @@ describe("demat account API", () => {
       }
       return new Response("[]", {
         headers: { "Content-Type": "application/json", "Content-Range": "50-99/520" },
+      });
+
+      it("treats SQL-like search syntax as a literal PostgREST filter value", async () => {
+        const requests = installSupabaseMock(
+          async () =>
+            new Response("[]", {
+              headers: { "Content-Type": "application/json", "Content-Range": "*/0" },
+            }),
+        );
+        const response = await createApp().request(
+          "/api/accounts?holder_name=%25_%27%20OR%201%3D1%20--",
+          { headers: bearerHeaders() },
+          bindings,
+        );
+
+        expect(response.status).toBe(200);
+        const listRequest = requests.find((request) => request.method === "GET");
+        const query = new URL(listRequest!.url).searchParams;
+        expect(query.get("holder_name")).toBe("ilike.\\%\\_' OR 1=1 --%");
+        expect(query.get("or")).toBeNull();
       });
     });
     const response = await createApp().request(
