@@ -478,7 +478,11 @@ export function DashboardPage() {
                     {analytics.applications_by_status
                       .filter((row) => row.count > 0)
                       .map((row, index) => (
-                        <Cell key={row.status} fill={chartColors[index % chartColors.length]} />
+                        <Cell
+                          key={row.status}
+                          aria-hidden="true"
+                          fill={chartColors[index % chartColors.length]}
+                        />
                       ))}
                   </Pie>
                   <Tooltip formatter={(value) => [value, "Applications"]} />

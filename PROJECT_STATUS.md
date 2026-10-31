@@ -228,3 +228,19 @@ not changed. No table or index was added; Phase 7 adds one analytics migration/f
   a 1.3 MB minified JavaScript bundle warning.
 - The Phase 3 local database/RLS, concurrency, secret-history, hosted configuration, and GitHub CI
   gates remain open and are not represented as passed.
+
+  ## Phase 8 — Parallel QA, security, and testing infrastructure
+
+  **Status: Preparation in progress; not an integrated security certification or production-readiness
+  approval.**
+
+  The Phase 8 branch is `feature/phase-8`, based on the latest `origin/main`, which includes Phase 7.
+  This work adds React Testing Library/jsdom, axe-core scans, Vitest setup/coverage support, Playwright
+  CI execution, reusable synthetic financial fixtures, mocked API helpers, and loopback-only opt-in
+  database URL validation. It does not change Phase 5, 6, or 7 business logic or any shared migration.
+
+  Testing guidance now separates mocked API evidence from direct PostgreSQL/RLS evidence and records
+  the current coverage gaps. The full audit, manual assistive-technology checks, performance
+  measurements, and integrated CI verification remain outstanding. See
+  [`docs/testing/TESTING_STRATEGY.md`](docs/testing/TESTING_STRATEGY.md) and
+  [`docs/testing/TEST_COVERAGE.md`](docs/testing/TEST_COVERAGE.md).

@@ -191,4 +191,23 @@ describe("account import API", () => {
 
     expect(response.status).toBe(415);
   });
+
+  it("rejects uploads larger than the configured size limit", async () => {
+    const requests = installImportMock();
+    const oversizedCsv = new Blob([new Uint8Array(5 * 1024 * 1024 + 1)], {
+      type: "text/csv",
+    });
+    const response = await createApp().request(
+      "/api/accounts/import/preview",
+      {
+        method: "POST",
+        headers: { Authorization: "Bearer test-user-token" },
+        body: fileForm(oversizedCsv, "accounts.csv"),
+      },
+      bindings,
+    );
+
+    expect(response.status).toBe(413);
+    expect(requests).toHaveLength(0);
+  });
 });

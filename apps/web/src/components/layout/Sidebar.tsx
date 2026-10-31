@@ -24,12 +24,9 @@ export function Sidebar() {
       <a
         className="mb-8 flex min-h-touch items-center justify-center gap-3 rounded-lg px-2 text-center text-lg font-bold text-navy sm:justify-start sm:px-3"
         href="/"
-        aria-label="IPO Mania home"
       >
-        <span aria-hidden="true" className="text-xl">
-          IPO
-        </span>
-        <span className="hidden sm:inline">IPO Mania</span>
+        <span className="text-xl">IPO</span>
+        <span className="hidden sm:inline">Mania</span>
       </a>
       <nav aria-label="Main navigation">
         <NavLink
@@ -49,7 +46,6 @@ export function Sidebar() {
             <NavLink
               to="/accounts"
               end
-              aria-label="Demat account dashboard"
               className={({ isActive }) =>
                 `mt-2 flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
                   isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
@@ -57,7 +53,7 @@ export function Sidebar() {
               }
             >
               <BriefcaseBusiness aria-hidden="true" size={20} />
-              <span className="hidden sm:inline">Demat accounts</span>
+              <span className="sr-only sm:not-sr-only">Demat accounts</span>
             </NavLink>
             <div className="hidden pl-5 sm:block">
               <NavLink
@@ -93,7 +89,6 @@ export function Sidebar() {
             </div>
             <NavLink
               to="/applications"
-              aria-label="IPO application manager"
               className={({ isActive }) =>
                 `mt-2 flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
                   isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
@@ -101,7 +96,7 @@ export function Sidebar() {
               }
             >
               <ClipboardList aria-hidden="true" size={20} />
-              <span className="hidden sm:inline">Applications</span>
+              <span className="sr-only sm:not-sr-only">Applications</span>
             </NavLink>
             <div className="hidden pl-5 sm:block">
               <NavLink to="/applications/list" className={applicationNavClass}>
@@ -119,7 +114,6 @@ export function Sidebar() {
             </div>
             <NavLink
               to="/ipos"
-              aria-label="IPO management"
               className={({ isActive }) =>
                 `mt-2 flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
                   isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
@@ -127,7 +121,7 @@ export function Sidebar() {
               }
             >
               <CalendarDays aria-hidden="true" size={20} />
-              <span className="hidden sm:inline">IPOs</span>
+              <span className="sr-only sm:not-sr-only">IPOs</span>
             </NavLink>
             <div className="hidden pl-5 sm:block">
               <NavLink
