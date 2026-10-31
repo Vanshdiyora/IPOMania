@@ -1,8 +1,8 @@
 # Environment variables
 
-Copy `.env.example` for local reference, and keep real `.env*` files and `.dev.vars` out of version
-control. Do not place production secrets in Vite variables: names prefixed with `VITE_` are exposed
-to browser code.
+Copy `.env.example` to the repository-root `.env` for local development, and keep real `.env*` files
+and `.dev.vars` out of version control. Vite reads that root file but exposes only variables prefixed
+with `VITE_` to browser code. Never put secrets in `VITE_` variables.
 
 | Variable                    | Consumer                       | Required               | Notes                                                             |
 | --------------------------- | ------------------------------ | ---------------------- | ----------------------------------------------------------------- |
@@ -18,11 +18,12 @@ to browser code.
 
 ## Local database
 
-Install the Supabase CLI, then use `supabase start` to launch the local project. The local
-PostgreSQL port is 54322 as configured in `supabase/config.toml`. Set `DATABASE_URL` to the CLI
-reported database URL and run `npm run db:check`. Use the CLI's local status output for the anon
-key and API URL. Put browser variables in `.env.local` and Worker-only bindings in
-`workers/api/.dev.vars`. Never check local credentials into source control.
+For local development, Vite reads the root `.env`, and `npm run dev:api` passes it to Wrangler.
+Use either hosted Supabase project values or local values from `supabase status`. The service-role
+key is available only to the API Worker and must never be given a `VITE_` name. For database checks,
+install the Supabase CLI and run `supabase start`; the local PostgreSQL port is 54322 as configured
+in `supabase/config.toml`. Set `DATABASE_URL` to the CLI-reported database URL and run
+`npm run db:check`. Never check local credentials into source control.
 
 ## JWT/RLS operations
 

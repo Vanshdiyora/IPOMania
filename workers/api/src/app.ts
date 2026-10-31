@@ -4,6 +4,7 @@ import type { ApiErrorResponse, ApiSuccessResponse, HealthStatus } from "@ipo-ma
 import { validateEnvironment, type EnvironmentBindings } from "./env";
 import { meRoutes } from "./routes/me";
 import { accountRoutes } from "./routes/account";
+import { accountsRoutes } from "./routes/accounts";
 
 const apiVersion = "1.0.0";
 
@@ -24,13 +25,14 @@ export function createApp() {
         return origin && allowedOrigins.has(origin) ? origin : undefined;
       },
       allowHeaders: ["Authorization", "Content-Type"],
-      allowMethods: ["GET", "PATCH", "DELETE", "OPTIONS"],
+      allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
       maxAge: 600,
     }),
   );
 
   app.route("/api/me", meRoutes);
   app.route("/api/auth/account", accountRoutes);
+  app.route("/api/accounts", accountsRoutes);
 
   app.get("/api/health", (context) => {
     const environment = validateEnvironment(context.env ?? {});

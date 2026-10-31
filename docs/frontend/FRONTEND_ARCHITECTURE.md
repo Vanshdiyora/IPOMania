@@ -12,7 +12,10 @@ restoration and distinguish expired sessions. Reusable display elements live und
 `tailwind.config.ts` and global fixed-light tokens are declared in `src/styles.css`. `components.json`
 and `src/lib/utils.ts` configure the standard shadcn/ui utility conventions.
 
-Zustand, React Hook Form, TanStack Table/Virtual, Recharts, and TanStack Query are available for
-future features; this shell intentionally does not create business stores, forms, tables, or charts.
+The protected demat-account routes include the dashboard, server-filtered account list, add/edit
+forms, details, bulk import, and import history. TanStack Query handles API state; TanStack Table
+and Virtual render the desktop account list, with readable mobile account cards. The forms and
+import mapping use accessible labels and inline validation. The fixed light palette and minimum
+touch-target styles apply throughout.
 Routing errors and unmatched paths render the not-found page. Unhandled React rendering errors are
 logged locally and replaced by an accessible recovery view.

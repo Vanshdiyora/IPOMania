@@ -2,7 +2,10 @@
 
 Application PostgreSQL migrations are stored here and applied by the Supabase CLI. Supabase Auth
 owns the `auth` schema; application tables may reference `auth.users` but must not modify that
-schema. See [RLS policies](../../docs/database/RLS_POLICIES.md) for user-owned table requirements.
+schema. Current migrations cover profiles/preferences and demat accounts/import history. See
+[RLS policies](../../docs/database/RLS_POLICIES.md) and
+[ACCOUNT_SCHEMA.md](../../docs/database/ACCOUNT_SCHEMA.md) for ownership, capacity, and retention.
 
-Run `supabase test db` against the local Supabase stack to execute the database policy tests in
-`supabase/tests/`.
+Run `supabase test db` against the local Supabase stack to execute the database policy and account
+tests in `supabase/tests/`. Run the additional two-connection capacity test only against a
+disposable loopback database using `DEMAT_TEST_DATABASE_URL`.

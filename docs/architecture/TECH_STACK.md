@@ -14,5 +14,6 @@
 | Tests              | Vitest and Playwright                                              |
 | Quality/CI         | ESLint, Prettier, GitHub Actions, npm audit                        |
 
-The choices are wired in the manifests and configuration. UI and data libraries are foundational
-dependencies only; no IPO business module is implemented.
+The choices are wired in the manifests and configuration. The demat-account management module
+uses the existing TanStack data/table/virtualization stack. IPO applications, market data, and the
+quota engine are not implemented.

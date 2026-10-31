@@ -23,6 +23,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:security:db": "supabase test db",
+    "test:integration:accounts": "vitest run tests/integration/demat-account-capacity.test.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:check": "tsx scripts/check-db.ts",
