@@ -16,7 +16,7 @@
     "dev:api": "npm --workspace @ipo-mania/api run dev",
     "build": "npm run typecheck && npm run build:web && npm run build:api",
     "build:web": "npm run build --workspace @ipo-mania/web",
-    "build:api": "npm run build --workspace @ipo-mania/api",
+    "build:api": "npm run build --workspace @ipo-mania/shared && npm run build --workspace @ipo-mania/validation && npm run build --workspace @ipo-mania/financial-engine && npm run build --workspace @ipo-mania/api",
     "typecheck": "tsc --build",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",

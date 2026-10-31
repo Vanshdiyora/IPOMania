@@ -49,7 +49,7 @@ For hosted Supabase, use that project's URL and anon key. For local Supabase, us
 | `npm run test:security:db`          | Run direct PostgreSQL RLS tests (requires Supabase + Docker)   |
 | `npm run test:integration:accounts` | Test concurrent account creation in an isolated local database |
 | `npm run build:web`                 | Create the production frontend build                           |
-| `npm run build:api`                 | Bundle the Worker with Wrangler                                |
+| `npm run build:api`                 | Build shared packages and bundle the Worker with Wrangler      |
 | `npm run build`                     | Type-check and build both applications                         |
 | `npm run db:check`                  | Verify PostgreSQL connectivity with `SELECT 1`                 |
 | `npm run db:migrations:check`       | Check Drizzle migration consistency                            |

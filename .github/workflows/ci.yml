@@ -82,6 +82,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build Cloudflare Worker
+        run: npm run build:api
+
       - name: Deploy API Worker
         working-directory: workers/api
         env:
