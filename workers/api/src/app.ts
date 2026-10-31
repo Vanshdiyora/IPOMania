@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { createClient } from "@supabase/supabase-js";
 import { cors } from "hono/cors";
 import type { ApiErrorResponse, ApiSuccessResponse, HealthStatus } from "@ipo-mania/shared";
 import { validateEnvironment, type EnvironmentBindings } from "./env";
@@ -10,6 +11,7 @@ import { quotaRoutes } from "./routes/quota";
 import { capitalRoutes } from "./routes/capital";
 import { analyticsRoutes } from "./routes/analytics";
 import { applicationImportRoutes, applicationsRoutes } from "./routes/applications";
+import { adminIpoRoutes } from "./routes/admin-ipos";
 
 const apiVersion = "1.0.0";
 
@@ -45,6 +47,36 @@ export function createApp() {
   app.route("/api/analytics", analyticsRoutes);
   app.route("/api/applications", applicationsRoutes);
   app.route("/api/imports", applicationImportRoutes);
+  app.route("/api/admin/ipos", adminIpoRoutes());
+
+  app.get("/api/public/ipos", async (context) => {
+    const environment = validateEnvironment(context.env ?? {});
+    if (!environment.SUPABASE_URL || !environment.SUPABASE_ANON_KEY) {
+      return context.json(
+        { error: { code: "SERVICE_UNAVAILABLE", message: "Public IPO data is not configured." } },
+        503,
+      );
+    }
+    const supabase = createClient(environment.SUPABASE_URL, environment.SUPABASE_ANON_KEY);
+    const status = context.req.query("status")?.toLowerCase();
+    let request = supabase
+      .from("ipo_catalog")
+      .select("*")
+      .is("archived_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(200);
+    if (["upcoming", "open", "closed", "listed"].includes(status ?? ""))
+      request = request.eq("ipo_status", status);
+    const { data, error } = await request;
+    if (error)
+      return context.json(
+        { error: { code: "DATABASE_ERROR", message: "IPO data could not be loaded." } },
+        500,
+      );
+    return context.json({ data: data ?? [] }, 200, {
+      "Cache-Control": "public, max-age=300, stale-while-revalidate=900",
+    });
+  });
 
   app.get("/api/health", (context) => {
     const environment = validateEnvironment(context.env ?? {});

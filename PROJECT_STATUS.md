@@ -117,10 +117,10 @@ formatting and the independent Phase 3 database gates remain open.**
 
 The Phase 4 implementation adds user-owned IPO records, issue-specific append-only category rule
 versions, exact-decimal financial calculations, authenticated API routes, and protected IPO list,
-details, edit, category, calendar, and quota-calculator pages. IPO records are user-specific because
-the application has no trusted shared-catalog editor. Manual records and user-provided eligibility
-inputs are never represented as automatically verified. No IPO application or allotment workflow
-has been added.
+details, edit, category, calendar, and quota-calculator pages. Those records remain user-specific;
+the separately approved admin synchronization module may maintain a distinct shared catalog instead.
+Manual records and user-provided eligibility inputs are never represented as automatically verified.
+No IPO application or allotment workflow was added as part of this Phase 4 implementation.
 
 The quota engine is in `packages/financial-engine/` and uses `decimal.js`. It has no category
 defaults; unknown lot or investment rules fail closed. Historical calculations retain issue price,
@@ -130,9 +130,10 @@ additional local constraint was applied without resetting data, and the focused 
 rerun successfully.
 
 No official IPO-rule example was available in the repository. Tests use synthetic arithmetic
-fixtures, explicitly not authoritative rules. Do not proceed to IPO application management until
-the critical financial tests pass; the financial, API, validation, and database tests now pass, and
-no application-submission or allotment workflow was added.
+fixtures, explicitly not authoritative rules. The previous restriction against shared admin-managed
+IPO master data and synchronization has been explicitly lifted by the approved admin module task;
+this can now coexist with the user-owned IPO manager. No investment advice or application-submission
+workflow was added as part of this Phase 4 implementation.
 
 ### Phase 4 verification in this workspace
 

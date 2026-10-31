@@ -2,12 +2,14 @@
 
 ## Phase boundary
 
-Phase 4 implements user-owned IPO management and the issue-specific quota calculator under the
-approved Phase 4 task. Phase 3 local database/RLS, concurrency, and repository-wide formatting
-verification remains open; do not describe that gate as passed. Do not add IPO application
-submission/allotment workflows, investment advice, shared IPO master records, or fabricated market
-data without a separate approved task. Do not proceed to application management until critical
-financial calculation tests pass.
+Phase 4 implements the approved user-owned IPO management and issue-specific quota calculator,
+and also permits the separately approved admin-managed IPO synchronization module requested for
+IPO Mania. This authorization overrides the previous shared-catalog restriction; implement shared
+admin-managed IPO master data without using fabricated market data or investment advice. Phase 3
+local database/RLS, concurrency, and repository-wide formatting verification remains open; do not
+describe that gate as passed. Preserve existing user-owned IPO behavior and existing application
+workflows. Do not proceed to investment advice or IPO application submission/allotment behavior
+unless it is separately approved.
 
 ## Engineering conventions
 

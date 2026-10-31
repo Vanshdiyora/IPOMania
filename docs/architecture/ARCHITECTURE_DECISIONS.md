@@ -64,15 +64,16 @@ database transaction to confirm, and archive unchanged rows for reversal.
 **Reasoning:** A durable preview preserves invalid/duplicate row reports, a transaction avoids
 partial imports, and an idempotent state transition makes retries safe without service-role access.
 
-## ADR 009 — user-specific IPO records until a trusted publisher exists
+## ADR 009 — separate user-owned records and the approved admin catalog
 
-**Decision:** IPO records, category rules, and calculation history are user-owned and protected by
-forced RLS.
+**Decision:** User-facing IPO records, category rules, and calculation history remain user-owned and
+protected by forced RLS. The separately approved admin synchronization module may maintain a
+distinct shared catalog using explicit admin authorization, provider provenance, and field-level
+overrides.
 
-**Reasoning:** The application has no trusted shared-catalog editor or publication workflow.
-Making records shared would allow one user's manual data and private context to leak or be changed
-by another user. A future shared catalog requires a separately approved editorial authorization
-model.
+**Reasoning:** Sharing the existing user-owned records would expose one user's manual context and
+private data. The shared catalog must therefore be a separate domain with role-protected APIs and
+publication/RLS policies; admin implementation does not change ownership of user-specific records.
 
 ## ADR 010 — immutable issue-specific quota rule versions
 

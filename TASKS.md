@@ -73,7 +73,8 @@ expectation mismatch, and import fixture/grant issues; these remain outside the 
 ## Phase 4 — IPO manager and quota engine
 
 - [x] Read product, database, and architecture documentation before implementation.
-- [x] Choose and document user-owned IPO records until an approved shared-catalog editor exists.
+- [x] Choose and document user-owned IPO records for the user-facing manager; shared
+      admin-managed IPO synchronization and catalog support are now separately approved.
 - [x] Add IPO CRUD, search/filter, manual provenance, status, archive, and database ownership/RLS.
 - [x] Add append-only issue-specific rules for RETAIL, SHNI, BHNI, and SHAREHOLDER without category
       defaults or hard-coded limits.

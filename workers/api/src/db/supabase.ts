@@ -1,6 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 import { validateEnvironment, type EnvironmentBindings } from "../env";
 
+export function createServiceSupabaseClient(bindings: EnvironmentBindings) {
+  const environment = validateEnvironment(bindings);
+  if (!environment.SUPABASE_URL || !environment.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error(
+      "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured for scheduled synchronization.",
+    );
+  }
+  return createClient(environment.SUPABASE_URL, environment.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}
+
 export function createRlsSupabaseClient(request: Request, bindings: EnvironmentBindings) {
   const environment = validateEnvironment(bindings);
   if (!environment.SUPABASE_URL || !environment.SUPABASE_ANON_KEY) {

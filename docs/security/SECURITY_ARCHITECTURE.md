@@ -27,7 +27,8 @@
   Active membership is serialized and capped in the database. Import confirmation and reversal
   use narrow `SECURITY DEFINER` RPCs with an empty search path and explicit `auth.uid()` ownership
   checks; direct clients cannot update import state or results.
-- IPO data is user-specific until a trusted shared-catalog editor is designed. IPO, category-rule,
+- User-facing IPO data is user-specific; the separately approved admin IPO synchronization module
+  may maintain a distinct shared catalog under explicit admin authorization. IPO, category-rule,
   and calculation tables force RLS; composite foreign keys bind categories/calculations to the same
   user-owned IPO and demat account. Rule versions are database-assigned and immutable, and
   calculation records cannot be updated through authenticated grants.

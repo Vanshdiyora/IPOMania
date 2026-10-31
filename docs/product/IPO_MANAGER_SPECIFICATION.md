@@ -3,11 +3,11 @@
 ## Scope and ownership
 
 IPO records are **user-specific**, not shared master data. Every IPO row belongs to the
-authenticated user who created it. This is the deliberate Phase 4 choice because the project has
-no trusted publisher, editorial workflow, or administrator role for maintaining a shared IPO
-catalog. RLS prevents another user from reading or changing the record. A future shared catalog
-requires an explicit publishing and review design; it must not expose user-specific notes or
-calculation inputs.
+authenticated user who created it. This remains the ownership model for the user-facing IPO
+manager. A separate administrator-managed IPO synchronization and master-catalog module is now
+approved; it may coexist with user-owned records when implemented through explicit shared/public
+access controls, provider provenance, field-level overrides, and admin authorization. It must not
+expose user-specific notes or calculation inputs, and it must not create fabricated market data.
 
 The manager stores manually entered IPO facts and issue-specific category rules. An eligible saved
 quota calculation may be recorded as a private application-tracking record; this does not submit

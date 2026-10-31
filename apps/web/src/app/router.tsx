@@ -18,6 +18,15 @@ import {
   ImportHistoryPage,
 } from "../pages/accounts/AccountPages";
 import {
+  AdminHistoryPage,
+  AdminIposPage,
+  AdminLayout,
+  AdminOverviewPage,
+  AdminRoute,
+  AdminSettingsPage,
+  AdminSyncPage,
+} from "../pages/admin/AdminPages";
+import {
   IpoCategoryConfigurationPage,
   IpoDetailsPage,
   IpoFormPage,
@@ -55,6 +64,21 @@ export const router = createBrowserRouter([
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
   { path: "/reset-password", element: <ResetPasswordPage /> },
   { path: "/auth/confirm", element: <ConfirmEmailPage /> },
+  {
+    path: "/admin",
+    element: (
+      <AdminRoute>
+        <AdminLayout />
+      </AdminRoute>
+    ),
+    children: [
+      { index: true, element: <AdminOverviewPage /> },
+      { path: "ipos", element: <AdminIposPage /> },
+      { path: "sync", element: <AdminSyncPage /> },
+      { path: "ipo-sync-history", element: <AdminHistoryPage /> },
+      { path: "settings", element: <AdminSettingsPage /> },
+    ],
+  },
   {
     path: "/",
     element: <AppLayout />,

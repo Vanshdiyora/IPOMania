@@ -41,7 +41,8 @@ Shared packages: API types | validation exports | financial engine boundary
   summary logic delegates decimal operations to the isolated financial engine.
 - `packages/financial-engine` owns transport-independent exact-decimal capital summary and P&L
   calculations, in addition to issue-specific quota calculations.
-- IPO master data is per-user until the project defines a trusted shared-catalog publishing role.
+- IPO data used by the user manager is per-user; the approved admin module may maintain a distinct
+  shared catalog with explicit admin authorization and public read policies.
 - `apps/web` provides IPO list/details/forms, a date-ordered calendar, category configuration, and
   a calculator with explicit eligibility explanations.
 - PostgreSQL serializes each user's account-capacity changes through a private, atomically updated
