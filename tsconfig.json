@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./packages/validation" },
+    { "path": "./packages/financial-engine" },
+    { "path": "./workers/api" },
+    { "path": "./apps/web" }
+  ]
+}

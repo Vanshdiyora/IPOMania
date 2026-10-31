@@ -1,0 +1,22 @@
+{
+  "name": "@ipo-mania/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --ip 127.0.0.1 --port 8787",
+    "build": "wrangler deploy --dry-run --outdir dist"
+  },
+  "dependencies": {
+    "@ipo-mania/shared": "0.1.0",
+    "@ipo-mania/validation": "0.1.0",
+    "@hono/zod-validator": "0.4.2",
+    "@supabase/supabase-js": "2.49.1",
+    "hono": "4.6.16",
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20241218.0",
+    "wrangler": "3.99.0"
+  }
+}

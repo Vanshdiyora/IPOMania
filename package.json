@@ -1,0 +1,63 @@
+{
+  "name": "ipo-mania",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IPO Mania monorepo foundation",
+  "workspaces": [
+    "apps/web",
+    "workers/api",
+    "packages/shared",
+    "packages/validation",
+    "packages/financial-engine"
+  ],
+  "scripts": {
+    "dev": "npm --workspace @ipo-mania/web run dev",
+    "dev:web": "npm --workspace @ipo-mania/web run dev",
+    "dev:api": "npm --workspace @ipo-mania/api run dev",
+    "build": "npm run typecheck && npm run build:web && npm run build:api",
+    "build:web": "npm run build --workspace @ipo-mania/web",
+    "build:api": "npm run build --workspace @ipo-mania/api",
+    "typecheck": "tsc --build",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "db:check": "tsx scripts/check-db.ts",
+    "db:generate": "supabase gen types typescript --local",
+    "db:migrations:check": "drizzle-kit check",
+    "audit": "npm audit --audit-level=high"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.1",
+    "@types/node": "20.17.10",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@typescript-eslint/eslint-plugin": "8.18.0",
+    "@typescript-eslint/parser": "8.18.0",
+    "@vitejs/plugin-react": "4.3.4",
+    "autoprefixer": "10.4.20",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "drizzle-kit": "0.30.1",
+    "eslint": "8.57.1",
+    "eslint-plugin-react-hooks": "5.1.0",
+    "eslint-plugin-react-refresh": "0.4.16",
+    "postcss": "8.4.49",
+    "prettier": "3.4.2",
+    "tailwindcss": "3.4.16",
+    "tailwind-merge": "2.5.5",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2",
+    "vite": "5.4.11",
+    "vitest": "2.1.6"
+  },
+  "dependencies": {
+    "postgres": "3.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
