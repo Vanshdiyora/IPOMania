@@ -12,24 +12,25 @@
   branch and deploys to the isolated `preview` Cloudflare environment.
 - `deploy-production.yml` runs automatically after the `CI` workflow completes successfully for
   a push to `main` (including the push created when a pull request is merged). It can also be
-  dispatched manually from `main`. Its `production` GitHub environment must require
-  reviewer approval before the job can access environment secrets. This workflow does not apply
-  database migrations.
+  dispatched manually from `main`. The `production-api` and `production-web` GitHub environments
+  must require reviewer approval before their jobs can access environment secrets. This workflow
+  does not apply database migrations.
 
 ## GitHub environment setup
 
-Create GitHub environments named `preview` and `production` under **Settings → Environments**.
+Create GitHub environments named `preview`, `production-api`, and `production-web` under
+**Settings → Environments**.
 
-For `production`:
+For each production environment:
 
 1. Require one or more designated reviewers; disallow self-review and administrator bypass where
    the repository plan/settings permit it.
 2. Limit deployment branches to `main`.
 3. Add environment-scoped secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Use a
-   production-specific Cloudflare API token.
-4. Add the environment variables listed in
-   [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md), including production Supabase public
-   values and the exact production health-check URLs.
+   production-specific Cloudflare API token in both environments.
+4. In `production-api`, add `API_HEALTH_URL`. In `production-web`, add `VITE_SUPABASE_URL`,
+   `VITE_SUPABASE_ANON_KEY`, `VITE_WEB_APP_ORIGIN`, and `WEB_HEALTH_URL`. See
+   [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md).
 
 Also protect `main` in repository rulesets: require pull requests, block force pushes, and require
 the `Quality and build`, `Supabase RLS tests`, and `Analyze TypeScript` checks before merge. These
@@ -58,8 +59,8 @@ Before creating or approving a production release:
 3. Dispatch the preview workflow from a trusted branch and verify the preview health endpoints,
    authentication redirects, CORS, and core smoke tests.
 4. A push of the exact commit to `main` starts production automatically after successful CI, or
-   dispatch production manually from `main`; obtain the independent `production` environment
-   approval before deployment.
+   dispatch production manually from `main`; obtain approval for both `production-api` and
+   `production-web` before their deployments.
 5. Confirm the API health response reports `production`, the website responds over HTTPS, and
    browser authentication uses the intended production Supabase project.
 6. If verification fails, stop further changes and use
