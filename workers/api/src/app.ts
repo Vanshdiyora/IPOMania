@@ -1,11 +1,36 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import type { ApiErrorResponse, ApiSuccessResponse, HealthStatus } from "@ipo-mania/shared";
 import { validateEnvironment, type EnvironmentBindings } from "./env";
+import { meRoutes } from "./routes/me";
+import { accountRoutes } from "./routes/account";
 
 const apiVersion = "1.0.0";
 
 export function createApp() {
   const app = new Hono<{ Bindings: EnvironmentBindings }>();
+
+  app.use(
+    "/api/*",
+    cors({
+      origin: (origin, context) => {
+        const configuredOrigin = context.env?.WEB_APP_ORIGIN;
+        const allowedOrigins = new Set([
+          ...(context.env?.RUNTIME_ENV === "production"
+            ? []
+            : ["http://127.0.0.1:4175", "http://localhost:4175"]),
+          ...(configuredOrigin ? [configuredOrigin] : []),
+        ]);
+        return origin && allowedOrigins.has(origin) ? origin : undefined;
+      },
+      allowHeaders: ["Authorization", "Content-Type"],
+      allowMethods: ["GET", "PATCH", "DELETE", "OPTIONS"],
+      maxAge: 600,
+    }),
+  );
+
+  app.route("/api/me", meRoutes);
+  app.route("/api/auth/account", accountRoutes);
 
   app.get("/api/health", (context) => {
     const environment = validateEnvironment(context.env ?? {});
@@ -32,7 +57,7 @@ export function createApp() {
 
   app.onError((error, context) => {
     console.error("Unhandled API error", {
-      message: error.message,
+      name: error.name,
       method: context.req.method,
       path: context.req.path,
     });

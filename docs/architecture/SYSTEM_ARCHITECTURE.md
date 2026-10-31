@@ -1,6 +1,6 @@
 # System architecture
 
-## Phase 1 scope
+## Current scope
 
 The repository is a TypeScript npm-workspaces monorepo. The browser application is a React SPA
 served and built by Vite. Its future HTTP boundary is a Hono application running on Cloudflare
@@ -11,8 +11,9 @@ schema.
 ```text
 Browser
   └── React / Vite application
-        └── future HTTP calls ──> Hono / Cloudflare Worker
-                                   └── Supabase/PostgreSQL (future RLS operations)
+        ├── Supabase Auth (email/password; PKCE session)
+        └── bearer-token HTTP calls ──> Hono / Cloudflare Worker
+                                        └── Supabase/PostgreSQL (caller JWT + anon key + RLS)
 
 Shared packages: API types | validation exports | financial engine boundary
 ```
@@ -34,12 +35,13 @@ from apps or workers, preventing circular dependencies.
 ## API and errors
 
 `GET /api/health` returns a typed status payload with the API version and validated runtime
-environment. The API does not expose credentials. Unmatched routes return a structured 404. The
-global error handler logs server-side context and returns a generic structured 500 response.
+environment. Protected profile routes verify the bearer token through Supabase Auth before
+forwarding it as the PostgREST authorization context. Account deletion is the only service-role
+operation and receives only the verified caller's user ID. Errors are structured; logs do not
+include tokens or request bodies.
 
 ## Database and RLS plan
 
-Future database operations should use Supabase's anon project key with the caller's verified
-Supabase JWT forwarded as the request authorization context. This retains PostgreSQL RLS behavior.
-No service-role access or authentication flow is implemented in Phase 1. See
+User-scoped database operations use Supabase's anon project key with the caller's verified JWT
+forwarded as the request authorization context. This retains PostgreSQL RLS behavior. See
 [DATA_FLOW.md](./DATA_FLOW.md) and [environment variables](../deployment/ENVIRONMENT_VARIABLES.md).

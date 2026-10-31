@@ -36,3 +36,13 @@ the database. The Phase 1 scaffold does not implement authentication or data ope
 records.
 
 **Reasoning:** Product requirements and policy need to define the business model in a later phase.
+
+## ADR 006 — Supabase Auth and caller-context RLS
+
+**Decision:** Supabase Auth owns credentials and PKCE sessions. Protected API routes verify the
+bearer token with Supabase Auth and forward the same token with the anon project key for
+user-scoped PostgREST operations.
+
+**Reasoning:** Server-side Auth verification provides the authoritative user identity, and
+PostgreSQL RLS remains the final owner-isolation boundary. Service-role access is isolated to the
+verified account-deletion operation.

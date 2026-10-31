@@ -4,8 +4,11 @@
 boundary and styles. `src/app/App.tsx` sets up TanStack Query, and `src/app/router.tsx` defines
 client-side routes. `AppLayout` composes the responsive sidebar, header, and route outlet.
 
-Reusable display elements live under `src/components/`; primitives compatible with shadcn/ui's
-copy-in component approach live in `src/components/ui/`. Tailwind design tokens are configured in
+Supabase Auth state is managed by `src/auth/AuthProvider.tsx`. Registration, login, recovery, reset,
+verification, and profile pages use React Hook Form and Zod. Protected routes wait for session
+restoration and distinguish expired sessions. Reusable display elements live under
+`src/components/`; primitives compatible with shadcn/ui's copy-in component approach live in
+`src/components/ui/`. Tailwind design tokens are configured in
 `tailwind.config.ts` and global fixed-light tokens are declared in `src/styles.css`. `components.json`
 and `src/lib/utils.ts` configure the standard shadcn/ui utility conventions.
 

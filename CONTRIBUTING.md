@@ -2,7 +2,7 @@
 
 ## Local setup
 
-Install Node.js 20+ and npm 10+, then run `npm ci`. Copy `.env.example` to `.env.local` for local
+Install Node.js 22.12+ and npm 10+, then run `npm ci`. Copy `.env.example` to `.env.local` for local
 settings. The web frontend and Worker API run independently with `npm run dev:web` and
 `npm run dev:api`.
 

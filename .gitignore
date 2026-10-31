@@ -8,5 +8,8 @@ test-results/
 .env
 .env.*
 !.env.example
+/supabase/.branches/
+/supabase/.temp/
+/supabase-start*.log
+/supabase-status-*.tmp
 .DS_Store
-

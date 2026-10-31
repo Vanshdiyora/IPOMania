@@ -1,7 +1,7 @@
 # GitHub Actions
 
 `.github/workflows/ci.yml` runs for pushes to `main` and all pull requests. The quality job uses
-Ubuntu and Node.js 20 with npm caching, then runs `npm ci`, formatting, lint, TypeScript checks,
+Ubuntu and Node.js 22 with npm caching, then runs `npm ci`, formatting, lint, TypeScript checks,
 Vitest, frontend production build, Worker dry-run bundle, and `npm audit --audit-level=high`.
 
 The workflow requests read-only repository contents permission. It does not need secrets because
