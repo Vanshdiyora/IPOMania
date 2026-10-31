@@ -1,13 +1,13 @@
 import { createBrowserRouter } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
 import { NotFoundPage } from "../pages/NotFoundPage";
-import { WelcomePage } from "../pages/WelcomePage";
 import { RegisterPage } from "../pages/RegisterPage";
 import { LoginPage } from "../pages/LoginPage";
 import { ForgotPasswordPage } from "../pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "../pages/ResetPasswordPage";
 import { ConfirmEmailPage } from "../pages/ConfirmEmailPage";
 import { ProfilePage } from "../pages/ProfilePage";
+import { DashboardHomePage } from "../pages/DashboardPage";
 import { ProtectedRoute } from "../auth/ProtectedRoute";
 import {
   AccountDashboardPage,
@@ -60,7 +60,7 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     errorElement: <NotFoundPage />,
     children: [
-      { index: true, element: <WelcomePage /> },
+      { index: true, element: <DashboardHomePage /> },
       { path: "accounts", element: protectedPage(<AccountDashboardPage />) },
       { path: "accounts/list", element: protectedPage(<AccountListPage />) },
       { path: "accounts/new", element: protectedPage(<AccountFormPage />) },

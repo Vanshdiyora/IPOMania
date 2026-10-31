@@ -2,9 +2,9 @@
 
 ```text
 apps/
-  web/                 React/Vite app, Supabase Auth, demat and IPO management pages
+  web/                 React/Vite app, Supabase Auth, dashboard, demat and IPO pages
 workers/
-  api/                 Hono routes, JWT verification, environment, and DB adapters
+  api/                 Hono routes, JWT verification, analytics aggregation, and DB adapters
 packages/
   shared/              Shared response and health types
   validation/          Shared Zod export

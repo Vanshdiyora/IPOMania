@@ -44,3 +44,29 @@ export async function apiRequest<T>(
 
   return payload as T;
 }
+
+export async function downloadApiFile(path: string, session: Session): Promise<void> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? ""}${path}`, {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json()) as ApiErrorResponse;
+    throw new ApiRequestError(
+      payload.error?.message ?? "The report could not be exported.",
+      response.status,
+    );
+  }
+
+  const filename =
+    response.headers
+      .get("Content-Disposition")
+      ?.match(/filename="([^"]+)"/i)?.[1]
+      ?.replace(/[\\/"\r\n]/g, "") ?? "ipo-mania-report";
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
