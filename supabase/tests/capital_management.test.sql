@@ -1,6 +1,6 @@
 begin;
 
-select plan(41);
+select plan(43);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -141,6 +141,12 @@ select lives_ok(
       'RETAIL', 1, 10, 10, 20, null, 2, 20, 'BID', 10, 200
     )$$,
   'User A records an application from their eligible calculation'
+);
+select set_config(
+  'ipo_test.user_a_application_id',
+  (select id::text from public.applications
+    where quota_calculation_id = '9a9a9a9a-9a9a-49a9-89a9-9a9a9a9a9a9a'),
+  true
 );
 select is((select count(*) from public.applications), 1::bigint, 'User A reads only their application');
 select is(
@@ -288,41 +294,9 @@ select throws_ok(
   'Duplicate financial events are rejected instead of silently appended'
 );
 select is(
-  (select count(*) from public.applications where id = 'abababab-abab-4bab-8bab-abababababab'),
-  0::bigint,
-  'User A cannot read User B application'
-);
-select is(
-  (select count(*) from public.mandates where application_id = 'abababab-abab-4bab-8bab-abababababab'),
-  0::bigint,
-  'User A cannot read a mandate belonging to User B'
-);
-select is(
-  (select count(*) from public.allotments where application_id = 'abababab-abab-4bab-8bab-abababababab'),
-  0::bigint,
-  'User A cannot read User B allotments'
-);
-select is(
-  (select count(*) from public.capital_ledger where user_id = '23232323-2323-4232-8232-232323232323'),
-  0::bigint,
-  'User A cannot read User B ledger events'
-);
-select is(
   (select count(*) from public.allotment_history),
   2::bigint,
   'User A reads their allotment history'
-);
-select throws_ok(
-  $$insert into public.mandates (
-      user_id, application_id, mandate_reference, mandate_amount
-    ) values (
-      '12121212-1212-4121-8121-121212121212',
-      (select id from public.applications where quota_calculation_id = 'abababab-abab-4bab-8bab-abababababab'),
-      'FORGED-APPLICATION', 200
-    )$$,
-  '23503',
-  'insert or update on table "mandates" violates foreign key constraint "mandates_owner_application_fk"',
-  'User A cannot bind a mandate to User B application'
 );
 select throws_ok(
   $$delete from public.capital_ledger where idempotency_key = 'debit-a-1'$$,
@@ -354,14 +328,89 @@ select lives_ok(
     )$$,
   'User B can record their own eligible application'
 );
+select set_config(
+  'ipo_test.user_b_application_id',
+  (select id::text from public.applications
+    where quota_calculation_id = 'abababab-abab-4bab-8bab-abababababab'),
+  true
+);
+select lives_ok(
+  $$insert into public.mandates (
+      user_id, application_id, mandate_reference, mandate_amount
+    ) values (
+      '23232323-2323-4232-8232-232323232323',
+      current_setting('ipo_test.user_b_application_id')::uuid,
+      'MANDATE-B-1', 200
+    )$$,
+  'User B creates a mandate for their application'
+);
+select lives_ok(
+  $$insert into public.allotments (
+      user_id, application_id, allotment_status, allotted_lots, allotted_shares,
+      allotment_price, refund_amount
+    ) values (
+      '23232323-2323-4232-8232-232323232323',
+      current_setting('ipo_test.user_b_application_id')::uuid,
+      'ALLOTTED', 2, 20, 10, 0
+    )$$,
+  'User B creates an allotment for their application'
+);
+select set_config('request.jwt.claim.sub', '12121212-1212-4121-8121-121212121212', true);
+select is(
+  (select count(*) from public.applications
+    where id = current_setting('ipo_test.user_b_application_id')::uuid),
+  0::bigint,
+  'User A cannot read User B application'
+);
+select is(
+  (select count(*) from public.mandates
+    where application_id = current_setting('ipo_test.user_b_application_id')::uuid),
+  0::bigint,
+  'User A cannot read a mandate belonging to User B'
+);
+select is(
+  (select count(*) from public.allotments
+    where application_id = current_setting('ipo_test.user_b_application_id')::uuid),
+  0::bigint,
+  'User A cannot read User B allotments'
+);
+select is(
+  (select count(*) from public.capital_ledger where user_id = '23232323-2323-4232-8232-232323232323'),
+  0::bigint,
+  'User A cannot read User B ledger events'
+);
+select throws_ok(
+  $$insert into public.mandates (
+      user_id, application_id, mandate_reference, mandate_amount
+    ) values (
+      '12121212-1212-4121-8121-121212121212',
+      current_setting('ipo_test.user_b_application_id')::uuid,
+      'FORGED-APPLICATION', 200
+    )$$,
+  '23503',
+  'insert or update on table "mandates" violates foreign key constraint "mandates_owner_application_fk"',
+  'User A cannot bind a mandate to User B application'
+);
+select set_config('request.jwt.claim.sub', '23232323-2323-4232-8232-232323232323', true);
 select is((select count(*) from public.applications), 1::bigint, 'User B reads only their application');
 select is(
-  (select count(*) from public.applications where id = '9a9a9a9a-9a9a-49a9-89a9-9a9a9a9a9a9a'),
+  (select count(*) from public.applications
+    where id = current_setting('ipo_test.user_a_application_id')::uuid),
   0::bigint,
   'User B cannot read User A application'
 );
-select is((select count(*) from public.mandates), 0::bigint, 'User B cannot read User A mandate');
-select is((select count(*) from public.allotments), 0::bigint, 'User B cannot read User A allotment');
+select is(
+  (select count(*) from public.mandates
+    where application_id = current_setting('ipo_test.user_a_application_id')::uuid),
+  0::bigint,
+  'User B cannot read User A mandate'
+);
+select is(
+  (select count(*) from public.allotments
+    where application_id = current_setting('ipo_test.user_a_application_id')::uuid),
+  0::bigint,
+  'User B cannot read User A allotment'
+);
 select is(
   (select count(*) from public.allotment_history),
   0::bigint,
