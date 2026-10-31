@@ -26,22 +26,14 @@ const categoryColumns =
 export const quotaRoutes = new Hono<QuotaContext>();
 quotaRoutes.use("*", authenticate);
 
-quotaRoutes.post(
-  "/calculate",
-  validateJson(ipoCalculationSchema),
-  async (context) => calculate(context, context.req.valid("json"), true),
+quotaRoutes.post("/calculate", validateJson(ipoCalculationSchema), async (context) =>
+  calculate(context, context.req.valid("json"), true),
 );
-quotaRoutes.post(
-  "/validate",
-  validateJson(ipoCalculationSchema),
-  async (context) => calculate(context, context.req.valid("json"), false),
+quotaRoutes.post("/validate", validateJson(ipoCalculationSchema), async (context) =>
+  calculate(context, context.req.valid("json"), false),
 );
 
-async function calculate(
-  context: QuotaRouteContext,
-  request: CalculationRequest,
-  save: boolean,
-) {
+async function calculate(context: QuotaRouteContext, request: CalculationRequest, save: boolean) {
   const supabase = context.get("rlsSupabase");
   const userId = context.get("authenticatedUser").id;
   const { data: ipo, error: ipoError } = await supabase
@@ -105,7 +97,8 @@ async function calculate(
     minimum_lots: rule.minimum_lots as number | null,
     maximum_lots: rule.maximum_lots as number | null,
     lot_increment: rule.lot_increment as number,
-    investment_limit_status: rule.investment_limit_status as CategoryRules["investment_limit_status"],
+    investment_limit_status:
+      rule.investment_limit_status as CategoryRules["investment_limit_status"],
     minimum_investment: rule.minimum_investment as string | null,
     maximum_investment: rule.maximum_investment as string | null,
     shareholder_record_date: rule.shareholder_record_date as string | null,

@@ -133,10 +133,11 @@ describe("IPO management API", () => {
   });
 
   it("filters IPO lists by the verified owner, status, and exact symbol", async () => {
-    const requests = installSupabaseMock(async () =>
-      new Response(JSON.stringify([ipoRow]), {
-        headers: { "Content-Type": "application/json", "Content-Range": "0-24/1" },
-      }),
+    const requests = installSupabaseMock(
+      async () =>
+        new Response(JSON.stringify([ipoRow]), {
+          headers: { "Content-Type": "application/json", "Content-Range": "0-24/1" },
+        }),
     );
     const response = await createApp().request(
       "/api/ipos?status=UPCOMING&search=IPOTEST",
@@ -199,7 +200,11 @@ describe("IPO management API", () => {
     expect(inserted?.user_id).toBe(userId);
     expect(inserted?.rule_version).toBeUndefined();
     expect(inserted?.eligibility_conditions).toEqual(configuration.eligibility_conditions);
-    expect(requests.some((request) => new URL(request.url).searchParams.get("user_id") === `eq.${userId}`)).toBe(true);
+    expect(
+      requests.some(
+        (request) => new URL(request.url).searchParams.get("user_id") === `eq.${userId}`,
+      ),
+    ).toBe(true);
   });
 
   it("calculates with the latest issue rules and writes an owner-scoped reproducibility snapshot", async () => {
@@ -207,13 +212,19 @@ describe("IPO management API", () => {
     const requests = installSupabaseMock(async (request) => {
       const table = new URL(request.url).pathname.split("/").pop();
       if (table === "ipos") {
-        return new Response(JSON.stringify({ ...ipoRow, ...{
-          issue_price_min: "10.00",
-          issue_price_max: "20.00",
-          cut_off_price: "20.00",
-          lot_size: 10,
-          archived_at: null,
-        } }), { headers: { "Content-Type": "application/json" } });
+        return new Response(
+          JSON.stringify({
+            ...ipoRow,
+            ...{
+              issue_price_min: "10.00",
+              issue_price_max: "20.00",
+              cut_off_price: "20.00",
+              lot_size: 10,
+              archived_at: null,
+            },
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        );
       }
       if (table === "demat_accounts") {
         return new Response(JSON.stringify({ id: accountId }), {
@@ -227,7 +238,10 @@ describe("IPO management API", () => {
       }
       calculationInsert = (await request.json()) as Record<string, unknown>;
       return new Response(
-        JSON.stringify({ id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", calculation_timestamp: "2026-10-31T12:30:00Z" }),
+        JSON.stringify({
+          id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+          calculation_timestamp: "2026-10-31T12:30:00Z",
+        }),
         { headers: { "Content-Type": "application/json" } },
       );
     });
@@ -268,8 +282,16 @@ describe("IPO management API", () => {
       category_configuration: { rule_version: 2 },
       price: "10.00",
     });
-    expect(requests.filter((request) => new URL(request.url).pathname.endsWith("/ipo_quota_calculations"))).toHaveLength(1);
-    expect(requests.every((request) => new URL(request.url).searchParams.get("user_id") !== `eq.${otherUserId}`)).toBe(true);
+    expect(
+      requests.filter((request) =>
+        new URL(request.url).pathname.endsWith("/ipo_quota_calculations"),
+      ),
+    ).toHaveLength(1);
+    expect(
+      requests.every(
+        (request) => new URL(request.url).searchParams.get("user_id") !== `eq.${otherUserId}`,
+      ),
+    ).toBe(true);
   });
 
   it("does not save validation-only calculations or trust a foreign account", async () => {
@@ -280,7 +302,8 @@ describe("IPO management API", () => {
           headers: { "Content-Type": "application/json" },
         });
       }
-      if (table === "demat_accounts") return new Response("null", { headers: { "Content-Type": "application/json" } });
+      if (table === "demat_accounts")
+        return new Response("null", { headers: { "Content-Type": "application/json" } });
       return new Response("[]", { headers: { "Content-Type": "application/json" } });
     });
     const response = await createApp().request(
@@ -303,7 +326,9 @@ describe("IPO management API", () => {
     );
 
     expect(response.status).toBe(404);
-    expect(requests.some((request) => new URL(request.url).pathname.endsWith("/ipo_quota_calculations"))).toBe(false);
+    expect(
+      requests.some((request) => new URL(request.url).pathname.endsWith("/ipo_quota_calculations")),
+    ).toBe(false);
     const accountRequest = requests.find((request) =>
       new URL(request.url).pathname.endsWith("/demat_accounts"),
     );

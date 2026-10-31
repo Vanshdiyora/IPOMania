@@ -1,10 +1,4 @@
-import {
-  BriefcaseBusiness,
-  CalendarDays,
-  LayoutDashboard,
-  LogOut,
-  UserRound,
-} from "lucide-react";
+import { BriefcaseBusiness, CalendarDays, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../../auth/useAuth";
