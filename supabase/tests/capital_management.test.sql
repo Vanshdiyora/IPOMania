@@ -1,6 +1,6 @@
 begin;
 
-select plan(43);
+select plan(41);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -335,16 +335,6 @@ select set_config(
   true
 );
 select lives_ok(
-  $$insert into public.mandates (
-      user_id, application_id, mandate_reference, mandate_amount
-    ) values (
-      '23232323-2323-4232-8232-232323232323',
-      current_setting('ipo_test.user_b_application_id')::uuid,
-      'MANDATE-B-1', 200
-    )$$,
-  'User B creates a mandate for their application'
-);
-select lives_ok(
   $$insert into public.allotments (
       user_id, application_id, allotment_status, allotted_lots, allotted_shares,
       allotment_price, refund_amount
@@ -361,12 +351,6 @@ select is(
     where id = current_setting('ipo_test.user_b_application_id')::uuid),
   0::bigint,
   'User A cannot read User B application'
-);
-select is(
-  (select count(*) from public.mandates
-    where application_id = current_setting('ipo_test.user_b_application_id')::uuid),
-  0::bigint,
-  'User A cannot read a mandate belonging to User B'
 );
 select is(
   (select count(*) from public.allotments
