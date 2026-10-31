@@ -203,7 +203,7 @@ describe("capital-management API", () => {
       );
     });
     const response = await createApp().request(
-      "/api/applications",
+      "/api/capital/applications",
       {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },

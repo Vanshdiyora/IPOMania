@@ -1,7 +1,19 @@
-import { BriefcaseBusiness, CalendarDays, LayoutDashboard, LogOut, UserRound } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  CalendarDays,
+  ClipboardList,
+  LayoutDashboard,
+  LogOut,
+  UserRound,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../../auth/useAuth";
+
+const applicationNavClass = ({ isActive }: { isActive: boolean }) =>
+  `mt-1 flex min-h-touch items-center rounded-lg px-3 text-sm font-semibold ${
+    isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+  }`;
 
 export function Sidebar() {
   const { user, signOut } = useAuth();
@@ -76,6 +88,32 @@ export function Sidebar() {
                   }`
                 }
               >
+                Import history
+              </NavLink>
+            </div>
+            <NavLink
+              to="/applications"
+              aria-label="IPO application manager"
+              className={({ isActive }) =>
+                `mt-2 flex min-h-touch items-center justify-center gap-3 rounded-lg px-3 text-base font-semibold sm:justify-start ${
+                  isActive ? "bg-[#EAF0F6] text-navy" : "text-muted hover:bg-canvas"
+                }`
+              }
+            >
+              <ClipboardList aria-hidden="true" size={20} />
+              <span className="hidden sm:inline">Applications</span>
+            </NavLink>
+            <div className="hidden pl-5 sm:block">
+              <NavLink to="/applications/list" className={applicationNavClass}>
+                Application table
+              </NavLink>
+              <NavLink to="/applications/bulk" className={applicationNavClass}>
+                Bulk entry
+              </NavLink>
+              <NavLink to="/applications/import" className={applicationNavClass}>
+                Import wizard
+              </NavLink>
+              <NavLink to="/applications/import-history" className={applicationNavClass}>
                 Import history
               </NavLink>
             </div>

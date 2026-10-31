@@ -143,17 +143,43 @@ no application-submission or allotment workflow was added.
   Repository-wide `npm run format:check` remains blocked by 43 files outside this change.
 - The web build reports the existing large-chunk warning; both application builds completed.
 
+## Phase 5 — Application manager and bulk import
+
+**Status: Implemented; automated verification passes except for browser/E2E coverage.**
+
+Phase 5 adds a user-owned application table with composite ownership foreign keys to the caller's
+IPO, demat account, and issue-specific category rule; forced RLS; retained calculation snapshots;
+independent application/mandate/allotment statuses; soft archive; paginated filtering/export;
+individual and all-or-nothing bulk creation; bulk status changes; and CSV/XLSX staging, previews,
+history, retry-safe confirmation, and archive-based reversal. Application calculations call the
+existing exact-decimal quota engine. Imported rows default to draft; imported prices must be
+explicitly mapped rather than inferred from current IPO pricing.
+
+The application dashboard, application table/details/forms, per-account bulk validation, import
+mapping/preview, and import-history/report pages are protected by authenticated routing. Import
+row numbers are report references only. Stable external references are unique per user, while other
+potential duplicates are surfaced as warnings and do not prohibit legitimate multiple applications.
+
+Focused application unit/API validation passes (15 tests, including all four quota categories). The
+direct application pgTAP suite passes 16/16 locally, including owner isolation, snapshot/status
+preservation, import retry, external-reference uniqueness, and reversal. The full test suite passes
+(67 passed, 2 skipped), and lint, typecheck, and both production builds pass. API tests cover
+CSV/XLSX imports, a 500-row CSV,
+duplicate warnings, and formula-safe export. The loopback-only two-transaction race test passes
+(1/1) via `npm run test:integration:applications`; browser/E2E coverage remains outstanding. The
+repository-wide format check still reports pre-existing unformatted files, and the broader Phase 3
+local database/RLS and concurrency gates remain open.
+
 ## Phase 6 — Mandates, allotments, and capital management
 
 **Status: Implementation complete; workspace tests and builds pass. Direct PostgreSQL/RLS
 verification remains open.**
 
-Phase 6 adds owner-scoped manual application tracking from saved eligible quota calculations,
-UPI mandate state management, allotment and refund tracking, an append-only capital ledger,
-per-currency decimal-safe summaries, API routes, and management pages. Application records retain
-the issue lot size and price bounds used by the calculation so allotment checks do not rely on
-later-edited IPO configuration. No application is submitted externally, no payment is initiated,
-and mandates are never approved automatically.
+Phase 6 adds owner-scoped mandate state management, allotment and refund tracking, an append-only
+capital ledger, per-currency decimal-safe summaries, API routes, and management pages. Application
+records retain the issue lot size and price bounds used by the calculation so allotment checks do
+not rely on later-edited IPO configuration. No application is submitted externally, no payment is
+initiated, and mandates are never approved automatically.
 
 Automated unit and API tests cover mandate validation, allotment and refund rules, blocked versus
 debited capital, duplicate events, idempotency, and financial reconciliation. The migration also
@@ -162,10 +188,10 @@ Supabase CLI and `psql` are unavailable.
 
 ### Phase 6 verification in this workspace
 
-- Passed: `npm run lint`, `npm run typecheck`, `npm test` (69 passed, 1 skipped),
-  `npm run build:web`, and `npm run build:api`.
-- Repository-wide `npm run format:check` remains blocked by 102 unformatted files, including
-  pre-existing formatting debt outside Phase 6. Targeted Prettier checks passed for the changed
-  source and feature documentation; this status file was not reformatted wholesale.
+- Passed before merging Phase 5: `npm run lint`, `npm run typecheck`, `npm test` (69 passed, 1
+  skipped), `npm run build:web`, and `npm run build:api`.
+- Repository-wide `npm run format:check` remains blocked by unformatted files, including
+  pre-existing formatting debt outside Phase 6. Targeted Prettier checks passed for changed source
+  and feature documentation.
 - Not run: `npm run test:security:db` (requires the unavailable Supabase CLI and local PostgreSQL).
 - The Phase 3 local RLS/concurrency and repository-wide formatting gates remain open.

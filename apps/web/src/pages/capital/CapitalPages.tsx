@@ -3,10 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type {
   CapitalLedgerEntry,
+  CapitalApplication,
   CapitalSummary,
   DematAccount,
   IpoAllotment,
-  IpoApplication,
   IpoMandate,
   IpoRecord,
 } from "@ipo-mania/shared";
@@ -15,7 +15,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { ApiRequestError, apiRequest } from "../../lib/api";
 
-type RelatedApplication = IpoApplication & {
+type RelatedApplication = CapitalApplication & {
   ipo?:
     | Pick<IpoRecord, "company_name" | "symbol">
     | Array<Pick<IpoRecord, "company_name" | "symbol">>;
@@ -1263,7 +1263,8 @@ function useApplications(session: ReturnType<typeof useAuth>["session"]) {
   return useQuery({
     queryKey: ["applications"],
     enabled: Boolean(session),
-    queryFn: () => apiRequest<ApplicationsResponse>("/api/applications?page_size=100", session!),
+    queryFn: () =>
+      apiRequest<ApplicationsResponse>("/api/capital/applications?page_size=100", session!),
   });
 }
 

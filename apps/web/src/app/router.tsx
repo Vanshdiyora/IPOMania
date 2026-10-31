@@ -25,6 +25,15 @@ import {
   QuotaCalculatorPage,
 } from "../pages/ipos/IpoPages";
 import {
+  ApplicationDashboardPage,
+  ApplicationDetailsPage,
+  ApplicationFormPage,
+  ApplicationImportHistoryPage,
+  ApplicationImportPage,
+  ApplicationListPage,
+  BulkApplicationPage,
+} from "../pages/applications/ApplicationPages";
+import {
   AllotmentDashboardPage,
   AllotmentDetailsPage,
   CapitalTrackerPage,
@@ -82,6 +91,24 @@ export const router = createBrowserRouter([
         element: protectedPage(<FinancialTransactionHistoryPage />),
       },
       { path: "capital/refunds", element: protectedPage(<RefundTrackerPage />) },
+      { path: "applications", element: protectedPage(<ApplicationDashboardPage />) },
+      { path: "applications/list", element: protectedPage(<ApplicationListPage />) },
+      { path: "applications/new", element: protectedPage(<ApplicationFormPage />) },
+      { path: "applications/bulk", element: protectedPage(<BulkApplicationPage />) },
+      { path: "applications/import", element: protectedPage(<ApplicationImportPage />) },
+      {
+        path: "applications/import-history",
+        element: protectedPage(<ApplicationImportHistoryPage />),
+      },
+      {
+        path: "applications/import-history/:importId",
+        element: protectedPage(<ApplicationImportHistoryPage />),
+      },
+      {
+        path: "applications/:applicationId/edit",
+        element: protectedPage(<ApplicationFormPage editing />),
+      },
+      { path: "applications/:applicationId", element: protectedPage(<ApplicationDetailsPage />) },
       {
         path: "profile",
         element: (

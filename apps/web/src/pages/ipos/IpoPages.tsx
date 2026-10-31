@@ -849,10 +849,14 @@ export function QuotaCalculatorPage() {
     if (!session || !result?.eligible || !result.calculation_id) return;
     setRequestError("");
     try {
-      const response = await apiRequest<{ data: { id: string } }>("/api/applications", session, {
-        method: "POST",
-        body: JSON.stringify({ calculation_id: result.calculation_id }),
-      });
+      const response = await apiRequest<{ data: { id: string } }>(
+        "/api/capital/applications",
+        session,
+        {
+          method: "POST",
+          body: JSON.stringify({ calculation_id: result.calculation_id }),
+        },
+      );
       setApplicationMessage(
         `Application ${response.data.id} recorded for tracking. No application was submitted.`,
       );

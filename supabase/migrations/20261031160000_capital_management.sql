@@ -1,52 +1,81 @@
 create unique index ipo_quota_calculations_id_user_unique_idx
   on public.ipo_quota_calculations (id, user_id);
 
-create table public.applications (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users (id) on delete cascade,
-  ipo_id uuid not null,
-  demat_account_id uuid not null,
-  category_configuration_id uuid not null,
-  quota_calculation_id uuid not null,
-  category text not null check (category in ('RETAIL', 'SHNI', 'BHNI', 'SHAREHOLDER')),
-  rule_version integer not null check (rule_version > 0),
-  lot_size integer not null check (lot_size > 0),
-  issue_price_min numeric(18, 6) not null check (issue_price_min > 0),
-  issue_price_max numeric(18, 6) not null check (issue_price_max >= issue_price_min),
-  cut_off_price numeric(18, 6),
-  lots integer not null check (lots > 0),
-  shares bigint not null check (shares > 0),
-  price_type text not null check (price_type in ('BID', 'CUT_OFF')),
-  price numeric(18, 6) not null check (price > 0),
-  application_amount numeric(38, 6) not null check (application_amount > 0),
-  currency text not null default 'INR' check (currency ~ '^[A-Z]{3}$'),
-  created_at timestamptz not null default now(),
-  constraint applications_owner_ipo_fk
-    foreign key (ipo_id, user_id) references public.ipos (id, user_id) on delete restrict,
-  constraint applications_owner_account_fk
-    foreign key (demat_account_id, user_id)
-    references public.demat_accounts (id, user_id) on delete restrict,
-  constraint applications_owner_rules_fk
+alter table public.applications
+  add column category_configuration_id uuid,
+  add column quota_calculation_id uuid,
+  add column category text check (category in ('RETAIL', 'SHNI', 'BHNI', 'SHAREHOLDER')),
+  add column lot_size integer check (lot_size is null or lot_size > 0),
+  add column issue_price_min numeric(18, 6) check (issue_price_min is null or issue_price_min > 0),
+  add column issue_price_max numeric(18, 6),
+  add column cut_off_price numeric(18, 6),
+  add column shares bigint,
+  add column price_type text check (price_type in ('BID', 'CUT_OFF')),
+  add column price numeric(18, 6),
+  add column currency text not null default 'INR' check (currency ~ '^[A-Z]{3}$');
+
+alter table public.applications
+  add constraint applications_owner_rules_fk
     foreign key (category_configuration_id, ipo_id, user_id)
     references public.ipo_categories (id, ipo_id, user_id) on delete restrict,
-  constraint applications_category_version_fk
+  add constraint applications_category_version_fk
     foreign key (category_configuration_id, category, rule_version)
     references public.ipo_categories (id, category, rule_version) on delete restrict,
-  constraint applications_owner_calculation_fk
+  add constraint applications_owner_calculation_fk
     foreign key (quota_calculation_id, user_id)
     references public.ipo_quota_calculations (id, user_id) on delete restrict,
-  constraint applications_calculation_unique unique (quota_calculation_id),
-  constraint applications_cut_off_price_check
+  add constraint applications_calculation_unique unique (quota_calculation_id),
+  add constraint applications_capital_fields_check check (
+    (quota_calculation_id is null and category_configuration_id is null and category is null
+      and lot_size is null and issue_price_min is null and issue_price_max is null
+      and cut_off_price is null and shares is null and price_type is null and price is null)
+    or
+    (quota_calculation_id is not null and category_configuration_id is not null
+      and category is not null and lot_size is not null and issue_price_min is not null
+      and issue_price_max is not null and shares is not null and price_type is not null
+      and price is not null)
+  ),
+  add constraint applications_capital_cut_off_price_check
     check (cut_off_price is null or cut_off_price between issue_price_min and issue_price_max),
-  constraint applications_id_user_unique unique (id, user_id)
-);
+  add constraint applications_capital_values_check check (
+    (quota_calculation_id is null)
+    or (lots > 0 and shares > 0 and price > 0 and application_amount > 0
+      and issue_price_max >= issue_price_min)
+  );
 
-create index applications_owner_created_idx
-  on public.applications (user_id, created_at desc, id);
 create index applications_owner_ipo_idx
   on public.applications (user_id, ipo_id, created_at desc);
 create index applications_owner_account_idx
   on public.applications (user_id, demat_account_id, created_at desc);
+
+create function public.populate_capital_application_fields()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.quota_calculation_id is not null then
+    new.category_id := coalesce(new.category_id, new.category_configuration_id);
+    new.total_shares := coalesce(new.total_shares, new.shares);
+    new.calculation_snapshot := coalesce(
+      new.calculation_snapshot,
+      pg_catalog.jsonb_build_object(
+        'quota_calculation_id', new.quota_calculation_id,
+        'category', new.category,
+        'lots', new.lots,
+        'shares', new.shares,
+        'price_type', new.price_type,
+        'price', new.price
+      )
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create trigger applications_populate_capital_fields
+  before insert on public.applications
+  for each row execute function public.populate_capital_application_fields();
 
 create table public.mandates (
   id uuid primary key default gen_random_uuid(),
@@ -186,6 +215,10 @@ declare
   condition_record jsonb;
   calculated_amount numeric;
 begin
+  if new.quota_calculation_id is null then
+    return new;
+  end if;
+
   select * into ipo_record
   from public.ipos
   where id = new.ipo_id and user_id = new.user_id;
@@ -369,6 +402,9 @@ begin
   where id = new.application_id and user_id = new.user_id;
   if not found then
     raise exception using errcode = '23503', message = 'Allotment application is unavailable.';
+  end if;
+  if application_record.quota_calculation_id is null then
+    raise exception using errcode = '23514', message = 'Allotments require a saved quota calculation.';
   end if;
   if tg_op = 'UPDATE' then
     select exists (

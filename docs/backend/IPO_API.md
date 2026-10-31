@@ -15,8 +15,8 @@ Responses use `{ data }` or `{ error: { code, message } }`.
 | `POST /api/ipos/:ipoId/categories` | Add a validated issue-specific rule version. The database assigns its version.      |
 | `POST /api/quota/validate`         | Validate a calculation without saving an audit record.                              |
 | `POST /api/quota/calculate`        | Calculate and save a reproducibility snapshot.                                      |
-| `POST /api/applications`           | Record an owned application from an eligible saved calculation; does not submit it. |
-| `GET /api/applications`            | List owned application records with IPO/account/date filters.                       |
+| `POST /api/capital/applications`   | Record an owned application from an eligible saved calculation; does not submit it. |
+| `GET /api/capital/applications`    | List capital-tracked applications with IPO/account/date filters.                    |
 | `GET /api/mandates`                | List owned mandates with IPO/account/broker/category/date/status filters.           |
 | `POST /api/mandates`               | Record a pending UPI mandate; never initiates or approves a payment.                |
 | `PATCH /api/mandates/:mandateId`   | Manually update a mandate using validated state transitions.                        |

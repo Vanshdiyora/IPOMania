@@ -684,9 +684,108 @@ function multiplyDecimalString(value: string, quantity: number): string {
   return `${wholePart}.${fractionalPart}`.replace(/\.?0+$/, "");
 }
 
-export const applicationListQuerySchema = z
+export const capitalApplicationListQuerySchema = z
   .object({
     ...managementListQueryFields,
   })
   .strict()
   .superRefine(validateDateRange);
+export const applicationStatusSchema = z.enum([
+  "DRAFT",
+  "SUBMITTED",
+  "UNDER_PROCESSING",
+  "REJECTED",
+  "FAILED",
+  "COMPLETED",
+]);
+export const applicationMandateStatusSchema = z.enum([
+  "UNKNOWN",
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+  "FAILED",
+  "NOT_REQUIRED",
+]);
+export const applicationAllotmentStatusSchema = z.enum([
+  "UNKNOWN",
+  "PENDING",
+  "ALLOTTED",
+  "PARTIALLY_ALLOTTED",
+  "NOT_ALLOTTED",
+]);
+
+const applicationFieldsSchema = z
+  .object({
+    ipo_id: z.uuid(),
+    demat_account_id: z.uuid(),
+    category_id: z.uuid(),
+    lots: z.number().int().positive().max(1_000_000),
+    price_type: z.enum(["BID", "CUT_OFF"]),
+    price: positivePriceSchema,
+    shareholder_shares: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
+    eligibility_answers: z.record(z.string(), z.boolean().nullable()),
+    application_number: z.string().trim().max(120).nullable().default(null),
+    external_reference: z.string().trim().min(1).max(200).nullable().default(null),
+    submission_date: z.iso.datetime().nullable().default(null),
+    application_status: applicationStatusSchema.default("DRAFT"),
+    mandate_status: applicationMandateStatusSchema.default("UNKNOWN"),
+    allotment_status: applicationAllotmentStatusSchema.default("UNKNOWN"),
+    notes: z.string().trim().max(2000).nullable().default(null),
+  })
+  .strict();
+
+export const applicationCreateSchema = applicationFieldsSchema;
+export const applicationBulkCreateSchema = z
+  .object({
+    applications: z.array(applicationFieldsSchema).min(1).max(500),
+  })
+  .strict();
+export const applicationUpdateSchema = z
+  .object({
+    application_number: z.string().trim().max(120).nullable().optional(),
+    external_reference: z.string().trim().min(1).max(200).nullable().optional(),
+    submission_date: z.iso.datetime().nullable().optional(),
+    application_status: applicationStatusSchema.optional(),
+    mandate_status: applicationMandateStatusSchema.optional(),
+    allotment_status: applicationAllotmentStatusSchema.optional(),
+    notes: z.string().trim().max(2000).nullable().optional(),
+  })
+  .strict();
+export const applicationBulkStatusSchema = z
+  .object({
+    application_ids: z.array(z.uuid()).min(1).max(500),
+    application_status: applicationStatusSchema.optional(),
+    mandate_status: applicationMandateStatusSchema.optional(),
+    allotment_status: applicationAllotmentStatusSchema.optional(),
+  })
+  .strict()
+  .refine(
+    ({ application_status, mandate_status, allotment_status }) =>
+      application_status !== undefined ||
+      mandate_status !== undefined ||
+      allotment_status !== undefined,
+    { message: "Provide at least one status to update." },
+  );
+export const applicationListQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    page_size: z.coerce.number().int().min(1).max(100).default(25),
+    ipo_id: z.uuid().optional(),
+    demat_account_id: z.uuid().optional(),
+    broker: z.string().trim().max(120).optional(),
+    category_id: z.uuid().optional(),
+    application_status: applicationStatusSchema.optional(),
+    mandate_status: applicationMandateStatusSchema.optional(),
+    submission_from: z.iso.date().optional(),
+    submission_to: z.iso.date().optional(),
+    search: z.string().trim().max(160).optional(),
+    include_archived: z.enum(["true", "false"]).default("false"),
+  })
+  .strict()
+  .refine(
+    (query) =>
+      !query.submission_from ||
+      !query.submission_to ||
+      query.submission_from <= query.submission_to,
+    { message: "submission_from must not be after submission_to.", path: ["submission_from"] },
+  );

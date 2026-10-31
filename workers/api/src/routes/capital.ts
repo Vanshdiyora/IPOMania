@@ -9,15 +9,15 @@ import {
 } from "@ipo-mania/financial-engine";
 import type {
   CapitalLedgerEntry,
+  CapitalApplication as CapitalApplicationRecord,
   IpoAllotment,
-  IpoApplication,
   IpoMandate,
 } from "@ipo-mania/shared";
 import {
   allotmentListQuerySchema,
   allotmentSchema,
   allotmentUpdateSchema,
-  applicationListQuerySchema,
+  capitalApplicationListQuerySchema,
   applicationRecordSchema,
   capitalLedgerEntrySchema,
   capitalLedgerListQuerySchema,
@@ -47,12 +47,12 @@ const allotmentColumns =
 const ledgerColumns =
   "id, user_id, application_id, transaction_type, amount, currency, effective_at, created_at, source, audit_reference, idempotency_key, quantity, unit_price, adjustment_direction, blocked_consumed";
 const applicationRelation =
-  "application:applications!inner(id, ipo_id, demat_account_id, category, currency, created_at, ipo:ipos!applications_owner_ipo_fk(company_name, symbol), demat_account:demat_accounts!applications_owner_account_fk(id, holder_name, broker_name))";
+  "application:applications!inner(id, ipo_id, demat_account_id, category, currency, created_at, ipo:ipos!applications_ipo_owner_fk(company_name, symbol), demat_account:demat_accounts!applications_account_owner_fk(id, holder_name, broker_name))";
 
 export const capitalRoutes = new Hono<CapitalContext>();
 for (const path of [
-  "/applications",
-  "/applications/*",
+  "/capital/applications",
+  "/capital/applications/*",
   "/mandates",
   "/mandates/*",
   "/allotments",
@@ -62,8 +62,8 @@ for (const path of [
   capitalRoutes.use(path, authenticate);
 }
 
-capitalRoutes.get("/applications", async (context) => {
-  const parsed = applicationListQuerySchema.safeParse(context.req.query());
+capitalRoutes.get("/capital/applications", async (context) => {
+  const parsed = capitalApplicationListQuerySchema.safeParse(context.req.query());
   if (!parsed.success) return validationError(context);
 
   const query = parsed.data;
@@ -72,10 +72,11 @@ capitalRoutes.get("/applications", async (context) => {
     .get("rlsSupabase")
     .from("applications")
     .select(
-      `${applicationColumns}, ipo:ipos!applications_owner_ipo_fk(company_name, symbol), demat_account:demat_accounts!applications_owner_account_fk(id, holder_name, broker_name)`,
+      `${applicationColumns}, ipo:ipos!applications_ipo_owner_fk(company_name, symbol), demat_account:demat_accounts!applications_account_owner_fk(id, holder_name, broker_name)`,
       { count: "exact" },
     )
     .eq("user_id", userId)
+    .not("quota_calculation_id", "is", null)
     .order("created_at", { ascending: false })
     .order("id", { ascending: true });
   if (query.ipo_id) request = request.eq("ipo_id", query.ipo_id);
@@ -91,31 +92,34 @@ capitalRoutes.get("/applications", async (context) => {
   if (error) throw error;
   return context.json({
     data: {
-      applications: (data ?? []) as IpoApplication[],
+      applications: (data ?? []) as CapitalApplicationRecord[],
       pagination: pagination(query.page, query.page_size, count ?? 0),
     },
   });
 });
 
-capitalRoutes.get("/applications/:applicationId", async (context) => {
+capitalRoutes.get("/capital/applications/:applicationId", async (context) => {
   const applicationId = context.req.param("applicationId");
   if (!isUuid(applicationId)) return recordNotFound(context, "APPLICATION_NOT_FOUND");
   const { data, error } = await context
     .get("rlsSupabase")
     .from("applications")
     .select(
-      `${applicationColumns}, ipo:ipos!applications_owner_ipo_fk(company_name, symbol), demat_account:demat_accounts!applications_owner_account_fk(id, holder_name, broker_name)`,
+      `${applicationColumns}, ipo:ipos!applications_ipo_owner_fk(company_name, symbol), demat_account:demat_accounts!applications_account_owner_fk(id, holder_name, broker_name)`,
     )
     .eq("id", applicationId)
     .eq("user_id", context.get("authenticatedUser").id)
+    .not("quota_calculation_id", "is", null)
     .maybeSingle();
   if (error) throw error;
   if (!data) return recordNotFound(context, "APPLICATION_NOT_FOUND");
-  return context.json({ data: data as IpoApplication });
+  return context.json({ data: data as CapitalApplicationRecord });
 });
 
-capitalRoutes.post("/applications", validateJson(applicationRecordSchema), async (context) =>
-  recordApplication(context, context.req.valid("json")),
+capitalRoutes.post(
+  "/capital/applications",
+  validateJson(applicationRecordSchema),
+  async (context) => recordApplication(context, context.req.valid("json")),
 );
 
 capitalRoutes.get("/mandates", async (context) => {
@@ -311,7 +315,7 @@ capitalRoutes.get("/capital/summary", async (context) => {
       let request = supabase
         .from("applications")
         .select(
-          "id, application_amount, currency, ipo:ipos!applications_owner_ipo_fk(company_name), demat_account:demat_accounts!applications_owner_account_fk(broker_name)",
+          "id, application_amount, currency, ipo:ipos!applications_ipo_owner_fk(company_name), demat_account:demat_accounts!applications_account_owner_fk(broker_name)",
         )
         .eq("user_id", userId)
         .order("created_at", { ascending: true });
@@ -327,7 +331,7 @@ capitalRoutes.get("/capital/summary", async (context) => {
         supabase
           .from("mandates")
           .select(
-            "mandate_amount, mandate_status, application:applications!inner(currency, ipo_id, demat_account_id, category, demat_account:demat_accounts!applications_owner_account_fk(broker_name))",
+            "mandate_amount, mandate_status, application:applications!inner(currency, ipo_id, demat_account_id, category, demat_account:demat_accounts!applications_account_owner_fk(broker_name))",
           )
           .eq("user_id", userId)
           .order("created_at", { ascending: true }),
@@ -343,7 +347,7 @@ capitalRoutes.get("/capital/summary", async (context) => {
         supabase
           .from("allotments")
           .select(
-            "application_id, allotment_status, allotted_shares, allotment_price, refund_amount, application:applications!inner(currency, ipo_id, demat_account_id, category, demat_account:demat_accounts!applications_owner_account_fk(broker_name))",
+            "application_id, allotment_status, allotted_shares, allotment_price, refund_amount, application:applications!inner(currency, ipo_id, demat_account_id, category, demat_account:demat_accounts!applications_account_owner_fk(broker_name))",
           )
           .eq("user_id", userId)
           .order("created_at", { ascending: true }),
@@ -354,7 +358,7 @@ capitalRoutes.get("/capital/summary", async (context) => {
       let request = supabase
         .from("capital_ledger")
         .select(
-          "application_id, transaction_type, amount, currency, quantity, unit_price, blocked_consumed, effective_at, created_at, adjustment_direction, application:applications(ipo_id, demat_account_id, category, demat_account:demat_accounts!applications_owner_account_fk(broker_name))",
+          "application_id, transaction_type, amount, currency, quantity, unit_price, blocked_consumed, effective_at, created_at, adjustment_direction, application:applications(ipo_id, demat_account_id, category, demat_account:demat_accounts!applications_account_owner_fk(broker_name))",
         )
         .eq("user_id", userId)
         .order("effective_at", { ascending: true });
@@ -510,10 +514,11 @@ async function recordApplication(context: CapitalRouteContext, request: Applicat
       .eq("quota_calculation_id", calculation.id)
       .maybeSingle();
     if (existing.error) throw existing.error;
-    if (existing.data) return context.json({ data: existing.data as IpoApplication }, 200);
+    if (existing.data)
+      return context.json({ data: existing.data as CapitalApplicationRecord }, 200);
   }
   if (error) return databaseError(context, error, "APPLICATION");
-  return context.json({ data: data as IpoApplication }, 201);
+  return context.json({ data: data as CapitalApplicationRecord }, 201);
 }
 
 function applyManagementFilters<T>(

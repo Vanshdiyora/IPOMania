@@ -91,3 +91,28 @@ expectation mismatch, and import fixture/grant issues; these remain outside the 
       submission/allotment workflow was added.
 - [x] Run Prettier on changed/new supported files; repository-wide `npm run format:check` still
       reports 43 unformatted files outside this change.
+
+## Phase 5 — Application manager and bulk import
+
+- [x] Verify the critical financial-engine tests pass before adding application calculations
+      (17/17 focused financial-engine tests passed at Phase 5 start).
+- [x] Add an owner-scoped application schema, ownership foreign keys, forced RLS, independent
+      application/mandate/allotment statuses, soft archive, immutable historical snapshots, and
+      stable external-reference uniqueness.
+- [x] Add authenticated create/read/edit/archive, filters, pagination, export, bulk validation and
+      creation, and bulk status update APIs using caller-JWT access.
+- [x] Add CSV/XLSX column mapping, owned IPO/account/category matching, price/lots validation,
+      duplicate reports, staged preview, retry-safe confirmation, history, and reversal.
+- [x] Add application dashboard/table/details/add pages, per-account bulk entry, and import,
+      preview, report, and history pages.
+- [x] Add product/backend import and application documentation.
+- [x] Add focused validation/API tests (15 passed, including all four quota categories).
+- [x] Run `supabase/tests/applications.test.sql` against local Supabase/PostgreSQL (16/16 passed),
+      covering two-user RLS, snapshot preservation, idempotent retry, external-reference uniqueness,
+      and reversal.
+- [x] Add CSV/XLSX, 500-row CSV, duplicate-warning, and formula-safe export coverage; execute the
+      two-transaction external-reference race test against local Supabase (1/1 passed).
+- [ ] Complete browser/E2E coverage.
+- [x] Run full tests (67 passed, 2 skipped), lint, typecheck, and both production builds. The
+      required repository-wide format check still fails on pre-existing unformatted files; Phase 3
+      local database/RLS and concurrency gates remain open.

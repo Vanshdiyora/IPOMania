@@ -114,7 +114,54 @@ export interface IpoCalculationAudit {
   result_snapshot: Record<string, unknown>;
 }
 
+export type ApplicationStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "UNDER_PROCESSING"
+  | "REJECTED"
+  | "FAILED"
+  | "COMPLETED";
+export type MandateStatus =
+  | "UNKNOWN"
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "FAILED"
+  | "NOT_REQUIRED"
+  | "REVOKED"
+  | "EXPIRED"
+  | "RELEASED";
+export type AllotmentStatus =
+  | "UNKNOWN"
+  | "PENDING"
+  | "ALLOTTED"
+  | "PARTIALLY_ALLOTTED"
+  | "NOT_ALLOTTED"
+  | "PARTIAL_ALLOTMENT";
 export interface IpoApplication {
+  id: string;
+  user_id: string;
+  ipo_id: string;
+  demat_account_id: string;
+  category_id: string;
+  lots: number;
+  total_shares: number;
+  application_amount: string;
+  application_number: string | null;
+  external_reference: string | null;
+  submission_date: string | null;
+  application_status: ApplicationStatus;
+  mandate_status: MandateStatus;
+  allotment_status: AllotmentStatus;
+  notes: string | null;
+  rule_version: number;
+  calculation_snapshot: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+}
+
+export interface CapitalApplication {
   id: string;
   user_id: string;
   ipo_id: string;
@@ -136,14 +183,6 @@ export interface IpoApplication {
   created_at: string;
 }
 
-export type MandateStatus =
-  | "PENDING"
-  | "APPROVED"
-  | "REJECTED"
-  | "REVOKED"
-  | "EXPIRED"
-  | "RELEASED";
-
 export interface IpoMandate {
   id: string;
   user_id: string;
@@ -158,7 +197,6 @@ export interface IpoMandate {
   created_at: string;
 }
 
-export type AllotmentStatus = "ALLOTTED" | "NOT_ALLOTTED" | "PARTIAL_ALLOTMENT";
 export type RefundStatus = "NOT_REQUIRED" | "PENDING" | "COMPLETED";
 
 export interface IpoAllotment {
@@ -217,4 +255,13 @@ export interface CapitalSummary {
   outstanding_refunds: string;
   realized_pnl: string;
   unrealized_pnl: string | null;
+}
+
+export interface ApplicationImportRow {
+  row_number: number;
+  record: Record<string, unknown>;
+  row_status: "ready" | "duplicate" | "invalid" | "imported";
+  errors: string[];
+  warnings: string[];
+  created_application_id: string | null;
 }
