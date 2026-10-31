@@ -4,17 +4,31 @@ Copy `.env.example` to the repository-root `.env` for local development, and kee
 and `.dev.vars` out of version control. Vite reads that root file but exposes only variables prefixed
 with `VITE_` to browser code. Never put secrets in `VITE_` variables.
 
-| Variable                    | Consumer                       | Required               | Notes                                                             |
-| --------------------------- | ------------------------------ | ---------------------- | ----------------------------------------------------------------- |
-| `RUNTIME_ENV`               | Worker                         | No                     | `development`, `test`, or `production`; defaults to `development` |
-| `VITE_API_BASE_URL`         | Web                            | No                     | Worker API base URL                                               |
-| `VITE_SUPABASE_URL`         | Web                            | Yes for authentication | Public project base URL; do not append `/rest/v1` or `/auth/v1`   |
-| `VITE_SUPABASE_ANON_KEY`    | Web                            | Yes for authentication | Public anon key, intended for browser use                         |
-| `SUPABASE_URL`              | Worker/database tooling        | Yes for authentication | Project base URL; do not append `/rest/v1` or `/auth/v1`          |
-| `SUPABASE_ANON_KEY`         | Worker/database tooling        | Yes for authentication | Public key for user-scoped operations                             |
-| `SUPABASE_SERVICE_ROLE_KEY` | Worker                         | Account deletion only  | Secret binding isolated to verified account deletion              |
-| `WEB_APP_ORIGIN`            | Worker                         | Production             | Exact web origin permitted by API CORS                            |
-| `DATABASE_URL`              | Drizzle and `npm run db:check` | Only for DB commands   | PostgreSQL connection string; keep private                        |
+| Variable                    | Consumer                       | Required               | Notes                                                                                             |
+| --------------------------- | ------------------------------ | ---------------------- | ------------------------------------------------------------------------------------------------- |
+| `RUNTIME_ENV`               | Worker                         | No                     | `development`, `test`, or `production`; defaults to `development`                                 |
+| `VITE_API_BASE_URL`         | Web                            | No                     | Worker API base URL                                                                               |
+| `VITE_WEB_APP_ORIGIN`       | Web                            | Production             | Public web origin used for authentication email redirects; omit locally to use the current origin |
+| `VITE_SUPABASE_URL`         | Web                            | Yes for authentication | Public project base URL; do not append `/rest/v1` or `/auth/v1`                                   |
+| `VITE_SUPABASE_ANON_KEY`    | Web                            | Yes for authentication | Public anon key, intended for browser use                                                         |
+| `SUPABASE_URL`              | Worker/database tooling        | Yes for authentication | Project base URL; do not append `/rest/v1` or `/auth/v1`                                          |
+| `SUPABASE_ANON_KEY`         | Worker/database tooling        | Yes for authentication | Public key for user-scoped operations                                                             |
+| `SUPABASE_SERVICE_ROLE_KEY` | Worker                         | Account deletion only  | Secret binding isolated to verified account deletion                                              |
+| `WEB_APP_ORIGIN`            | Worker                         | Production             | Exact web origin permitted by API CORS                                                            |
+| `DATABASE_URL`              | Drizzle and `npm run db:check` | Only for DB commands   | PostgreSQL connection string; keep private                                                        |
+
+For production, set `VITE_WEB_APP_ORIGIN` to the canonical website origin and rebuild the web app.
+For example, `https://ipo-mania-web.vanshadiyora.workers.dev`. Signup verification and password
+recovery links use this origin. If it is unset, they use the origin serving the current page, which
+is useful for local development.
+
+In the hosted Supabase project, set **Authentication → URL Configuration → Site URL** to the
+canonical web origin. Add these exact paths under **Redirect URLs**:
+
+- `https://ipo-mania-web.vanshadiyora.workers.dev/auth/confirm`
+- `https://ipo-mania-web.vanshadiyora.workers.dev/reset-password`
+
+These settings are separate from the local Supabase CLI configuration in `supabase/config.toml`.
 
 ## Local database
 
