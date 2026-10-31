@@ -4,7 +4,11 @@ import { auditAccessibility } from "./accessibility";
 test("renders the light application shell", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Welcome to IPO Mania" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: /Orchestrate IPO applications.*across all demat accounts/i,
+    }),
+  ).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
 });
 

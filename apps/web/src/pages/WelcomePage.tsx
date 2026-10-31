@@ -48,9 +48,7 @@ export function WelcomePage() {
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             {user ? (
               <div className="space-y-4">
-                <p className="text-sm font-medium text-muted">
-                  Signed in as {user.email}.
-                </p>
+                <p className="text-sm font-medium text-muted">Signed in as {user.email}.</p>
                 <div className="flex flex-wrap items-center justify-center gap-4">
                   <Button asChild size="lg">
                     <Link to="/accounts" className="gap-2">
