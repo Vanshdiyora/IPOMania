@@ -2,9 +2,12 @@
 
 ## Phase boundary
 
-Phase 3 implements demat account management only. Do not add IPO applications, the IPO quota
-engine, investment advice, or fabricated market data until this module's verification gate passes
-and a later-phase task is approved.
+Phase 4 implements user-owned IPO management and the issue-specific quota calculator under the
+approved Phase 4 task. Phase 3 local database/RLS, concurrency, and repository-wide formatting
+verification remains open; do not describe that gate as passed. Do not add IPO application
+submission/allotment workflows, investment advice, shared IPO master records, or fabricated market
+data without a separate approved task. Do not proceed to application management until critical
+financial calculation tests pass.
 
 ## Engineering conventions
 

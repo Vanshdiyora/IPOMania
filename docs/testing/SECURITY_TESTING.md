@@ -39,6 +39,12 @@ The integration test creates a fixture user and 499 accounts before racing two i
 exactly one succeeds and the final count is 500, then deletes the fixture through the Auth foreign
 key cascade. Use a disposable local database only.
 
+`supabase/tests/ipo_manager.test.sql` checks forced RLS and two-user isolation for IPO records,
+category rule versions, and quota calculation snapshots. It also checks owner-bound foreign keys,
+database-assigned rule versions, immutable historical records, and strict eligibility-condition
+structure. IPO and calculation tests use synthetic decimal values only; no fixture is represented
+as an official IPO rule example.
+
 ## Account API and import tests
 
 `tests/unit/account-validation.test.ts`, `tests/security/accounts-api.test.ts`, and

@@ -18,6 +18,11 @@ verified owner as defense in depth, and forced PostgreSQL RLS remains authoritat
 capacity trigger atomically updates a private counter row for the verified owner; clients cannot
 read or modify that counter directly.
 
+IPO records are also user-specific. `ipo_categories` and calculation history use composite
+owner-bound foreign keys to prevent cross-user references, including references to another user's
+IPO or demat account. Category configurations are append-only and calculation history is
+read-only after insertion.
+
 ## Adding another user-owned table
 
 1. Add a non-null `user_id uuid references auth.users(id) on delete cascade` (or use the auth ID as

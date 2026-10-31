@@ -5,6 +5,8 @@ import { validateEnvironment, type EnvironmentBindings } from "./env";
 import { meRoutes } from "./routes/me";
 import { accountRoutes } from "./routes/account";
 import { accountsRoutes } from "./routes/accounts";
+import { iposRoutes } from "./routes/ipos";
+import { quotaRoutes } from "./routes/quota";
 
 const apiVersion = "1.0.0";
 
@@ -33,6 +35,8 @@ export function createApp() {
   app.route("/api/me", meRoutes);
   app.route("/api/auth/account", accountRoutes);
   app.route("/api/accounts", accountsRoutes);
+  app.route("/api/ipos", iposRoutes);
+  app.route("/api/quota", quotaRoutes);
 
   app.get("/api/health", (context) => {
     const environment = validateEnvironment(context.env ?? {});

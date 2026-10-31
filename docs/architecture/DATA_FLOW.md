@@ -4,14 +4,18 @@
 
 The Vite frontend uses Supabase Auth for email/password registration, verification, login, session
 refresh, recovery, and logout. The Hono Worker handles `/api/health`, protected profile routes,
-and protected demat-account routes. It verifies caller identity through Supabase Auth and uses the
-caller's bearer token and project anon key for user-scoped database operations.
+protected demat-account routes, and protected IPO/quota routes. It verifies caller identity through
+Supabase Auth and uses the caller's bearer token and project anon key for user-scoped database
+operations.
 
 Protected demat-account pages call `/api/accounts` with that same session token. The Worker derives
 ownership from the Auth-verified identity; account CRUD, filtering, and import history remain under
 RLS. CSV/XLSX previews are parsed and staged as owned import records; confirmation calls a
 transactional database function, while atomic updates to a private per-user counter row serialize
-active-account count changes.
+active-account count changes. IPO records and category configurations are owned by one user;
+category changes append an immutable rule version. Quota calculations read the caller's latest
+issue-specific configuration, calculate with `decimal.js`, and store a private snapshot of
+pricing, lot-size, inputs, result, and timestamp.
 
 ## Authenticated database flow
 
@@ -26,6 +30,12 @@ For a protected API request:
 
 For account import confirmation, a caller-scoped RPC locks the import preview, inserts ready rows,
 records results, and commits atomically. Retried requests return the existing result.
+
+For quota calculations, the API derives ownership from the verified identity, reads the IPO,
+demat account, and latest category version through caller-context RLS, and validates all inputs.
+The `calculate` route stores the exact inputs and result; `validate` does not. A demat account is
+not evidence of shareholder eligibility. User-provided holdings and condition confirmations remain
+unverified.
 
 Never replace the user's JWT with a service-role credential for user-scoped operations. The
 service-role key is isolated to account deletion using the verified caller ID. Avoid logging

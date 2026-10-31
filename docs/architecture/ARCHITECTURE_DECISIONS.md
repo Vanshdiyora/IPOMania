@@ -63,3 +63,32 @@ database transaction to confirm, and archive unchanged rows for reversal.
 
 **Reasoning:** A durable preview preserves invalid/duplicate row reports, a transaction avoids
 partial imports, and an idempotent state transition makes retries safe without service-role access.
+
+## ADR 009 — user-specific IPO records until a trusted publisher exists
+
+**Decision:** IPO records, category rules, and calculation history are user-owned and protected by
+forced RLS.
+
+**Reasoning:** The application has no trusted shared-catalog editor or publication workflow.
+Making records shared would allow one user's manual data and private context to leak or be changed
+by another user. A future shared catalog requires a separately approved editorial authorization
+model.
+
+## ADR 010 — immutable issue-specific quota rule versions
+
+**Decision:** Store category rules per IPO and category as append-only versions. Assign version
+numbers under a database transaction lock, and snapshot the selected version and calculation
+inputs/results.
+
+**Reasoning:** IPO limits and eligibility criteria vary by issue. No category defaults or
+hard-coded quota limits are safe; unknown rules must fail closed. Immutable versions preserve
+historical reproducibility after an issue is edited.
+
+## ADR 011 — Decimal financial calculations
+
+**Decision:** Use `decimal.js` for monetary comparison and multiplication in the isolated
+financial-engine package. Monetary API inputs are decimal strings.
+
+**Reasoning:** IEEE-754 floating-point rounding is inappropriate for financial calculations.
+Integer share counts are range-checked separately, and the engine has no market-data or investment
+advice behavior.

@@ -39,6 +39,25 @@ export const profileUpdateSchema = z
   })
   .strict();
 
+function compareDecimalStrings(left: string, right: string): number {
+  if (typeof left !== "string" || typeof right !== "string") return 0;
+  const [leftWhole, leftFraction = ""] = left.split(".");
+  const [rightWhole, rightFraction = ""] = right.split(".");
+  const normalizedLeftWhole = leftWhole.replace(/^0+(?=\d)/, "");
+  const normalizedRightWhole = rightWhole.replace(/^0+(?=\d)/, "");
+  if (normalizedLeftWhole.length !== normalizedRightWhole.length) {
+    return normalizedLeftWhole.length < normalizedRightWhole.length ? -1 : 1;
+  }
+  if (normalizedLeftWhole !== normalizedRightWhole) {
+    return normalizedLeftWhole < normalizedRightWhole ? -1 : 1;
+  }
+  const precision = Math.max(leftFraction.length, rightFraction.length);
+  const normalizedLeftFraction = leftFraction.padEnd(precision, "0");
+  const normalizedRightFraction = rightFraction.padEnd(precision, "0");
+  if (normalizedLeftFraction === normalizedRightFraction) return 0;
+  return normalizedLeftFraction < normalizedRightFraction ? -1 : 1;
+}
+
 export const preferencesUpdateSchema = z
   .object({
     email_notifications: z.boolean(),
@@ -109,5 +128,302 @@ export const accountImportPreviewSchema = z
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ]),
     rows: z.array(z.unknown()).min(1).max(500),
+  })
+  .strict();
+
+export const ipoStatusSchema = z.enum([
+  "UPCOMING",
+  "OPEN",
+  "CLOSED",
+  "ALLOTMENT_PENDING",
+  "LISTED",
+  "WITHDRAWN",
+]);
+export const ipoCategorySchema = z.enum(["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"]);
+
+const priceDecimalSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{1,12}(?:\.\d{1,6})?$/, "Enter a price with at most 12 integer and 6 decimal digits.");
+const amountDecimalSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^\d{1,20}(?:\.\d{1,4})?$/,
+    "Enter an amount with at most 20 integer and 4 decimal digits.",
+  );
+const decimalStringSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^\d{1,20}(?:\.\d{1,6})?$/,
+    "Enter a decimal amount with at most 20 integer and 6 decimal digits.",
+  );
+const positivePriceSchema = priceDecimalSchema.refine((value) => /[1-9]/.test(value));
+const positiveAmountSchema = amountDecimalSchema.refine((value) => /[1-9]/.test(value));
+const optionalDateSchema = z.iso.date().nullable();
+
+const ipoObjectSchema = z
+  .object({
+    company_name: z.string().trim().min(1).max(160),
+    symbol: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .min(1)
+      .max(24)
+      .regex(/^[A-Z0-9._-]+$/),
+    ipo_type: z.string().trim().min(1).max(40),
+    exchange: z.string().trim().min(1).max(40),
+    issue_price_min: positivePriceSchema,
+    issue_price_max: positivePriceSchema,
+    cut_off_price: positivePriceSchema.nullable(),
+    lot_size: z.number().int().positive().max(1_000_000),
+    issue_size: positiveAmountSchema,
+    opening_date: z.iso.date(),
+    closing_date: z.iso.date(),
+    allotment_date: optionalDateSchema,
+    listing_date: optionalDateSchema,
+    status: ipoStatusSchema,
+    data_source: z.enum(["MANUAL", "PUBLISHED_SOURCE"]).default("MANUAL"),
+    source_reference: z.string().trim().max(1000).nullable(),
+    last_verified_at: z.iso.datetime().nullable(),
+  })
+  .strict();
+
+export const ipoSchema = ipoObjectSchema.superRefine((ipo, context) => {
+  if (
+    ipo.issue_price_min &&
+    ipo.issue_price_max &&
+    compareDecimalStrings(ipo.issue_price_min, ipo.issue_price_max) > 0
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Minimum issue price cannot exceed maximum issue price.",
+      path: ["issue_price_min"],
+    });
+  }
+  if (
+    ipo.cut_off_price !== null &&
+    ipo.cut_off_price !== undefined &&
+    ipo.issue_price_min &&
+    ipo.issue_price_max &&
+    (compareDecimalStrings(ipo.cut_off_price, ipo.issue_price_min) < 0 ||
+      compareDecimalStrings(ipo.cut_off_price, ipo.issue_price_max) > 0)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Cut-off price must be within the issue price range.",
+      path: ["cut_off_price"],
+    });
+  }
+  if (ipo.opening_date && ipo.closing_date && ipo.opening_date > ipo.closing_date) {
+    context.addIssue({
+      code: "custom",
+      message: "Opening date must not be after closing date.",
+      path: ["opening_date"],
+    });
+  }
+});
+
+export const ipoUpdateSchema = ipoObjectSchema.partial().superRefine((ipo, context) => {
+  if (
+    ipo.issue_price_min &&
+    ipo.issue_price_max &&
+    compareDecimalStrings(ipo.issue_price_min, ipo.issue_price_max) > 0
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Minimum issue price cannot exceed maximum issue price.",
+      path: ["issue_price_min"],
+    });
+  }
+  if (
+    ipo.cut_off_price &&
+    ipo.issue_price_min &&
+    ipo.issue_price_max &&
+    (compareDecimalStrings(ipo.cut_off_price, ipo.issue_price_min) < 0 ||
+      compareDecimalStrings(ipo.cut_off_price, ipo.issue_price_max) > 0)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Cut-off price must be within the issue price range.",
+      path: ["cut_off_price"],
+    });
+  }
+  if (ipo.opening_date && ipo.closing_date && ipo.opening_date > ipo.closing_date) {
+    context.addIssue({
+      code: "custom",
+      message: "Opening date must not be after closing date.",
+      path: ["opening_date"],
+    });
+  }
+});
+
+export const ipoListQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    page_size: z.coerce.number().int().min(1).max(100).default(25),
+    search: z.string().trim().max(160).optional(),
+    status: ipoStatusSchema.optional(),
+    exchange: z.string().trim().max(40).optional(),
+    opening_from: z.iso.date().optional(),
+    opening_to: z.iso.date().optional(),
+    include_archived: z.enum(["true", "false"]).default("false"),
+  })
+  .strict()
+  .refine(
+    (query) => !query.opening_from || !query.opening_to || query.opening_from <= query.opening_to,
+    { message: "opening_from must not be after opening_to.", path: ["opening_from"] },
+  );
+
+const eligibilityConditionSchema = z
+  .object({
+    id: z
+      .string()
+      .trim()
+      .min(1)
+      .max(40)
+      .regex(/^[A-Za-z0-9_-]+$/),
+    description: z.string().trim().min(1).max(500),
+  })
+  .strict();
+
+export const ipoCategoryConfigurationSchema = z
+  .object({
+    category: ipoCategorySchema,
+    lot_limit_status: z.enum(["CONFIGURED", "NO_PUBLISHED_LIMIT", "UNCONFIGURED"]),
+    minimum_lots: z.number().int().positive().max(2_147_483_647).nullable(),
+    maximum_lots: z.number().int().positive().max(2_147_483_647).nullable(),
+    lot_increment: z.number().int().positive().max(2_147_483_647),
+    investment_limit_status: z.enum(["CONFIGURED", "NO_PUBLISHED_LIMIT", "UNCONFIGURED"]),
+    minimum_investment: positiveAmountSchema.nullable(),
+    maximum_investment: positiveAmountSchema.nullable(),
+    reserved_shares: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
+    reserved_percentage: decimalStringSchema
+      .refine(
+        (value) => compareDecimalStrings(value, "100") <= 0,
+        "Reserved percentage cannot exceed 100.",
+      )
+      .nullable(),
+    shareholder_record_date: optionalDateSchema,
+    minimum_shareholding: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
+    eligibility_conditions: z.array(eligibilityConditionSchema).max(20),
+    allowed_price_types: z
+      .array(z.enum(["BID", "CUT_OFF"]))
+      .min(1)
+      .max(2),
+    minimum_price_increment: positivePriceSchema.nullable(),
+    source_reference: z.string().trim().max(1000).nullable(),
+    rule_source: z.enum(["MANUAL", "PUBLISHED_SOURCE"]).default("MANUAL"),
+    last_verified_at: z.iso.datetime().nullable(),
+  })
+  .strict()
+  .superRefine((configuration, context) => {
+    if (
+      configuration.lot_limit_status === "CONFIGURED" &&
+      configuration.minimum_lots === null &&
+      configuration.maximum_lots === null
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "A configured lot limit must include a minimum or maximum.",
+        path: ["minimum_lots"],
+      });
+    }
+    if (
+      configuration.lot_limit_status !== "CONFIGURED" &&
+      (configuration.minimum_lots !== null || configuration.maximum_lots !== null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Lot bounds are only allowed when lot limits are configured.",
+        path: ["lot_limit_status"],
+      });
+    }
+    if (
+      configuration.investment_limit_status === "CONFIGURED" &&
+      configuration.minimum_investment === null &&
+      configuration.maximum_investment === null
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "A configured investment limit must include a minimum or maximum.",
+        path: ["minimum_investment"],
+      });
+    }
+    if (
+      configuration.investment_limit_status !== "CONFIGURED" &&
+      (configuration.minimum_investment !== null || configuration.maximum_investment !== null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Investment bounds are only allowed when investment limits are configured.",
+        path: ["investment_limit_status"],
+      });
+    }
+    if (
+      configuration.minimum_lots !== null &&
+      configuration.maximum_lots !== null &&
+      configuration.minimum_lots > configuration.maximum_lots
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Minimum lots cannot exceed maximum lots.",
+        path: ["minimum_lots"],
+      });
+    }
+    if (
+      configuration.minimum_investment !== null &&
+      configuration.maximum_investment !== null &&
+      compareDecimalStrings(configuration.minimum_investment, configuration.maximum_investment) > 0
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Minimum investment cannot exceed maximum investment.",
+        path: ["minimum_investment"],
+      });
+    }
+    if (
+      configuration.minimum_shareholding !== null &&
+      configuration.shareholder_record_date === null
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "A record date is required when a minimum shareholder holding is configured.",
+        path: ["shareholder_record_date"],
+      });
+    }
+    if (
+      new Set(configuration.eligibility_conditions.map(({ id }) => id)).size !==
+      configuration.eligibility_conditions.length
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Eligibility condition IDs must be unique.",
+        path: ["eligibility_conditions"],
+      });
+    }
+    if (
+      new Set(configuration.allowed_price_types).size !== configuration.allowed_price_types.length
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Allowed price types must not contain duplicates.",
+        path: ["allowed_price_types"],
+      });
+    }
+  });
+
+export const ipoCalculationSchema = z
+  .object({
+    ipo_id: z.uuid(),
+    demat_account_id: z.uuid(),
+    category: ipoCategorySchema,
+    lots: z.number().int().positive().max(1_000_000),
+    price_type: z.enum(["BID", "CUT_OFF"]),
+    price: positivePriceSchema,
+    shareholder_shares: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
+    eligibility_answers: z.record(z.string(), z.boolean().nullable()),
   })
   .strict();

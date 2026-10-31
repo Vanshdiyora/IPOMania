@@ -1,9 +1,9 @@
 # IPO Mania
 
-IPO Mania is a TypeScript monorepo for an IPO research application. Phase 1 established the
-development and CI foundation, Phase 2 added Supabase email/password authentication and
-multi-user security, and Phase 3 adds user-owned demat account management with PostgreSQL RLS and
-bulk import. IPO application workflows, the IPO quota engine, and market data are not implemented.
+IPO Mania is a TypeScript monorepo for an IPO research application. It includes the development
+foundation, Supabase authentication and multi-user security, user-owned demat account management,
+and user-specific IPO records with an issue-configured decimal quota calculator. IPO application
+submission/allotment workflows and market-data integrations are not implemented.
 
 ## Requirements
 
@@ -64,7 +64,7 @@ Database checks need explicit credentials and do not run as part of the default 
 
 - `apps/web/` — React, Vite, Tailwind, and accessible application shell
 - `workers/api/` — Hono API deployed to Cloudflare Workers
-- `packages/` — shared API types, validation exports, and financial-engine package boundary
+- `packages/` — shared API types, Zod contracts, and isolated `decimal.js` financial engine
 - `supabase/` — local Supabase CLI configuration, seed entry point, and SQL migrations
 - `tests/` — unit, integration, security, and end-to-end test locations
 - `docs/` — architecture, frontend, and deployment documentation
@@ -78,3 +78,9 @@ The demat account behavior, API, schema, and import workflow are specified in
 Security tests and remaining deployment checks are documented in
 [SECURITY_TESTING.md](./docs/testing/SECURITY_TESTING.md). Passing local checks is not a security
 certification; review production configuration and residual risks before launch.
+IPO ownership, issue-specific configuration, calculation limits, and audit history are documented
+in [IPO_MANAGER_SPECIFICATION.md](./docs/product/IPO_MANAGER_SPECIFICATION.md),
+[IPO_QUOTA_RULES.md](./docs/product/IPO_QUOTA_RULES.md),
+[FINANCIAL_CALCULATIONS.md](./docs/product/FINANCIAL_CALCULATIONS.md),
+[IPO_API.md](./docs/backend/IPO_API.md), [QUOTA_ENGINE.md](./docs/backend/QUOTA_ENGINE.md), and
+[IPO_SCHEMA.md](./docs/database/IPO_SCHEMA.md).

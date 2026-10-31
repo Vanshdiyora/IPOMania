@@ -30,6 +30,12 @@ are no insert or delete policies: an Auth database trigger creates rows, and aut
 cascades them. Grants are restricted to authenticated users and the columns required for updates.
 Anonymous users have no table privileges.
 
+The `20261031140000_ipo_manager_quota_engine.sql` migration adds user-owned `ipos`,
+append-only `ipo_categories`, and `ipo_quota_calculations` tables. Forced RLS scopes each record to
+its owner. Composite foreign keys bind category versions and calculation snapshots to the same
+owner as their IPO and demat account. Authenticated users can archive IPOs but cannot mutate
+historical rule versions or calculation results. See [IPO_SCHEMA.md](./IPO_SCHEMA.md).
+
 ## Database verification
 
 Run `supabase start` followed by `npm run test:security:db`. The pgTAP suites execute as the
