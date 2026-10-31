@@ -110,6 +110,13 @@ describe("financial engine", () => {
     );
   });
 
+  it("anchors lot increments at the configured minimum", () => {
+    const rules = { ...baseRules, minimum_lots: 2, maximum_lots: 8, lot_increment: 3 };
+    expect(validateLotCount(2, 10, rules)).toEqual([]);
+    expect(validateLotCount(5, 10, rules)).toEqual([]);
+    expect(validateLotCount(4, 10, rules)[0]?.code).toBe("INVALID_LOT_INCREMENT");
+  });
+
   it("rejects out-of-band, disallowed, and incorrectly incremented prices", () => {
     const input = makeInput();
     expect(validatePrice(input.ipo, "BID", "20.05", input.rules)[0]?.code).toBe(
@@ -121,10 +128,12 @@ describe("financial engine", () => {
     expect(validatePrice(input.ipo, "CUT_OFF", "19.95", input.rules)[0]?.code).toBe(
       "CUT_OFF_PRICE_MISMATCH",
     );
-    expect(validatePrice(input.ipo, "CUT_OFF", "20.00", {
-      ...input.rules,
-      allowed_price_types: ["BID"],
-    }).map(({ code }) => code)).toContain("PRICE_TYPE_NOT_ALLOWED");
+    expect(
+      validatePrice(input.ipo, "CUT_OFF", "20.00", {
+        ...input.rules,
+        allowed_price_types: ["BID"],
+      }).map(({ code }) => code),
+    ).toContain("PRICE_TYPE_NOT_ALLOWED");
   });
 
   it("requires a configured category and rejects unknown categories", () => {
@@ -193,6 +202,17 @@ describe("financial engine", () => {
     expect(calculateMaximumEligibleLots(makeInput().ipo, rules, "10.05")).toBeNull();
   });
 
+  it("calculates a finite maximum from explicit lot and investment bounds", () => {
+    const rules = {
+      ...baseRules,
+      maximum_lots: 8,
+      maximum_investment: "502.50",
+      lot_increment: 3,
+      minimum_lots: 2,
+    };
+    expect(calculateMaximumEligibleLots(makeInput().ipo, rules, "10.05")).toBe(5);
+  });
+
   it("reproduces a historical result from its immutable rule and pricing snapshot", () => {
     const historicalInput = structuredClone({ ...makeInput(), lots: 2 });
     const historicalResult = validateApplicationConfiguration(historicalInput);
@@ -209,9 +229,7 @@ describe("financial engine", () => {
     expect(historicalResult.eligible).toBe(true);
     expect(revisedResult.rule_version).toBe(2);
     expect(revisedResult.eligible).toBe(false);
-    expect(revisedResult.validation_errors.map(({ code }) => code)).toContain(
-      "ABOVE_MAXIMUM_LOTS",
-    );
+    expect(revisedResult.validation_errors.map(({ code }) => code)).toContain("ABOVE_MAXIMUM_LOTS");
     expect(validateApplicationConfiguration(historicalInput)).toEqual(historicalResult);
   });
 });

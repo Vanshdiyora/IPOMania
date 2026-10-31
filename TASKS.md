@@ -64,5 +64,30 @@
 - [x] Run and record responsive account-page browser tests (desktop and mobile; 2/2 passed).
 
 The Phase 2 hosted-Auth, deployment, GitHub Actions, and secret-history follow-ups remain open.
-Do not publish this branch until those existing gates are resolved. Do not begin the IPO quota
-engine until all Phase 3 local verification items above pass.
+Do not publish this branch until those existing gates are resolved. The Phase 3 local database,
+concurrency, and formatting verification items remain open. The user explicitly authorized Phase 4
+implementation despite those Phase 3 gates; that authorization does not mark them passed.
+The earlier full Phase 3 database suite reported an invalid `throws_ok` invocation, a restore-boundary
+expectation mismatch, and import fixture/grant issues; these remain outside the Phase 4 changes.
+
+## Phase 4 — IPO manager and quota engine
+
+- [x] Read product, database, and architecture documentation before implementation.
+- [x] Choose and document user-owned IPO records until an approved shared-catalog editor exists.
+- [x] Add IPO CRUD, search/filter, manual provenance, status, archive, and database ownership/RLS.
+- [x] Add append-only issue-specific rules for RETAIL, SHNI, BHNI, and SHAREHOLDER without category
+      defaults or hard-coded limits.
+- [x] Add the decimal.js calculation engine, validations, explicit eligibility conditions, and
+      reproducible calculation snapshots.
+- [x] Add protected IPO, category, and quota API routes with caller-JWT database access.
+- [x] Add IPO list/details/form, category configuration, calendar, and quota calculator pages.
+- [x] Add product, API, database, engine, architecture, and security documentation.
+- [x] Run IPO-specific pgTAP ownership and RLS tests (23/23 passed locally).
+- [x] Run all Phase 4 unit/API tests (52 passed, 1 skipped), IPO E2E tests (2/2), and required
+      repository checks; lint, typecheck, unit/security tests, and both builds passed.
+- [x] Record known failures from the pre-existing Phase 3 full database suite; do not treat them as
+      IPO test failures or claim the Phase 3 gate has passed.
+- [x] Verify critical financial tests pass before considering application workflows; no application
+      submission/allotment workflow was added.
+- [x] Run Prettier on changed/new supported files; repository-wide `npm run format:check` still
+      reports 43 unformatted files outside this change.

@@ -80,8 +80,7 @@ production configuration follow-ups are resolved.
 
 ## Phase 3 — Demat account management
 
-**Status: Implemented; application checks pass, but local database/RLS/concurrency verification
-remains open.**
+**Status: Implemented; local database/RLS/concurrency verification remains open.**
 
 The implementation adds user-owned `demat_accounts`, import history/staging tables, forced RLS,
 caller-JWT API routes, a database-serialized 500-active-account cap, responsive account pages, and
@@ -105,4 +104,41 @@ remains blocked by 32 pre-existing unformatted files. The web build reports a la
 chunk warning.
 
 Production Supabase, hosted CI, and all database/integration checks remain separate verification
-gates. Do not begin the IPO quota engine until the account module passes these checks.
+gates. The Phase 3 local RLS/concurrency and repository-wide formatting gates remain open; the user
+explicitly authorized Phase 4 work to proceed despite those gates. This does not mark Phase 3 as
+verified. The earlier full local database suite also exposed pre-existing demat-test failures: an
+invalid `throws_ok` invocation, an incorrect restore-boundary expectation, and import fixture/grant
+issues. These were not changed as part of Phase 4.
+
+## Phase 4 — IPO manager and quota engine
+
+**Status: Implementation complete; local functional verification passed. Repository-wide
+formatting and the independent Phase 3 database gates remain open.**
+
+The Phase 4 implementation adds user-owned IPO records, issue-specific append-only category rule
+versions, exact-decimal financial calculations, authenticated API routes, and protected IPO list,
+details, edit, category, calendar, and quota-calculator pages. IPO records are user-specific because
+the application has no trusted shared-catalog editor. Manual records and user-provided eligibility
+inputs are never represented as automatically verified. No IPO application or allotment workflow
+has been added.
+
+The quota engine is in `packages/financial-engine/` and uses `decimal.js`. It has no category
+defaults; unknown lot or investment rules fail closed. Historical calculations retain issue price,
+lot size, rule version, user inputs, result, and timestamp. The new two-user pgTAP suite passed 23/23 assertions locally. The local database had already
+recorded the migration before its final composite category/IPO foreign-key strengthening; the
+additional local constraint was applied without resetting data, and the focused pgTAP suite was
+rerun successfully.
+
+No official IPO-rule example was available in the repository. Tests use synthetic arithmetic
+fixtures, explicitly not authoritative rules. Do not proceed to IPO application management until
+the critical financial tests pass; the financial, API, validation, and database tests now pass, and
+no application-submission or allotment workflow was added.
+
+### Phase 4 verification in this workspace
+
+- Passed: `npm run lint`, `npm run typecheck`, `npm test` (52 passed, 1 skipped),
+  `npm run build:web`, and `npm run build:api`.
+- Passed: IPO Playwright smoke tests (2/2) and local IPO pgTAP tests (23/23).
+- Passed: Prettier check for changed/new supported source and documentation files.
+  Repository-wide `npm run format:check` remains blocked by 43 files outside this change.
+- The web build reports the existing large-chunk warning; both application builds completed.

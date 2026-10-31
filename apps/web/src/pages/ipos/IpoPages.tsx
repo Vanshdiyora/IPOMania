@@ -10,11 +10,7 @@ import type {
   IpoRecord,
   IpoStatus,
 } from "@ipo-mania/shared";
-import {
-  ipoCategoryConfigurationSchema,
-  ipoSchema,
-  ipoStatusSchema,
-} from "@ipo-mania/validation";
+import { ipoCategoryConfigurationSchema, ipoSchema, ipoStatusSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
 import { useAuth } from "../../auth/useAuth";
 import { Button } from "../../components/ui/Button";
@@ -54,13 +50,13 @@ const blankIpo: IpoValues = {
   issue_price_min: "",
   issue_price_max: "",
   cut_off_price: null,
-  lot_size: 1,
+  lot_size: 0,
   issue_size: "",
   opening_date: "",
   closing_date: "",
   allotment_date: null,
   listing_date: null,
-  status: "UPCOMING",
+  status: "" as IpoValues["status"],
   data_source: "MANUAL",
   source_reference: null,
   last_verified_at: null,
@@ -169,7 +165,11 @@ export function IpoListPage({ calendar = false }: { calendar?: boolean }) {
                 Price {ipo.issue_price_min}–{ipo.issue_price_max} · Lot size {ipo.lot_size}
               </p>
               <p className="mt-1 text-xs text-muted">
-                {ipo.data_source === "MANUAL" ? "Manual entry · unverified" : "Published source"}
+                {ipo.data_source === "MANUAL"
+                  ? ipo.last_verified_at
+                    ? "Manual entry · user-marked verification date"
+                    : "Manual entry · unverified"
+                  : "Published source · user-entered"}
               </p>
             </div>
             <span className="rounded-full bg-[#EAF0F6] px-3 py-2 text-sm font-semibold text-navy">
@@ -281,15 +281,14 @@ export function IpoDetailsPage() {
           <Detail label="Data source" value={ipo.data_source} />
           <Detail label="Source reference" value={ipo.source_reference ?? "Not provided"} />
           <Detail
-            label="Last verified"
+            label="User-entered verification date"
             value={ipo.last_verified_at ? formatDateTime(ipo.last_verified_at) : "Not verified"}
           />
         </dl>
-        {ipo.data_source === "MANUAL" || !ipo.last_verified_at ? (
-          <p className="mt-5 rounded-lg border border-[#F1D9B3] bg-[#FFF9EF] p-4 text-sm text-ink">
-            This record is manually entered and is not automatically verified.
-          </p>
-        ) : null}
+        <p className="mt-5 rounded-lg border border-[#F1D9B3] bg-[#FFF9EF] p-4 text-sm text-ink">
+          This record and its source/verification date were entered by the user. The application
+          does not automatically fetch or verify the source.
+        </p>
       </Card>
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -380,7 +379,11 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
           automatically.
         </p>
       </header>
-      {errorMessage ? <p role="alert" className="text-danger">{errorMessage}</p> : null}
+      {errorMessage ? (
+        <p role="alert" className="text-danger">
+          {errorMessage}
+        </p>
+      ) : null}
       <Card>
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={submit}>
           <TextField form={form} name="company_name" label="Company name" />
@@ -393,13 +396,23 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
           <TextField form={form} name="lot_size" label="Lot size" inputMode="numeric" />
           <TextField form={form} name="issue_size" label="Issue size" />
           <SelectField form={form} name="status" label="Status">
+            <option value="" disabled>
+              Choose a status
+            </option>
             {statuses.map((status) => (
-              <option key={status} value={status}>{label(status)}</option>
+              <option key={status} value={status}>
+                {label(status)}
+              </option>
             ))}
           </SelectField>
           <TextField form={form} name="opening_date" label="Opening date" type="date" />
           <TextField form={form} name="closing_date" label="Closing date" type="date" />
-          <TextField form={form} name="allotment_date" label="Allotment date (optional)" type="date" />
+          <TextField
+            form={form}
+            name="allotment_date"
+            label="Allotment date (optional)"
+            type="date"
+          />
           <TextField form={form} name="listing_date" label="Listing date (optional)" type="date" />
           <SelectField form={form} name="data_source" label="Data source">
             <option value="MANUAL">Manual entry</option>
@@ -468,16 +481,17 @@ export function IpoCategoryConfigurationPage() {
       setMessage("A new rule version was saved. Earlier versions remain unchanged.");
       await queryClient.invalidateQueries({ queryKey: ["ipo-categories", ipoId] });
     },
-    onError: (error) => setMessage(error instanceof Error ? error.message : "Rules were not saved."),
+    onError: (error) =>
+      setMessage(error instanceof Error ? error.message : "Rules were not saved."),
   });
   const configurations = rulesQuery.data?.data.configurations ?? [];
   const latest = latestByCategory(configurations);
+  const existing = latest.get(category);
 
   useEffect(() => {
-    const existing = latest.get(category);
     if (existing) setForm(toRuleForm(existing));
     else setForm(emptyRuleForm());
-  }, [category, rulesQuery.data]);
+  }, [category, existing]);
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -519,9 +533,13 @@ export function IpoCategoryConfigurationPage() {
   return (
     <div className="space-y-6">
       <header>
-        <Link className="text-action underline" to={`/ipos/${ipo.id}`}>Back to IPO</Link>
+        <Link className="text-action underline" to={`/ipos/${ipo.id}`}>
+          Back to IPO
+        </Link>
         <h1 className="mt-2 text-3xl font-bold text-navy">Category configuration</h1>
-        <p className="mt-2 text-muted">{ipo.company_name} · {ipo.symbol}</p>
+        <p className="mt-2 text-muted">
+          {ipo.company_name} · {ipo.symbol}
+        </p>
         <p className="mt-2 rounded-lg border border-[#F1D9B3] bg-[#FFF9EF] p-3 text-sm text-ink">
           Enter the issue-specific values you have sourced. Unknown limits stay unconfigured; they
           are never treated as unlimited. A new submission creates a new immutable rule version.
@@ -535,7 +553,9 @@ export function IpoCategoryConfigurationPage() {
             value={category}
             onChange={(event) => setCategory(event.target.value as IpoCategoryCode)}
           >
-            {categories.map((value) => <option key={value}>{value}</option>)}
+            {categories.map((value) => (
+              <option key={value}>{value}</option>
+            ))}
           </select>
         </label>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -551,7 +571,11 @@ export function IpoCategoryConfigurationPage() {
           ))}
         </ul>
       </Card>
-      {message ? <p role="status" className="text-sm text-ink">{message}</p> : null}
+      {message ? (
+        <p role="status" className="text-sm text-ink">
+          {message}
+        </p>
+      ) : null}
       <Card>
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={submit}>
           <SelectRuleField
@@ -583,12 +607,43 @@ export function IpoCategoryConfigurationPage() {
               }))
             }
           />
-          <TextRuleField form={form} setForm={setForm} name="minimum_investment" label="Minimum investment" />
-          <TextRuleField form={form} setForm={setForm} name="maximum_investment" label="Maximum investment" />
-          <TextRuleField form={form} setForm={setForm} name="reserved_shares" label="Reserved shares (optional)" />
-          <TextRuleField form={form} setForm={setForm} name="reserved_percentage" label="Reserved percentage (optional)" />
-          <TextRuleField form={form} setForm={setForm} name="shareholder_record_date" label="Shareholder record date" type="date" />
-          <TextRuleField form={form} setForm={setForm} name="minimum_shareholding" label="Minimum eligible shares" />
+          <TextRuleField
+            form={form}
+            setForm={setForm}
+            name="minimum_investment"
+            label="Minimum investment"
+          />
+          <TextRuleField
+            form={form}
+            setForm={setForm}
+            name="maximum_investment"
+            label="Maximum investment"
+          />
+          <TextRuleField
+            form={form}
+            setForm={setForm}
+            name="reserved_shares"
+            label="Reserved shares (optional)"
+          />
+          <TextRuleField
+            form={form}
+            setForm={setForm}
+            name="reserved_percentage"
+            label="Reserved percentage (optional)"
+          />
+          <TextRuleField
+            form={form}
+            setForm={setForm}
+            name="shareholder_record_date"
+            label="Shareholder record date"
+            type="date"
+          />
+          <TextRuleField
+            form={form}
+            setForm={setForm}
+            name="minimum_shareholding"
+            label="Minimum eligible shares"
+          />
           <fieldset className="sm:col-span-2">
             <legend className="text-sm font-semibold text-ink">Allowed pricing</legend>
             <div className="mt-2 flex flex-wrap gap-5">
@@ -611,15 +666,31 @@ export function IpoCategoryConfigurationPage() {
               ))}
             </div>
           </fieldset>
-          <TextRuleField form={form} setForm={setForm} name="minimum_price_increment" label="Minimum price increment" />
+          <TextRuleField
+            form={form}
+            setForm={setForm}
+            name="minimum_price_increment"
+            label="Minimum price increment"
+          />
           <SelectRuleField
             label="Rule source"
             value={form.rule_source}
             options={["MANUAL", "PUBLISHED_SOURCE"]}
             onChange={(value) => updateRuleForm(setForm, "rule_source", value)}
           />
-          <TextRuleField form={form} setForm={setForm} name="source_reference" label="Source reference" />
-          <TextRuleField form={form} setForm={setForm} name="last_verified_at" label="Last verified at" type="datetime-local" />
+          <TextRuleField
+            form={form}
+            setForm={setForm}
+            name="source_reference"
+            label="Source reference"
+          />
+          <TextRuleField
+            form={form}
+            setForm={setForm}
+            name="last_verified_at"
+            label="Last verified at"
+            type="datetime-local"
+          />
           <div className="space-y-3 sm:col-span-2">
             <h2 className="text-lg font-bold text-ink">Published eligibility conditions</h2>
             <p className="text-sm text-muted">
@@ -629,11 +700,19 @@ export function IpoCategoryConfigurationPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-semibold text-ink">
                 Condition ID
-                <input className={inputClass} value={conditionId} onChange={(event) => setConditionId(event.target.value)} />
+                <input
+                  className={inputClass}
+                  value={conditionId}
+                  onChange={(event) => setConditionId(event.target.value)}
+                />
               </label>
               <label className="text-sm font-semibold text-ink">
                 Published condition text
-                <input className={inputClass} value={conditionDescription} onChange={(event) => setConditionDescription(event.target.value)} />
+                <input
+                  className={inputClass}
+                  value={conditionDescription}
+                  onChange={(event) => setConditionDescription(event.target.value)}
+                />
               </label>
             </div>
             <Button
@@ -662,16 +741,23 @@ export function IpoCategoryConfigurationPage() {
             </Button>
             <ul className="space-y-2">
               {form.eligibility_conditions.map((condition) => (
-                <li key={condition.id} className="flex flex-wrap items-center justify-between gap-3 rounded border border-border p-3 text-sm">
-                  <span><strong>{condition.id}:</strong> {condition.description}</span>
+                <li
+                  key={condition.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded border border-border p-3 text-sm"
+                >
+                  <span>
+                    <strong>{condition.id}:</strong> {condition.description}
+                  </span>
                   <Button
                     variant="outline"
-                    onClick={() => setForm((current) => ({
-                      ...current,
-                      eligibility_conditions: current.eligibility_conditions.filter(
-                        ({ id }) => id !== condition.id,
-                      ),
-                    }))}
+                    onClick={() =>
+                      setForm((current) => ({
+                        ...current,
+                        eligibility_conditions: current.eligibility_conditions.filter(
+                          ({ id }) => id !== condition.id,
+                        ),
+                      }))
+                    }
                   >
                     Remove
                   </Button>
@@ -723,20 +809,13 @@ export function QuotaCalculatorPage() {
 
   useEffect(() => {
     if (selectedRules) {
-      setPrice(
-        priceType === "CUT_OFF"
-          ? selectedIpo?.cut_off_price ?? ""
-          : selectedIpo?.issue_price_min ?? "",
-      );
       setAnswers(
-        Object.fromEntries(
-          selectedRules.eligibility_conditions.map(({ id }) => [id, false]),
-        ),
+        Object.fromEntries(selectedRules.eligibility_conditions.map(({ id }) => [id, false])),
       );
     } else {
       setAnswers({});
     }
-  }, [selectedRules?.id, selectedIpo?.id, priceType]);
+  }, [selectedRules]);
 
   const submitCalculation = async (persist: boolean) => {
     if (!session) return;
@@ -788,21 +867,35 @@ export function QuotaCalculatorPage() {
         and condition answers are your inputs, not verified holdings. This calculator does not
         confirm allotment or eligibility with an exchange.
       </p>
-      {requestError ? <p role="alert" className="text-danger">{requestError}</p> : null}
+      {requestError ? (
+        <p role="alert" className="text-danger">
+          {requestError}
+        </p>
+      ) : null}
       <Card>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-sm font-semibold text-ink">
             IPO
-            <select className={inputClass} value={ipoId} onChange={(event) => setIpoId(event.target.value)}>
+            <select
+              className={inputClass}
+              value={ipoId}
+              onChange={(event) => setIpoId(event.target.value)}
+            >
               <option value="">Choose an IPO</option>
               {ipoOptions.map((ipo) => (
-                <option key={ipo.id} value={ipo.id}>{ipo.company_name} ({ipo.symbol})</option>
+                <option key={ipo.id} value={ipo.id}>
+                  {ipo.company_name} ({ipo.symbol})
+                </option>
               ))}
             </select>
           </label>
           <label className="text-sm font-semibold text-ink">
             Demat account
-            <select className={inputClass} value={dematAccountId} onChange={(event) => setDematAccountId(event.target.value)}>
+            <select
+              className={inputClass}
+              value={dematAccountId}
+              onChange={(event) => setDematAccountId(event.target.value)}
+            >
               <option value="">Choose an account</option>
               {accountOptions.map((account) => (
                 <option key={account.id} value={account.id}>
@@ -820,29 +913,60 @@ export function QuotaCalculatorPage() {
             >
               {categories.map((value) => (
                 <option key={value} value={value}>
-                  {value}{latestRules.has(value) ? "" : " — not configured"}
+                  {value}
+                  {latestRules.has(value) ? "" : " — not configured"}
                 </option>
               ))}
             </select>
           </label>
           <label className="text-sm font-semibold text-ink">
             Lots
-            <input className={inputClass} type="number" min="1" step="1" value={lots} onChange={(event) => setLots(event.target.value)} />
+            <input
+              className={inputClass}
+              type="number"
+              min="1"
+              step="1"
+              value={lots}
+              onChange={(event) => setLots(event.target.value)}
+            />
           </label>
           <label className="text-sm font-semibold text-ink">
             Price type
-            <select className={inputClass} value={priceType} onChange={(event) => setPriceType(event.target.value as "BID" | "CUT_OFF")}>
-              {priceOptions.map((type) => <option key={type} value={type}>{type === "BID" ? "Bid price" : "Cut-off price"}</option>)}
+            <select
+              className={inputClass}
+              value={priceType}
+              onChange={(event) => setPriceType(event.target.value as "BID" | "CUT_OFF")}
+            >
+              {priceOptions.map((type) => (
+                <option key={type} value={type}>
+                  {type === "BID" ? "Bid price" : "Cut-off price"}
+                </option>
+              ))}
             </select>
           </label>
           <label className="text-sm font-semibold text-ink">
             Price per share
-            <input className={inputClass} inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value)} placeholder={selectedIpo ? `${selectedIpo.issue_price_min}–${selectedIpo.issue_price_max}` : ""} />
+            <input
+              className={inputClass}
+              inputMode="decimal"
+              value={price}
+              onChange={(event) => setPrice(event.target.value)}
+              placeholder={
+                selectedIpo ? `${selectedIpo.issue_price_min}–${selectedIpo.issue_price_max}` : ""
+              }
+            />
           </label>
           {category === "SHAREHOLDER" ? (
             <label className="text-sm font-semibold text-ink">
               Shares held on the configured record date
-              <input className={inputClass} type="number" min="0" step="1" value={shareholderShares} onChange={(event) => setShareholderShares(event.target.value)} />
+              <input
+                className={inputClass}
+                type="number"
+                min="0"
+                step="1"
+                value={shareholderShares}
+                onChange={(event) => setShareholderShares(event.target.value)}
+              />
               <span className="mt-1 block font-normal text-muted">
                 Self-reported input; account ownership does not establish record-date eligibility.
               </span>
@@ -851,9 +975,14 @@ export function QuotaCalculatorPage() {
         </div>
         {selectedRules?.eligibility_conditions.length ? (
           <fieldset className="mt-5 space-y-3">
-            <legend className="font-semibold text-ink">Issue-specific eligibility conditions</legend>
+            <legend className="font-semibold text-ink">
+              Issue-specific eligibility conditions
+            </legend>
             {selectedRules.eligibility_conditions.map((condition) => (
-              <label key={condition.id} className="flex min-h-touch items-start gap-3 rounded border border-border p-3 text-sm">
+              <label
+                key={condition.id}
+                className="flex min-h-touch items-start gap-3 rounded border border-border p-3 text-sm"
+              >
                 <input
                   type="checkbox"
                   checked={answers[condition.id] === true}
@@ -870,7 +999,7 @@ export function QuotaCalculatorPage() {
           <p className="mt-4 text-sm text-muted">
             Using rule version {selectedRules.rule_version} · {selectedRules.rule_source}
             {selectedRules.last_verified_at
-              ? ` · checked ${formatDateTime(selectedRules.last_verified_at)}`
+              ? ` · user-marked ${formatDateTime(selectedRules.last_verified_at)}`
               : " · not verified"}
           </p>
         ) : null}
@@ -910,7 +1039,10 @@ export function QuotaCalculatorPage() {
           ) : (
             <dl className="mt-4 grid gap-4 sm:grid-cols-2">
               <Detail label="Total shares" value={String(result.total_shares)} />
-              <Detail label="Application amount" value={result.application_amount ?? "Not calculated"} />
+              <Detail
+                label="Application amount"
+                value={result.application_amount ?? "Not calculated"}
+              />
               <Detail label="Rule version" value={String(result.rule_version)} />
               <Detail
                 label="Eligibility verification"
@@ -921,7 +1053,9 @@ export function QuotaCalculatorPage() {
           {result.calculation_id ? (
             <p className="mt-4 text-sm text-muted">
               Saved calculation {result.calculation_id}
-              {result.calculation_timestamp ? ` at ${formatDateTime(result.calculation_timestamp)}` : ""}
+              {result.calculation_timestamp
+                ? ` at ${formatDateTime(result.calculation_timestamp)}`
+                : ""}
             </p>
           ) : null}
         </Card>
@@ -955,7 +1089,7 @@ function emptyRuleForm(): RuleForm {
     lot_limit_status: "UNCONFIGURED",
     minimum_lots: "",
     maximum_lots: "",
-    lot_increment: "1",
+    lot_increment: "",
     investment_limit_status: "UNCONFIGURED",
     minimum_investment: "",
     maximum_investment: "",
@@ -964,7 +1098,7 @@ function emptyRuleForm(): RuleForm {
     shareholder_record_date: "",
     minimum_shareholding: "",
     eligibility_conditions: [],
-    allowed_price_types: ["BID"],
+    allowed_price_types: [],
     minimum_price_increment: "",
     source_reference: "",
     rule_source: "MANUAL",
@@ -1009,7 +1143,7 @@ function TextRuleField({
   label: string;
   type?: string;
 }) {
-  const value = typeof form[name] === "string" ? form[name] as string : "";
+  const value = typeof form[name] === "string" ? (form[name] as string) : "";
   return (
     <label className="block text-sm font-semibold text-ink">
       {label}
@@ -1038,8 +1172,16 @@ function SelectRuleField({
   return (
     <label className="block text-sm font-semibold text-ink">
       {label}
-      <select className={inputClass} value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => <option key={option} value={option}>{label.replace(" limits", "") === "Rule source" ? option : labelValue(option)}</option>)}
+      <select
+        className={inputClass}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {label.replace(" limits", "") === "Rule source" ? option : labelValue(option)}
+          </option>
+        ))}
       </select>
     </label>
   );
@@ -1066,10 +1208,22 @@ function TextField({
   type?: string;
   inputMode?: "numeric" | "decimal";
 }) {
+  const nullableField = ["cut_off_price", "allotment_date", "listing_date"].includes(name);
+  const registration =
+    name === "lot_size"
+      ? form.register(name, { valueAsNumber: true })
+      : nullableField
+        ? form.register(name, { setValueAs: (value: string) => (value === "" ? null : value) })
+        : form.register(name);
   return (
     <label className="block text-sm font-semibold text-ink">
       {label}
-      <input className={inputClass} type={type} inputMode={inputMode} {...form.register(name)} />
+      <input
+        className={inputClass}
+        type={name === "lot_size" ? "number" : type}
+        inputMode={inputMode}
+        {...registration}
+      />
       {form.formState.errors[name]?.message ? (
         <span className="mt-1 block font-normal text-danger">
           {String(form.formState.errors[name]?.message)}
@@ -1093,7 +1247,9 @@ function SelectField({
   return (
     <label className="block text-sm font-semibold text-ink">
       {label}
-      <select className={inputClass} {...form.register(name)}>{children}</select>
+      <select className={inputClass} {...form.register(name)}>
+        {children}
+      </select>
     </label>
   );
 }
@@ -1110,7 +1266,11 @@ function Detail({ label, value }: { label: string; value: string }) {
 function ErrorNotice({ error }: { error: unknown }) {
   const message =
     error instanceof ApiRequestError ? error.message : "The request could not be completed.";
-  return <p role="alert" className="rounded-lg bg-[#FDECEC] p-4 text-danger">{message}</p>;
+  return (
+    <p role="alert" className="rounded-lg bg-[#FDECEC] p-4 text-danger">
+      {message}
+    </p>
+  );
 }
 
 function latestByCategory(configurations: IpoCategoryConfiguration[]) {

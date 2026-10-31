@@ -1,6 +1,10 @@
-import Decimal from "decimal.js";
+import DecimalJs from "decimal.js";
 
-Decimal.set({ precision: 40, rounding: Decimal.ROUND_HALF_UP });
+const ExactDecimal = DecimalJs.clone({
+  precision: 40,
+  rounding: DecimalJs.ROUND_HALF_UP,
+});
+type Decimal = InstanceType<typeof ExactDecimal>;
 
 export type IpoCategory = "RETAIL" | "SHNI" | "BHNI" | "SHAREHOLDER";
 export type IpoPriceType = "BID" | "CUT_OFF";
@@ -92,7 +96,10 @@ export function validateLotCount(lots: number, lotSize: number, rules: CategoryR
     return errors;
   }
   if (!Number.isSafeInteger(lotSize) || lotSize <= 0) {
-    errors.push({ code: "INVALID_LOT_SIZE", message: "IPO lot size must be a positive whole number." });
+    errors.push({
+      code: "INVALID_LOT_SIZE",
+      message: "IPO lot size must be a positive whole number.",
+    });
     return errors;
   }
   if (rules.lot_limit_status === "UNCONFIGURED") {
@@ -150,7 +157,10 @@ export function validatePrice(
     return [{ code: "INVALID_ISSUE_PRICE_RANGE", message: "The issue price range is invalid." }];
   }
   if (minimum.greaterThan(maximum)) {
-    errors.push({ code: "INVALID_ISSUE_PRICE_RANGE", message: "The issue price range is invalid." });
+    errors.push({
+      code: "INVALID_ISSUE_PRICE_RANGE",
+      message: "The issue price range is invalid.",
+    });
   } else if (price.lessThan(minimum) || price.greaterThan(maximum)) {
     errors.push({
       code: "PRICE_OUTSIDE_ISSUE_RANGE",
@@ -165,7 +175,10 @@ export function validatePrice(
   }
   if (priceType === "CUT_OFF") {
     if (ipo.cut_off_price === null) {
-      errors.push({ code: "CUT_OFF_PRICE_UNAVAILABLE", message: "No cut-off price is configured." });
+      errors.push({
+        code: "CUT_OFF_PRICE_UNAVAILABLE",
+        message: "No cut-off price is configured.",
+      });
     } else if (!price.eq(parsePositiveDecimal(ipo.cut_off_price))) {
       errors.push({
         code: "CUT_OFF_PRICE_MISMATCH",
@@ -275,7 +288,8 @@ export function checkShareholderEligibility(
     return [
       {
         code: "SHAREHOLDER_HOLDING_REQUIRED",
-        message: "The provided holding does not include shares eligible for the shareholder category.",
+        message:
+          "The provided holding does not include shares eligible for the shareholder category.",
       },
     ];
   }
@@ -295,15 +309,29 @@ export function calculateMaximumEligibleLots(
   rules: CategoryRules,
   price: string,
 ): number | null {
+  if (
+    !Number.isSafeInteger(ipo.lot_size) ||
+    ipo.lot_size < 1 ||
+    !Number.isSafeInteger(rules.lot_increment) ||
+    rules.lot_increment < 1 ||
+    (rules.maximum_lots !== null && !Number.isSafeInteger(rules.maximum_lots))
+  ) {
+    return null;
+  }
   const validPrice = parsePositiveDecimal(price);
-  if (rules.lot_limit_status === "UNCONFIGURED" || rules.investment_limit_status === "UNCONFIGURED") {
+  if (
+    rules.lot_limit_status === "UNCONFIGURED" ||
+    rules.investment_limit_status === "UNCONFIGURED"
+  ) {
     return null;
   }
   let maximum: number | null = rules.maximum_lots;
   if (rules.maximum_investment !== null) {
     const investmentMaximum = parsePositiveDecimal(rules.maximum_investment);
     const amountPerLot = validPrice.mul(ipo.lot_size);
-    const investmentLots = investmentMaximum.dividedToIntegerBy(amountPerLot).toNumber();
+    const investmentLotsDecimal = investmentMaximum.dividedToIntegerBy(amountPerLot);
+    if (investmentLotsDecimal.greaterThan(Number.MAX_SAFE_INTEGER)) return null;
+    const investmentLots = investmentLotsDecimal.toNumber();
     maximum = maximum === null ? investmentLots : Math.min(maximum, investmentLots);
   }
   if (maximum === null) return null;
@@ -379,14 +407,10 @@ function isIpoCategory(value: string): value is IpoCategory {
 }
 
 function parsePositiveDecimal(value: string): Decimal {
-  if (
-    typeof value !== "string" ||
-    value.length > 64 ||
-    !/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)
-  ) {
+  if (typeof value !== "string" || value.length > 64 || !/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) {
     throw new RangeError("Amount must be a valid decimal string.");
   }
-  const decimal = new Decimal(value);
+  const decimal = new ExactDecimal(value);
   if (!decimal.isFinite() || !decimal.greaterThan(0)) {
     throw new RangeError("Amount must be greater than zero.");
   }

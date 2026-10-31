@@ -126,6 +126,7 @@ create table public.ipo_categories (
     foreign key (ipo_id, user_id) references public.ipos (id, user_id) on delete cascade,
   constraint ipo_categories_rule_version_unique unique (ipo_id, category, rule_version),
   constraint ipo_categories_id_user_unique unique (id, user_id),
+  constraint ipo_categories_id_ipo_user_unique unique (id, ipo_id, user_id),
   constraint ipo_categories_id_category_version_unique unique (id, category, rule_version),
   constraint ipo_categories_lot_status_values check (
     (lot_limit_status = 'CONFIGURED' and (minimum_lots is not null or maximum_lots is not null))
@@ -192,8 +193,8 @@ create table public.ipo_quota_calculations (
   constraint ipo_quota_calculations_owner_ipo_fk
     foreign key (ipo_id, user_id) references public.ipos (id, user_id) on delete restrict,
   constraint ipo_quota_calculations_owner_rules_fk
-    foreign key (category_configuration_id, user_id)
-    references public.ipo_categories (id, user_id) on delete restrict,
+    foreign key (category_configuration_id, ipo_id, user_id)
+    references public.ipo_categories (id, ipo_id, user_id) on delete restrict,
   constraint ipo_quota_calculations_owner_account_fk
     foreign key (demat_account_id, user_id)
     references public.demat_accounts (id, user_id) on delete restrict,

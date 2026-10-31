@@ -148,15 +148,17 @@ const priceDecimalSchema = z
 const amountDecimalSchema = z
   .string()
   .trim()
-  .regex(/^\d{1,20}(?:\.\d{1,4})?$/, "Enter an amount with at most 20 integer and 4 decimal digits.");
+  .regex(
+    /^\d{1,20}(?:\.\d{1,4})?$/,
+    "Enter an amount with at most 20 integer and 4 decimal digits.",
+  );
 const decimalStringSchema = z
   .string()
   .trim()
-  .regex(/^\d{1,20}(?:\.\d{1,6})?$/, "Enter a decimal amount with at most 20 integer and 6 decimal digits.");
-const positiveDecimalStringSchema = decimalStringSchema.refine(
-  (value) => /[1-9]/.test(value),
-  "Amount must be greater than zero.",
-);
+  .regex(
+    /^\d{1,20}(?:\.\d{1,6})?$/,
+    "Enter a decimal amount with at most 20 integer and 6 decimal digits.",
+  );
 const positivePriceSchema = priceDecimalSchema.refine((value) => /[1-9]/.test(value));
 const positiveAmountSchema = amountDecimalSchema.refine((value) => /[1-9]/.test(value));
 const optionalDateSchema = z.iso.date().nullable();
@@ -164,7 +166,13 @@ const optionalDateSchema = z.iso.date().nullable();
 const ipoObjectSchema = z
   .object({
     company_name: z.string().trim().min(1).max(160),
-    symbol: z.string().trim().toUpperCase().min(1).max(24).regex(/^[A-Z0-9._-]+$/),
+    symbol: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .min(1)
+      .max(24)
+      .regex(/^[A-Z0-9._-]+$/),
     ipo_type: z.string().trim().min(1).max(40),
     exchange: z.string().trim().min(1).max(40),
     issue_price_min: positivePriceSchema,
@@ -184,38 +192,38 @@ const ipoObjectSchema = z
   .strict();
 
 export const ipoSchema = ipoObjectSchema.superRefine((ipo, context) => {
-    if (
-      ipo.issue_price_min &&
-      ipo.issue_price_max &&
-      compareDecimalStrings(ipo.issue_price_min, ipo.issue_price_max) > 0
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "Minimum issue price cannot exceed maximum issue price.",
-        path: ["issue_price_min"],
-      });
-    }
-    if (
-      ipo.cut_off_price !== null &&
-      ipo.cut_off_price !== undefined &&
-      ipo.issue_price_min &&
-      ipo.issue_price_max &&
-      (compareDecimalStrings(ipo.cut_off_price, ipo.issue_price_min) < 0 ||
-        compareDecimalStrings(ipo.cut_off_price, ipo.issue_price_max) > 0)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "Cut-off price must be within the issue price range.",
-        path: ["cut_off_price"],
-      });
-    }
-    if (ipo.opening_date && ipo.closing_date && ipo.opening_date > ipo.closing_date) {
-      context.addIssue({
-        code: "custom",
-        message: "Opening date must not be after closing date.",
-        path: ["opening_date"],
-      });
-    }
+  if (
+    ipo.issue_price_min &&
+    ipo.issue_price_max &&
+    compareDecimalStrings(ipo.issue_price_min, ipo.issue_price_max) > 0
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Minimum issue price cannot exceed maximum issue price.",
+      path: ["issue_price_min"],
+    });
+  }
+  if (
+    ipo.cut_off_price !== null &&
+    ipo.cut_off_price !== undefined &&
+    ipo.issue_price_min &&
+    ipo.issue_price_max &&
+    (compareDecimalStrings(ipo.cut_off_price, ipo.issue_price_min) < 0 ||
+      compareDecimalStrings(ipo.cut_off_price, ipo.issue_price_max) > 0)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Cut-off price must be within the issue price range.",
+      path: ["cut_off_price"],
+    });
+  }
+  if (ipo.opening_date && ipo.closing_date && ipo.opening_date > ipo.closing_date) {
+    context.addIssue({
+      code: "custom",
+      message: "Opening date must not be after closing date.",
+      path: ["opening_date"],
+    });
+  }
 });
 
 export const ipoUpdateSchema = ipoObjectSchema.partial().superRefine((ipo, context) => {
@@ -265,14 +273,18 @@ export const ipoListQuerySchema = z
   })
   .strict()
   .refine(
-    (query) =>
-      !query.opening_from || !query.opening_to || query.opening_from <= query.opening_to,
+    (query) => !query.opening_from || !query.opening_to || query.opening_from <= query.opening_to,
     { message: "opening_from must not be after opening_to.", path: ["opening_from"] },
   );
 
 const eligibilityConditionSchema = z
   .object({
-    id: z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9_-]+$/),
+    id: z
+      .string()
+      .trim()
+      .min(1)
+      .max(40)
+      .regex(/^[A-Za-z0-9_-]+$/),
     description: z.string().trim().min(1).max(500),
   })
   .strict();
@@ -288,14 +300,19 @@ export const ipoCategoryConfigurationSchema = z
     minimum_investment: positiveAmountSchema.nullable(),
     maximum_investment: positiveAmountSchema.nullable(),
     reserved_shares: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
-    reserved_percentage: decimalStringSchema.refine(
-      (value) => compareDecimalStrings(value, "100") <= 0,
-      "Reserved percentage cannot exceed 100.",
-    ).nullable(),
+    reserved_percentage: decimalStringSchema
+      .refine(
+        (value) => compareDecimalStrings(value, "100") <= 0,
+        "Reserved percentage cannot exceed 100.",
+      )
+      .nullable(),
     shareholder_record_date: optionalDateSchema,
     minimum_shareholding: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
     eligibility_conditions: z.array(eligibilityConditionSchema).max(20),
-    allowed_price_types: z.array(z.enum(["BID", "CUT_OFF"])).min(1).max(2),
+    allowed_price_types: z
+      .array(z.enum(["BID", "CUT_OFF"]))
+      .min(1)
+      .max(2),
     minimum_price_increment: positivePriceSchema.nullable(),
     source_reference: z.string().trim().max(1000).nullable(),
     rule_source: z.enum(["MANUAL", "PUBLISHED_SOURCE"]).default("MANUAL"),
@@ -337,8 +354,7 @@ export const ipoCategoryConfigurationSchema = z
     }
     if (
       configuration.investment_limit_status !== "CONFIGURED" &&
-      (configuration.minimum_investment !== null ||
-        configuration.maximum_investment !== null)
+      (configuration.minimum_investment !== null || configuration.maximum_investment !== null)
     ) {
       context.addIssue({
         code: "custom",
@@ -360,10 +376,7 @@ export const ipoCategoryConfigurationSchema = z
     if (
       configuration.minimum_investment !== null &&
       configuration.maximum_investment !== null &&
-      compareDecimalStrings(
-        configuration.minimum_investment,
-        configuration.maximum_investment,
-      ) > 0
+      compareDecimalStrings(configuration.minimum_investment, configuration.maximum_investment) > 0
     ) {
       context.addIssue({
         code: "custom",
@@ -381,8 +394,10 @@ export const ipoCategoryConfigurationSchema = z
         path: ["shareholder_record_date"],
       });
     }
-    if (new Set(configuration.eligibility_conditions.map(({ id }) => id)).size !==
-      configuration.eligibility_conditions.length) {
+    if (
+      new Set(configuration.eligibility_conditions.map(({ id }) => id)).size !==
+      configuration.eligibility_conditions.length
+    ) {
       context.addIssue({
         code: "custom",
         message: "Eligibility condition IDs must be unique.",

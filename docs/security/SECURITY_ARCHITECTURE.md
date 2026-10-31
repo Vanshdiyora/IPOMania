@@ -8,7 +8,7 @@
    `auth.getUser(token)` and uses the returned identity, not decoded request data.
 3. Ordinary database requests use the anon project key and forward the verified caller's bearer
    token to PostgREST. PostgreSQL RLS is the final ownership boundary for profiles, preferences,
-   demat accounts, and import records.
+   demat accounts, imports, IPO records, category rules, and quota calculations.
 4. The service-role key is not available to the browser or ordinary route handlers. Its only use
    is the account-deletion handler, which deletes the authenticated caller ID returned by the
    verification middleware and accepts no target user ID from the client.
@@ -27,6 +27,13 @@
   Active membership is serialized and capped in the database. Import confirmation and reversal
   use narrow `SECURITY DEFINER` RPCs with an empty search path and explicit `auth.uid()` ownership
   checks; direct clients cannot update import state or results.
+- IPO data is user-specific until a trusted shared-catalog editor is designed. IPO, category-rule,
+  and calculation tables force RLS; composite foreign keys bind categories/calculations to the same
+  user-owned IPO and demat account. Rule versions are database-assigned and immutable, and
+  calculation records cannot be updated through authenticated grants.
+- The quota engine uses exact decimal arithmetic and issue-specific rules only. User-entered
+  shareholder values and eligibility attestations are not exchange-verified and are always shown
+  as unverified.
 - XLSX parsing uses the patched `@e965/xlsx` fork rather than the unmaintained, advisory-affected
   `xlsx` package. Upload size, file type, row count, column count, and row content are bounded and
   validated.
