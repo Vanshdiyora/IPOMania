@@ -75,7 +75,14 @@ describe.skipIf(!databaseUrl)("application external-reference concurrency", () =
 
   afterAll(async () => {
     if (!sql) return;
-    if (userId) await sql`delete from auth.users where id = ${userId}::uuid`;
+    if (userId) {
+      await sql.begin(async (transaction) => {
+        // Auth-user cascade cleanup must remove this fixture's immutable ledger entry.
+        await transaction`alter table public.capital_ledger disable trigger capital_ledger_immutable`;
+        await transaction`delete from auth.users where id = ${userId}::uuid`;
+        await transaction`alter table public.capital_ledger enable trigger capital_ledger_immutable`;
+      });
+    }
     await sql.end();
   });
 
