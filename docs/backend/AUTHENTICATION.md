@@ -11,8 +11,11 @@ Both URL variables must be the Supabase project base URL (for example,
 `https://<project-ref>.supabase.co`), with no `/rest/v1` or `/auth/v1` path. Supabase clients add
 their own API paths.
 
-Set `WEB_APP_ORIGIN` to the exact production web origin to allow API CORS requests. Add the web
-origin and `/auth/confirm` and `/reset-password` callback paths to the Supabase Auth URL allowlist.
+Set `WEB_APP_ORIGIN` to the exact production web origin to allow API CORS requests, and
+`VITE_WEB_APP_ORIGIN` to the exact production web origin for auth email redirects. In the hosted
+Supabase project's **Authentication → URL Configuration**, set the Site URL to the production web
+origin and add `/auth/confirm` and `/reset-password` callback URLs to the Redirect URLs allowlist.
+The deployment environment is independent of the local Supabase CLI configuration.
 For local development, set the public `VITE_` variables and Worker bindings in the repository-root
 `.env`; Vite exposes only `VITE_` variables, and the local Wrangler command loads the file for the
 API. Do not commit the file. Use hosted Supabase credentials to connect to the hosted project, or

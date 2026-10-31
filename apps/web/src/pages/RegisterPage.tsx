@@ -6,6 +6,7 @@ import { registerSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
 import { AuthPage, FieldError } from "../auth/AuthPage";
 import { Button } from "../components/ui/Button";
+import { getAuthRedirectUrl } from "../lib/authRedirect";
 import { getSupabaseClient } from "../lib/supabase";
 
 type RegisterValues = z.infer<typeof registerSchema>;
@@ -28,7 +29,7 @@ export function RegisterPage() {
         password: values.password,
         options: {
           data: { full_name: values.fullName },
-          emailRedirectTo: `${window.location.origin}/auth/confirm`,
+          emailRedirectTo: getAuthRedirectUrl("/auth/confirm", window.location.origin),
         },
       });
       if (error) throw error;

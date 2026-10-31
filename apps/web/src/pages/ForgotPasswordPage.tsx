@@ -6,6 +6,7 @@ import { forgotPasswordSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
 import { AuthPage, FieldError } from "../auth/AuthPage";
 import { Button } from "../components/ui/Button";
+import { getAuthRedirectUrl } from "../lib/authRedirect";
 import { getSupabaseClient } from "../lib/supabase";
 
 type ForgotValues = z.infer<typeof forgotPasswordSchema>;
@@ -24,7 +25,7 @@ export function ForgotPasswordPage() {
     setMessage("");
     try {
       const { error } = await getSupabaseClient().auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: getAuthRedirectUrl("/reset-password", window.location.origin),
       });
       if (error) throw error;
       setMessage("If an account exists for that email, password reset instructions will be sent.");
