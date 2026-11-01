@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../../auth/useAuth";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 
 export function AppLayout() {
+  const { loading, user } = useAuth();
+  const { pathname } = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuWasOpen = useRef(false);
@@ -36,6 +39,10 @@ export function AppLayout() {
       document.body.style.overflow = "";
     };
   }, [mobileMenuOpen]);
+
+  if (pathname === "/" && (loading || !user)) {
+    return <Outlet />;
+  }
 
   return (
     <div className="flex min-h-screen min-w-0 bg-canvas">
