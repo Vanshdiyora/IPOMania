@@ -104,7 +104,9 @@ export async function downloadApiFile(path: string, session: Session): Promise<v
     response.headers
       .get("Content-Disposition")
       ?.match(/filename="([^"]+)"/i)?.[1]
-      ?.replace(/[\/"\r\n]/g, "") ?? "ipo-mania-report";
+      ?.replace(/["\r\n]/g, "")
+      .replaceAll("\\", "")
+      .replaceAll("/", "") ?? "ipo-mania-report";
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;

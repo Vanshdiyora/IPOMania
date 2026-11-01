@@ -8,7 +8,6 @@ import { ResetPasswordPage } from "../pages/ResetPasswordPage";
 import { ConfirmEmailPage } from "../pages/ConfirmEmailPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { DashboardHomePage } from "../pages/DashboardPage";
-import { WelcomePage } from "../pages/WelcomePage";
 import { ProtectedRoute } from "../auth/ProtectedRoute";
 import {
   AccountDashboardPage,
@@ -60,7 +59,6 @@ function protectedPage(element: React.ReactNode) {
 }
 
 export const router = createBrowserRouter([
-  { path: "/", element: <WelcomePage />, errorElement: <NotFoundPage /> },
   { path: "/register", element: <RegisterPage /> },
   { path: "/login", element: <LoginPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
@@ -86,6 +84,7 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     errorElement: <NotFoundPage />,
     children: [
+      { index: true, element: <DashboardHomePage /> },
       { path: "dashboard", element: protectedPage(<DashboardHomePage />) },
       { path: "accounts", element: protectedPage(<AccountDashboardPage />) },
       { path: "accounts/list", element: protectedPage(<AccountListPage />) },

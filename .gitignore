@@ -7,7 +7,6 @@ test-results/
 .dev.vars
 .env
 .env.*
-/local.env
 !.env.example
 /supabase/.branches/
 /supabase/.temp/
