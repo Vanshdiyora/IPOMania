@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { resetPasswordSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
-import { AuthPage, FieldError } from "../auth/AuthPage";
+import { AuthPage } from "../auth/AuthPage";
 import { Button } from "../components/ui/Button";
 import { Input, FormField } from "../components/ui/Input";
 import { getSupabaseClient } from "../lib/supabase";
@@ -21,7 +21,10 @@ export function ResetPasswordPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<ResetValues>({ resolver: zodResolver(resetPasswordSchema) });
+  } = useForm<ResetValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: { password: "", confirmPassword: "" },
+  });
 
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get("code");
@@ -96,7 +99,6 @@ export function ResetPasswordPage() {
               aria-describedby={errors.password ? "password-error" : undefined}
               {...register("password")}
             />
-            <FieldError id="password-error" message={errors.password?.message} />
           </FormField>
 
           <FormField
@@ -113,7 +115,6 @@ export function ResetPasswordPage() {
               aria-describedby={errors.confirmPassword ? "confirmPassword-error" : undefined}
               {...register("confirmPassword")}
             />
-            <FieldError id="confirmPassword-error" message={errors.confirmPassword?.message} />
           </FormField>
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>

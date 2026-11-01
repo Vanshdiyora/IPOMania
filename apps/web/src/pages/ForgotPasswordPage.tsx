@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { forgotPasswordSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
-import { AuthPage, FieldError } from "../auth/AuthPage";
+import { AuthPage } from "../auth/AuthPage";
 import { Button } from "../components/ui/Button";
 import { Input, FormField } from "../components/ui/Input";
 import { getAuthRedirectUrl } from "../lib/authRedirect";
@@ -19,7 +19,10 @@ export function ForgotPasswordPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<ForgotValues>({ resolver: zodResolver(forgotPasswordSchema) });
+  } = useForm<ForgotValues>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: { email: "" },
+  });
 
   async function submit({ email }: ForgotValues) {
     setErrorMessage("");
@@ -73,7 +76,6 @@ export function ForgotPasswordPage() {
             aria-describedby={errors.email ? "email-error" : undefined}
             {...register("email")}
           />
-          <FieldError id="email-error" message={errors.email?.message} />
         </FormField>
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
