@@ -9,15 +9,15 @@
 
   /* Design tokens as CSS custom properties for use outside Tailwind */
   --color-navy: #101828;
-  --color-action: #2563eb;
+  --color-action: #1d4ed8;
   --color-canvas: #f8fafc;
   --color-surface: #ffffff;
   --color-border: #e2e8f0;
   --color-ink: #0f172a;
-  --color-muted: #64748b;
-  --color-success: #16a34a;
+  --color-muted: #475569;
+  --color-success: #15803d;
   --color-danger: #dc2626;
-  --color-warning: #d97706;
+  --color-warning: #b45309;
 
   color-scheme: light;
   font-family: var(--font-sans);

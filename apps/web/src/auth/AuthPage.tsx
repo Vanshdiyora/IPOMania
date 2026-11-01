@@ -40,7 +40,7 @@ export function AuthPage({
         </div>
 
         {/* Logo */}
-        <Link to="/" className="relative flex items-center gap-3 w-fit" aria-label="IPO Mania home">
+        <Link to="/" className="relative flex items-center gap-3 w-fit">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-action text-white font-bold">
             IM
           </div>
@@ -86,11 +86,7 @@ export function AuthPage({
       {/* Right form panel */}
       <div className="flex flex-1 flex-col items-center justify-center p-6 sm:p-10">
         {/* Mobile logo */}
-        <Link
-          to="/"
-          className="mb-8 flex items-center gap-2.5 lg:hidden"
-          aria-label="IPO Mania home"
-        >
+        <Link to="/" className="mb-8 flex items-center gap-2.5 lg:hidden">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-action text-white font-bold text-sm">
             IM
           </div>

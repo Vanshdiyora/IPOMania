@@ -22,7 +22,7 @@ const config: Config = {
         "navy-light": "#253650",
 
         // ── Primary interactive ──────────────────────────────────────────────
-        action: "#2563EB",
+        action: "#1D4ED8",
         "action-hover": "#1D4ED8",
         "action-light": "#EFF6FF",
         "action-border": "#BFDBFE",
@@ -36,7 +36,7 @@ const config: Config = {
         // ── Text ─────────────────────────────────────────────────────────────
         ink: "#0F172A",
         "ink-secondary": "#334155",
-        muted: "#64748B",
+        muted: "#475569",
         subtle: "#94A3B8",
 
         // ── Borders ──────────────────────────────────────────────────────────
@@ -45,11 +45,11 @@ const config: Config = {
         "border-focus": "#2563EB",
 
         // ── Semantic ─────────────────────────────────────────────────────────
-        success: "#16A34A",
+        success: "#15803D",
         "success-bg": "#F0FDF4",
         "success-border": "#BBF7D0",
 
-        warning: "#D97706",
+        warning: "#B45309",
         "warning-bg": "#FFFBEB",
         "warning-border": "#FDE68A",
 
@@ -57,7 +57,7 @@ const config: Config = {
         "danger-bg": "#FEF2F2",
         "danger-border": "#FECACA",
 
-        info: "#0284C7",
+        info: "#0369A1",
         "info-bg": "#F0F9FF",
         "info-border": "#BAE6FD",
 

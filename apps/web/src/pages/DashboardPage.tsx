@@ -197,7 +197,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="min-w-0 w-full space-y-8 animate-fade-in">
       {/* ─── Page Header ─────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -263,12 +263,12 @@ export function DashboardPage() {
           )}
         </div>
         <div className="p-5">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <div>
               <label className="text-xs font-semibold text-muted block mb-1">From date</label>
               <input
                 aria-label="From date"
-                className={inputClass}
+                className={`${inputClass} min-w-0 max-w-full`}
                 type="date"
                 value={filters.date_from}
                 onChange={(event) => updateFilter("date_from", event.target.value)}
@@ -278,7 +278,7 @@ export function DashboardPage() {
               <label className="text-xs font-semibold text-muted block mb-1">To date</label>
               <input
                 aria-label="To date"
-                className={inputClass}
+                className={`${inputClass} min-w-0 max-w-full`}
                 type="date"
                 value={filters.date_to}
                 onChange={(event) => updateFilter("date_to", event.target.value)}
@@ -618,7 +618,7 @@ export function DashboardPage() {
       </section>
 
       {/* ─── Visual Analytics Charts ──────────────────────────────────────── */}
-      <section className="grid gap-6 xl:grid-cols-2" aria-label="Application charts">
+      <section className="grid min-w-0 gap-6 xl:grid-cols-2" aria-label="Application charts">
         <ChartCard title="Applications by Status" subtitle="Breakdown across active bid stages">
           {analytics?.applications_by_status.some((row) => row.count > 0) ? (
             <div role="img" aria-label="Applications grouped by status" className="h-72">

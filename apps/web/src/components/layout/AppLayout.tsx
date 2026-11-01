@@ -65,7 +65,7 @@ export function AppLayout() {
         />
         <main
           id="main-content"
-          className="mx-auto w-full max-w-7xl min-w-0 flex-1 p-4 sm:p-6 lg:p-8 animate-fade-in"
+          className="mx-auto w-full max-w-7xl min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8 animate-fade-in"
         >
           <Outlet />
         </main>

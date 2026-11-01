@@ -197,9 +197,7 @@ test("dashboard exposes analytics, filters and downloadable reports", async ({ p
   await expect(page.getByRole("heading", { name: "Dashboard & analytics" })).toBeVisible();
   await expect(page.getByText("INR 2,500", { exact: true })).toBeVisible();
   await expect(page.getByText("Unavailable").first()).toBeVisible();
-  await expect(
-    page.getByRole("img", { name: "Applications grouped by application status" }),
-  ).toBeVisible();
+  await expect(page.getByRole("img", { name: "Applications grouped by status" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Dashboard Test IPO (DASH)" }).first()).toBeVisible();
   expect(await auditAccessibility(page)).toEqual([]);
 

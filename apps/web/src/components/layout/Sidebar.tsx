@@ -177,7 +177,7 @@ export function Sidebar({
     >
       {/* Logo */}
       <div className="mb-4 flex items-center justify-between px-2">
-        <Link to="/" className="flex items-center gap-2.5 min-h-touch" aria-label="IPO Mania home">
+        <Link to="/" className="flex items-center gap-2.5 min-h-touch">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-action text-white font-bold text-sm">
             IM
           </div>

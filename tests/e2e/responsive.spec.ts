@@ -103,7 +103,7 @@ for (const viewport of viewports) {
     await page.goto("/");
     await expect(
       page.getByRole("heading", {
-        name: /Orchestrate IPO applications.*across all demat accounts/i,
+        name: /Orchestrate IPO applications across all demat accounts/i,
       }),
     ).toBeVisible();
     await expectNoHorizontalOverflow(page);
@@ -185,7 +185,7 @@ for (const viewport of viewports.filter(({ width }) => width < 768)) {
       })
       .click();
     await expect(page).toHaveURL(/\/login$/);
-    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });
 }
