@@ -21,7 +21,7 @@ export function WelcomePage() {
   const { user } = useAuth();
 
   return (
-    <div className="relative -mx-4 -my-6 sm:-mx-6 lg:-mx-8">
+    <div className="min-h-screen bg-canvas">
       {/* ─── Hero Section ─────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-gradient-to-b from-navy-light/40 via-canvas to-canvas px-4 py-16 sm:px-8 sm:py-24 lg:px-12">
         <div className="absolute inset-0 bg-grid pointer-events-none opacity-40" />
@@ -69,7 +69,12 @@ export function WelcomePage() {
                     <ArrowRight size={18} />
                   </Link>
                 </Button>
-                <Button asChild variant="outline" size="lg">
+                <Button
+                  asChild
+                  variant="outline"
+                  size="lg"
+                  className="min-w-[132px] border-border-strong bg-white shadow-sm hover:border-action hover:text-action"
+                >
                   <Link to="/login">Sign in</Link>
                 </Button>
               </>

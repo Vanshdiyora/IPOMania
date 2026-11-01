@@ -15,7 +15,7 @@ export function LoginPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
-  const destination = (location.state as { from?: string } | null)?.from ?? "/profile";
+  const destination = (location.state as { from?: string } | null)?.from ?? "/dashboard";
   const {
     register,
     handleSubmit,

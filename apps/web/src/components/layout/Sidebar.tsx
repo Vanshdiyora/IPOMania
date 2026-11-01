@@ -202,7 +202,7 @@ export function Sidebar({
         onClick={onNavigate}
       >
         <NavItem
-          to="/"
+          to="/dashboard"
           end
           icon={<LayoutDashboard size={18} />}
           label="Dashboard"

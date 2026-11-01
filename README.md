@@ -17,7 +17,6 @@ applications, initiate payments, approve mandates automatically, or fetch market
 
 ```powershell
 npm ci
-Copy-Item .env.example .env
 npm run dev:web
 ```
 
@@ -27,11 +26,9 @@ In another terminal, run the Cloudflare Worker API:
 npm run dev:api
 ```
 
-Fill the root `.env` with the Supabase project values for `VITE_SUPABASE_URL`,
-`VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY`. The Vite frontend reads only
-variables prefixed with `VITE_`; Wrangler loads the same file for the local API. Keep the service-role
-key out of all `VITE_` variables; it is used only by the API for account deletion. See
-[authentication setup](./docs/backend/AUTHENTICATION.md). The web app is served at
+Local development uses the separate root `local.env` file; production builds continue to use root
+`.env`. Keep hosted Supabase values in both `VITE_*` and API variables in `local.env`, and keep API-only secrets such as `SUPABASE_SERVICE_ROLE_KEY` out of every `VITE_*`
+variable. The production defaults remain in root `.env`. The web app is served at
 `http://127.0.0.1:4175`. The API listens at `http://127.0.0.1:8787`; check `GET /api/health`.
 For hosted Supabase, use that project's URL and anon key. For local Supabase, use the values from
 `supabase status` instead.
