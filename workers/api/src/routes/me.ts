@@ -14,17 +14,37 @@ meRoutes.use("*", authenticate);
 
 meRoutes.get("/profile", async (context) => {
   const supabase = context.get("rlsSupabase");
+  const user = context.get("authenticatedUser");
   const { data, error } = await supabase
     .from("profiles")
     .select("id, full_name, created_at, updated_at")
-    .eq("id", context.get("authenticatedUser").id)
+    .eq("id", user.id)
     .maybeSingle();
 
   if (error) {
     throw error;
   }
 
-  return context.json({ data });
+  if (data) {
+    return context.json({ data });
+  }
+
+  const metadataFullName = user.user_metadata?.full_name;
+  const fullName =
+    typeof metadataFullName === "string" && metadataFullName.trim()
+      ? metadataFullName.trim().slice(0, 120)
+      : null;
+  const createdProfile = await supabase
+    .from("profiles")
+    .insert({ id: user.id, full_name: fullName })
+    .select("id, full_name, created_at, updated_at")
+    .single();
+
+  if (createdProfile.error) {
+    throw createdProfile.error;
+  }
+
+  return context.json({ data: createdProfile.data });
 });
 
 meRoutes.patch("/profile", validateJson(profileUpdateSchema), async (context) => {

@@ -104,6 +104,7 @@ export function createApp() {
   app.onError((error, context) => {
     console.error("Unhandled API error", {
       name: error.name,
+      message: error instanceof Error ? error.message : String(error),
       method: context.req.method,
       path: context.req.path,
     });

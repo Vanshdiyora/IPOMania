@@ -527,7 +527,7 @@ export function DashboardPage() {
                 {capitalQuery.isLoading
                   ? "Loading capital summary…"
                   : capitalQuery.error
-                    ? "Unavailable: capital summary could not be loaded."
+                    ? sectionErrorMessage(capitalQuery.error, "Capital summary unavailable")
                     : "No capital records logged yet."}
               </p>
             </CardContent>
@@ -610,7 +610,7 @@ export function DashboardPage() {
               <AnalyticsStateMessage
                 label="No allotment results are available for the selected filters."
                 loading={analyticsQuery.isLoading}
-                failed={Boolean(analyticsQuery.error)}
+                error={analyticsQuery.error}
               />
             )}
           </CardContent>
@@ -663,7 +663,7 @@ export function DashboardPage() {
             <AnalyticsStateMessage
               label="No applications found for this filter."
               loading={analyticsQuery.isLoading}
-              failed={Boolean(analyticsQuery.error)}
+              error={analyticsQuery.error}
             />
           )}
         </ChartCard>
@@ -699,7 +699,7 @@ export function DashboardPage() {
             <AnalyticsStateMessage
               label="No IPO application data available."
               loading={analyticsQuery.isLoading}
-              failed={Boolean(analyticsQuery.error)}
+              error={analyticsQuery.error}
             />
           )}
         </ChartCard>
@@ -743,7 +743,7 @@ export function DashboardPage() {
             <AnalyticsStateMessage
               label="No category distribution available."
               loading={analyticsQuery.isLoading}
-              failed={Boolean(analyticsQuery.error)}
+              error={analyticsQuery.error}
             />
           )}
         </ChartCard>
@@ -783,7 +783,7 @@ export function DashboardPage() {
             <AnalyticsStateMessage
               label="No application trends available."
               loading={analyticsQuery.isLoading}
-              failed={Boolean(analyticsQuery.error)}
+              error={analyticsQuery.error}
             />
           )}
         </ChartCard>
@@ -858,7 +858,7 @@ export function DashboardPage() {
               <AnalyticsStateMessage
                 label="No capital ledger movements found for this filter."
                 loading={analyticsQuery.isLoading}
-                failed={Boolean(analyticsQuery.error)}
+                error={analyticsQuery.error}
               />
             </CardContent>
           </Card>
@@ -898,7 +898,7 @@ export function DashboardPage() {
             <AnalyticsStateMessage
               label="No demat-specific application data available."
               loading={analyticsQuery.isLoading}
-              failed={Boolean(analyticsQuery.error)}
+              error={analyticsQuery.error}
             />
           )}
         </ChartCard>
@@ -951,7 +951,7 @@ export function DashboardPage() {
                 <AnalyticsStateMessage
                   label="No broker data is available."
                   loading={analyticsQuery.isLoading}
-                  failed={Boolean(analyticsQuery.error)}
+                  error={analyticsQuery.error}
                 />
               </div>
             )}
@@ -1012,7 +1012,7 @@ export function DashboardPage() {
                 <AnalyticsStateMessage
                   label="No upcoming IPO closing dates found."
                   loading={analyticsQuery.isLoading}
-                  failed={Boolean(analyticsQuery.error)}
+                  error={analyticsQuery.error}
                 />
               </div>
             )}
@@ -1085,7 +1085,7 @@ export function DashboardPage() {
               <AnalyticsStateMessage
                 label="No recent application activity is available."
                 loading={analyticsQuery.isLoading}
-                failed={Boolean(analyticsQuery.error)}
+                error={analyticsQuery.error}
               />
             </div>
           )}
@@ -1211,15 +1211,20 @@ function EmptyMessage({ label }: { label: string }) {
 function AnalyticsStateMessage({
   label,
   loading,
-  failed,
+  error,
 }: {
   label: string;
   loading: boolean;
-  failed: boolean;
+  error?: unknown;
 }) {
   if (loading) return <LoadingState label="Loading analytics…" inline />;
-  if (failed) return <EmptyMessage label="Analytics section unavailable." />;
+  if (error)
+    return <EmptyMessage label={sectionErrorMessage(error, "Analytics section unavailable")} />;
   return <EmptyMessage label={label} />;
+}
+
+function sectionErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 function ErrorNotice({ error }: { error: unknown }) {

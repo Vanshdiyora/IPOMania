@@ -60,4 +60,4 @@ At most one manual run is allowed in a local IST day in addition to the schedule
 
 ## Provider configuration
 
-IPO Guru API calls use `X-API-KEY`. Confirm the provider endpoint and plan scope in IPO Guru's documentation, and rotate keys using Cloudflare secrets. Provider failures preserve existing catalog rows and are recorded in synchronization logs; omitted records are never converted to deleted rows.
+IPO Guru API calls use `X-API-KEY`. Confirm the provider endpoint and plan scope in IPO Guru's documentation, and rotate keys using Cloudflare secrets. Provider failures preserve existing catalog rows and are recorded in synchronization logs; omitted records are never converted to deleted rows. A `429` response from IPO Guru means the provider is rate-limited or the API quota is exhausted; synchronization will wait for the displayed cooldown rather than retrying immediately.

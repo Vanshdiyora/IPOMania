@@ -85,6 +85,7 @@ export const router = createBrowserRouter([
     errorElement: <NotFoundPage />,
     children: [
       { index: true, element: <DashboardHomePage /> },
+      { path: "dashboard", element: protectedPage(<DashboardHomePage />) },
       { path: "accounts", element: protectedPage(<AccountDashboardPage />) },
       { path: "accounts/list", element: protectedPage(<AccountListPage />) },
       { path: "accounts/new", element: protectedPage(<AccountFormPage />) },
