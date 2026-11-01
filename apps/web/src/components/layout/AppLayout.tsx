@@ -57,7 +57,7 @@ export function AppLayout() {
       />
 
       {/* Main content */}
-      <div ref={pageContentRef} className="flex min-w-0 flex-1 flex-col">
+      <div ref={pageContentRef} className="flex min-w-0 flex-1 flex-col md:ml-64">
         <Header
           mobileMenuOpen={mobileMenuOpen}
           menuButtonRef={menuButtonRef}

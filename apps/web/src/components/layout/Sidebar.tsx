@@ -169,14 +169,14 @@ export function Sidebar({
         mobileOpen
           ? "fixed inset-y-0 left-0 z-50 flex w-[min(20rem,85vw)] animate-slide-in-left"
           : "hidden",
-        // Desktop: static sidebar
-        "min-w-0 shrink-0 flex-col overflow-y-auto bg-surface border-r border-border",
+        // Desktop: fixed sidebar
+        "min-w-0 shrink-0 flex-col overflow-hidden bg-surface border-r border-border",
         "px-3 py-4",
-        "md:static md:z-auto md:flex md:w-64 md:overflow-y-auto",
+        "md:fixed md:inset-y-0 md:left-0 md:z-auto md:flex md:h-screen md:w-64",
       )}
     >
       {/* Logo */}
-      <div className="mb-4 flex items-center justify-between px-2">
+      <div className="mb-4 flex shrink-0 items-center justify-between px-2">
         <Link to="/" className="flex items-center gap-2.5 min-h-touch">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-action text-white font-bold text-sm">
             IM
@@ -198,7 +198,7 @@ export function Sidebar({
       <nav
         id="main-navigation"
         aria-label="Main navigation"
-        className="flex-1 space-y-0.5"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-0.5 pr-1"
         onClick={onNavigate}
       >
         <NavItem
@@ -303,7 +303,7 @@ export function Sidebar({
 
       {/* Bottom: Sign out + user */}
       {user && (
-        <div className="mt-4 space-y-2 border-t border-border pt-3">
+        <div className="mt-4 shrink-0 space-y-2 border-t border-border pt-3">
           {/* User identifier */}
           <div className="flex items-center gap-2.5 px-3 py-1">
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-action-light text-action text-xs font-bold uppercase">
