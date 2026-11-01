@@ -4,10 +4,14 @@ import { z } from "zod";
 
 export const registerSchema = z
   .object({
-    email: z.string().trim().email("Enter a valid email address."),
-    fullName: z.string().trim().min(1, "Enter your name.").max(120, "Use 120 characters or fewer."),
-    password: z.string().min(12, "Use at least 12 characters."),
-    confirmPassword: z.string(),
+    email: z.string("Enter a valid email address.").trim().email("Enter a valid email address."),
+    fullName: z
+      .string("Enter your name.")
+      .trim()
+      .min(1, "Enter your name.")
+      .max(120, "Use 120 characters or fewer."),
+    password: z.string("Use at least 12 characters.").min(12, "Use at least 12 characters."),
+    confirmPassword: z.string("Confirm your password."),
   })
   .refine((value) => value.password === value.confirmPassword, {
     message: "Passwords do not match.",

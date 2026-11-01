@@ -6,6 +6,7 @@ import { loginSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
 import { AuthPage, FieldError } from "../auth/AuthPage";
 import { Button } from "../components/ui/Button";
+import { Input, FormField } from "../components/ui/Input";
 import { getSupabaseClient } from "../lib/supabase";
 
 type LoginValues = z.infer<typeof loginSchema>;
@@ -34,53 +35,59 @@ export function LoginPage() {
 
   return (
     <AuthPage
-      title="Sign in"
+      title="Welcome back"
+      subtitle="Sign in to your IPO Mania account"
       footer={
         <>
           New to IPO Mania?{" "}
-          <Link className="font-semibold text-action underline" to="/register">
+          <Link className="font-semibold text-action hover:underline" to="/register">
             Create an account
           </Link>
         </>
       }
     >
-      <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
-        {errorMessage ? (
-          <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-danger">
+      <form className="space-y-5" onSubmit={handleSubmit(submit)} noValidate>
+        {errorMessage && (
+          <div
+            role="alert"
+            className="rounded-lg border border-danger-border bg-danger-bg p-3 text-sm text-danger"
+          >
             {errorMessage}
-          </p>
-        ) : null}
-        <label className="block text-sm font-semibold text-ink" htmlFor="email">
-          Email
-        </label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          aria-invalid={Boolean(errors.email)}
-          aria-describedby={errors.email ? "email-error" : undefined}
-          className="min-h-touch w-full rounded-lg border border-border px-3"
-          {...register("email")}
-        />
-        <FieldError id="email-error" message={errors.email?.message} />
-        <label className="block text-sm font-semibold text-ink" htmlFor="password">
-          Password
-        </label>
-        <input
-          id="password"
-          type="password"
-          autoComplete="current-password"
-          aria-invalid={Boolean(errors.password)}
-          aria-describedby={errors.password ? "password-error" : undefined}
-          className="min-h-touch w-full rounded-lg border border-border px-3"
-          {...register("password")}
-        />
-        <FieldError id="password-error" message={errors.password?.message} />
-        <div className="text-right">
-          <Link className="font-semibold text-action underline" to="/forgot-password">
+          </div>
+        )}
+
+        <FormField label="Email address" htmlFor="email" error={errors.email?.message}>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            aria-invalid={Boolean(errors.email)}
+            aria-describedby={errors.email ? "email-error" : undefined}
+            {...register("email")}
+          />
+          <FieldError id="email-error" message={errors.email?.message} />
+        </FormField>
+
+        <FormField label="Password" htmlFor="password" error={errors.password?.message}>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="Enter your password"
+            aria-invalid={Boolean(errors.password)}
+            aria-describedby={errors.password ? "password-error" : undefined}
+            {...register("password")}
+          />
+          <FieldError id="password-error" message={errors.password?.message} />
+        </FormField>
+
+        <div className="flex items-center justify-end">
+          <Link className="text-sm font-semibold text-action hover:underline" to="/forgot-password">
             Forgot password?
           </Link>
         </div>
+
         <Button type="submit" className="w-full" disabled={isSubmitting}>
           {isSubmitting ? "Signing in…" : "Sign in"}
         </Button>

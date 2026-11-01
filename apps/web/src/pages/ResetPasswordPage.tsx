@@ -6,7 +6,9 @@ import { resetPasswordSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
 import { AuthPage, FieldError } from "../auth/AuthPage";
 import { Button } from "../components/ui/Button";
+import { Input, FormField } from "../components/ui/Input";
 import { getSupabaseClient } from "../lib/supabase";
+import { CheckCircle } from "lucide-react";
 
 type ResetValues = z.infer<typeof resetPasswordSchema>;
 
@@ -46,7 +48,9 @@ export function ResetPasswordPage() {
   async function submit(values: ResetValues) {
     setErrorMessage("");
     try {
-      const { error } = await getSupabaseClient().auth.updateUser({ password: values.password });
+      const { error } = await getSupabaseClient().auth.updateUser({
+        password: values.password,
+      });
       if (error) throw error;
       setSuccess(true);
     } catch {
@@ -55,47 +59,63 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <AuthPage title="Choose a new password">
-      {errorMessage ? (
-        <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-danger">
+    <AuthPage title="Choose a new password" subtitle="Enter your new password below">
+      {errorMessage && (
+        <div
+          role="alert"
+          className="mb-5 rounded-lg border border-danger-border bg-danger-bg p-3 text-sm text-danger"
+        >
           {errorMessage}
-        </p>
-      ) : null}
+        </div>
+      )}
+
       {success ? (
-        <div role="status" className="space-y-4">
-          <p className="text-sm text-success">Your password has been updated.</p>
+        <div role="status" className="space-y-5 text-center">
+          <div className="flex justify-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-success-bg text-success">
+              <CheckCircle size={28} />
+            </div>
+          </div>
+          <div>
+            <p className="font-semibold text-ink">Password updated</p>
+            <p className="mt-1 text-sm text-muted">Your password has been changed successfully.</p>
+          </div>
           <Button className="w-full" onClick={() => navigate("/login", { replace: true })}>
-            Return to sign in
+            Continue to sign in
           </Button>
         </div>
       ) : ready ? (
-        <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
-          <label className="block text-sm font-semibold text-ink" htmlFor="password">
-            New password
-          </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="new-password"
-            aria-invalid={Boolean(errors.password)}
-            aria-describedby={errors.password ? "password-error" : undefined}
-            className="min-h-touch w-full rounded-lg border border-border px-3"
-            {...register("password")}
-          />
-          <FieldError id="password-error" message={errors.password?.message} />
-          <label className="block text-sm font-semibold text-ink" htmlFor="confirmPassword">
-            Confirm new password
-          </label>
-          <input
-            id="confirmPassword"
-            type="password"
-            autoComplete="new-password"
-            aria-invalid={Boolean(errors.confirmPassword)}
-            aria-describedby={errors.confirmPassword ? "confirmPassword-error" : undefined}
-            className="min-h-touch w-full rounded-lg border border-border px-3"
-            {...register("confirmPassword")}
-          />
-          <FieldError id="confirmPassword-error" message={errors.confirmPassword?.message} />
+        <form className="space-y-5" onSubmit={handleSubmit(submit)} noValidate>
+          <FormField label="New password" htmlFor="password" error={errors.password?.message}>
+            <Input
+              id="password"
+              type="password"
+              autoComplete="new-password"
+              placeholder="Create a strong password"
+              aria-invalid={Boolean(errors.password)}
+              aria-describedby={errors.password ? "password-error" : undefined}
+              {...register("password")}
+            />
+            <FieldError id="password-error" message={errors.password?.message} />
+          </FormField>
+
+          <FormField
+            label="Confirm new password"
+            htmlFor="confirmPassword"
+            error={errors.confirmPassword?.message}
+          >
+            <Input
+              id="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              placeholder="Repeat your new password"
+              aria-invalid={Boolean(errors.confirmPassword)}
+              aria-describedby={errors.confirmPassword ? "confirmPassword-error" : undefined}
+              {...register("confirmPassword")}
+            />
+            <FieldError id="confirmPassword-error" message={errors.confirmPassword?.message} />
+          </FormField>
+
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? "Updating…" : "Update password"}
           </Button>
@@ -105,8 +125,9 @@ export function ResetPasswordPage() {
           Verifying your reset link…
         </p>
       ) : null}
-      <p className="mt-5 text-sm">
-        <Link className="font-semibold text-action underline" to="/forgot-password">
+
+      <p className="mt-5 text-center text-sm">
+        <Link className="font-semibold text-action hover:underline" to="/forgot-password">
           Request another reset link
         </Link>
       </p>

@@ -101,7 +101,11 @@ for (const viewport of viewports) {
   }, testInfo) => {
     await page.setViewportSize(viewport);
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Welcome to IPO Mania" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: /Orchestrate IPO applications across all demat accounts/i,
+      }),
+    ).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await testInfo.attach(`landing-${viewport.width}.png`, {
       body: await page.screenshot(),
@@ -181,7 +185,7 @@ for (const viewport of viewports.filter(({ width }) => width < 768)) {
       })
       .click();
     await expect(page).toHaveURL(/\/login$/);
-    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });
 }
