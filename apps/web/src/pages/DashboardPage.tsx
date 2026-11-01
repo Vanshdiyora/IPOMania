@@ -125,7 +125,7 @@ export function DashboardPage() {
     staleTime: 60_000,
     initialPageParam: 1,
     queryFn: ({ pageParam }) =>
-      apiRequest<IpoOptionsResponse>(`/api/ipos?page=${pageParam}&page_size=100`, session!),
+      apiRequest<IpoOptionsResponse>(`/api/ipos/catalog?page=${pageParam}&page_size=100`, session!),
     getNextPageParam: (lastPage) => {
       const { page, total_pages: totalPages } = lastPage.data.pagination ?? {};
       return page && totalPages && page < totalPages ? page + 1 : undefined;

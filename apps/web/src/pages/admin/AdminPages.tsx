@@ -475,7 +475,13 @@ export function AdminSyncPage() {
             </p>
           </div>
           <button
-            disabled={!status?.providerConfigured || status?.remainingManualRuns === 0}
+            disabled={
+              !status?.providerConfigured ||
+              status?.remainingManualRuns === 0 ||
+              Boolean(
+                status?.nextAllowedAt && new Date(status.nextAllowedAt).getTime() > Date.now(),
+              )
+            }
             onClick={() => void sync()}
             className="min-h-touch rounded-lg bg-slate-950 px-4 font-semibold text-white disabled:opacity-50"
           >
@@ -511,16 +517,18 @@ export function AdminSettingsPage() {
       <Card>
         <h2 className="font-bold">Data provider</h2>
         <p className="mt-2 text-sm text-slate-600">
-          Upstox: {settings?.providerConfigured ? "Configured" : "Requires Worker secret"}
+          IPO Guru: {settings?.providerConfigured ? "Configured" : "Requires Worker secret"}
         </p>
         <p className="mt-2 text-sm text-slate-600">
-          ipos.markets attribution is enabled where subscription data is displayed.
+          IPO Guru attribution is shown with provider-sourced catalog records.
         </p>
       </Card>
       <Card>
         <h2 className="font-bold">Scheduling</h2>
         <p className="mt-2 text-sm text-slate-600">Automatic sync: enabled</p>
-        <p className="text-sm text-slate-600">09:00 AM IST · Asia/Kolkata · 30 3 * * *</p>
+        <p className="text-sm text-slate-600">
+          Every 3 hours · configurable with IPO_SYNC_INTERVAL_HOURS
+        </p>
       </Card>
     </div>
   );

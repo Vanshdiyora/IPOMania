@@ -60,15 +60,17 @@ const date = (value: unknown) => {
 
 export function normalizeProviderIpo(row: Record<string, unknown>) {
   const companyName = first(row.company_name, row.companyName, row.company, row.name);
-  const providerId = first(row.provider_id, row.providerId, row.id, row.uuid);
+  const providerId = first(row.provider_id, row.providerId, row.slug, row.id, row.uuid);
   if (!companyName || !providerId) return null;
   const statusText = String(
     first(row.status, row.ipo_status, row.lifecycle_status, "upcoming"),
   ).toLowerCase();
   const ipoStatus =
-    (["upcoming", "open", "closed", "listed"] as const).find((status) =>
-      statusText.includes(status),
-    ) ?? "upcoming";
+    row.is_listed === true
+      ? "listed"
+      : ((["upcoming", "open", "closed", "listed"] as const).find((status) =>
+          statusText.includes(status),
+        ) ?? "upcoming");
   const issueTypeText = String(first(row.issue_type, row.type, "MAINBOARD")).toLowerCase();
   const issueType = issueTypeText.includes("sme") ? "SME" : "mainboard";
   return {
@@ -96,7 +98,7 @@ export function normalizeProviderIpo(row: Record<string, unknown>) {
     allotment_date: date(first(row.allotment_date, row.finalisation_date)),
     listing_date: date(first(row.listing_date, row.listedDate)),
     listing_price: number(first(row.listing_price, row.listingPrice)),
-    data_source: "UPSTOX",
+    data_source: "IPO_GURU",
     source_last_updated_at: new Date().toISOString(),
     last_synced_at: new Date().toISOString(),
   };
@@ -104,16 +106,16 @@ export function normalizeProviderIpo(row: Record<string, unknown>) {
 
 async function fetchProvider(env: EnvironmentBindings) {
   const environment = validateEnvironment(env);
-  if (!environment.UPSTOX_ACCESS_TOKEN)
+  if (!environment.IPO_GURU_API_KEY)
     return { configured: false, rows: [] as Record<string, unknown>[] };
-  const response = await fetch(environment.UPSTOX_API_URL, {
+  const response = await fetch(environment.IPO_GURU_API_URL, {
     headers: {
-      Authorization: `Bearer ${environment.UPSTOX_ACCESS_TOKEN}`,
+      "X-API-KEY": environment.IPO_GURU_API_KEY,
       Accept: "application/json",
     },
     signal: AbortSignal.timeout(20_000),
   });
-  if (!response.ok) throw new Error(`Provider request failed with status ${response.status}`);
+  if (!response.ok) throw new Error(`IPO Guru request failed with status ${response.status}`);
   return { configured: true, rows: normalizedRows(await response.json()) };
 }
 
@@ -132,7 +134,7 @@ export async function runIpoSync(
   triggerType: "scheduled" | "manual",
   env: EnvironmentBindings,
 ) {
-  const provider = await fetchProvider(env);
+  const environment = validateEnvironment(env);
   const { data: running, error: runningError } = await supabase
     .from("ipo_sync_logs")
     .select("id")
@@ -164,14 +166,59 @@ export async function runIpoSync(
       },
     };
   }
+
+  const { data: latestProviderCall } = await supabase
+    .from("ipo_sync_logs")
+    .select("started_at")
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latestProviderCall?.started_at) {
+    const nextAllowedAt =
+      new Date(latestProviderCall.started_at).getTime() +
+      environment.IPO_SYNC_INTERVAL_HOURS * 60 * 60 * 1000;
+    if (nextAllowedAt > Date.now()) {
+      return {
+        status: 429,
+        body: {
+          error: {
+            code: "SYNC_INTERVAL",
+            message: `IPO Guru calls are limited to once every ${environment.IPO_SYNC_INTERVAL_HOURS} hours.`,
+          },
+          nextAllowedAt: new Date(nextAllowedAt).toISOString(),
+        },
+      };
+    }
+  }
+
+  let provider: { configured: boolean; rows: Record<string, unknown>[] };
+  try {
+    provider = await fetchProvider(env);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "IPO Guru request failed";
+    await supabase.from("ipo_sync_logs").insert({
+      trigger_type: triggerType,
+      provider: "IPO_GURU",
+      status: "failed",
+      error_message: message,
+      execution_summary: { step: "Fetching IPO list" },
+      completed_at: new Date().toISOString(),
+    });
+    return {
+      status: 502,
+      body: {
+        error: { code: "SYNC_FAILED", message: "The IPO Guru synchronization request failed." },
+      },
+    };
+  }
   if (!provider.configured) {
     const { data: log } = await supabase
       .from("ipo_sync_logs")
       .insert({
         trigger_type: triggerType,
-        provider: "UPSTOX",
+        provider: "IPO_GURU",
         status: "failed",
-        error_message: "UPSTOX_ACCESS_TOKEN is not configured.",
+        error_message: "IPO_GURU_API_KEY is not configured.",
         execution_summary: { configured: false },
         completed_at: new Date().toISOString(),
       })
@@ -182,7 +229,7 @@ export async function runIpoSync(
       body: {
         error: {
           code: "PROVIDER_NOT_CONFIGURED",
-          message: "Configure UPSTOX_ACCESS_TOKEN in the existing Worker secrets.",
+          message: "Configure IPO_GURU_API_KEY in the existing Worker secrets.",
         },
         logId: log?.id,
       },
@@ -193,7 +240,7 @@ export async function runIpoSync(
     .from("ipo_sync_logs")
     .insert({
       trigger_type: triggerType,
-      provider: "UPSTOX",
+      provider: "IPO_GURU",
       status: "running",
       execution_summary: { steps: ["Fetching IPO list"] },
     })
@@ -420,11 +467,20 @@ export function adminIpoRoutes() {
       .select("id,trigger_type")
       .gte("started_at", istDayBounds().start);
     const environment = validateEnvironment(context.env);
+    const nextAllowedAt = latest?.started_at
+      ? new Date(
+          new Date(latest.started_at).getTime() +
+            environment.IPO_SYNC_INTERVAL_HOURS * 60 * 60 * 1000,
+        ).toISOString()
+      : null;
     return context.json({
       data: {
         running,
         latest,
-        providerConfigured: Boolean(environment.UPSTOX_ACCESS_TOKEN),
+        provider: "IPO_GURU",
+        providerConfigured: Boolean(environment.IPO_GURU_API_KEY),
+        syncIntervalHours: environment.IPO_SYNC_INTERVAL_HOURS,
+        nextAllowedAt,
         runsUsedToday: today?.length ?? 0,
         remainingManualRuns: Math.max(
           0,
@@ -460,7 +516,7 @@ export function adminIpoRoutes() {
     const { data } = await supabase.from("admin_settings").select("*");
     const environment = validateEnvironment(context.env);
     return context.json({
-      data: { settings: data ?? [], providerConfigured: Boolean(environment.UPSTOX_ACCESS_TOKEN) },
+      data: { settings: data ?? [], providerConfigured: Boolean(environment.IPO_GURU_API_KEY) },
     });
   });
 

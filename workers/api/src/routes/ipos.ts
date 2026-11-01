@@ -25,6 +25,38 @@ const categoryColumns =
 export const iposRoutes = new Hono<IpoContext>();
 iposRoutes.use("*", authenticate);
 
+iposRoutes.get("/catalog", async (context) => {
+  const { data, error } = await context
+    .get("rlsSupabase")
+    .from("ipo_catalog")
+    .select(
+      "id,provider_id,company_name,symbol,issue_type,exchange,price_band_min,price_band_max,issue_price,lot_size,issue_size,bidding_start_date,bidding_end_date,allotment_date,listing_date,ipo_status,data_source,last_synced_at,created_at,updated_at,archived_at",
+    )
+    .is("archived_at", null)
+    .order("bidding_start_date", { ascending: true, nullsFirst: false })
+    .order("company_name", { ascending: true })
+    .limit(500);
+  if (error) throw error;
+  const ipos = (data ?? []).map((row) => ({
+    ...row,
+    ipo_type: row.issue_type === "SME" ? "SME" : "MAINBOARD",
+    issue_price_min: row.price_band_min ?? row.issue_price,
+    issue_price_max: row.price_band_max ?? row.issue_price,
+    cut_off_price: row.issue_price,
+    opening_date: row.bidding_start_date,
+    closing_date: row.bidding_end_date,
+    status: row.ipo_status,
+    source_reference: row.provider_id ?? null,
+    last_verified_at: row.last_synced_at,
+  }));
+  return context.json({
+    data: {
+      ipos,
+      pagination: { page: 1, page_size: ipos.length, total: ipos.length, total_pages: 1 },
+    },
+  });
+});
+
 iposRoutes.get("/", async (context) => {
   const parsed = ipoListQuerySchema.safeParse(context.req.query());
   if (!parsed.success) return validationError(context);
