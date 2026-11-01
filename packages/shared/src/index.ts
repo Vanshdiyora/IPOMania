@@ -1,3 +1,9 @@
+export const ADMIN_EMAIL = "admin@gmail.com";
+
+export function isAdminEmail(email: string | null | undefined): boolean {
+  return email?.trim().toLowerCase() === ADMIN_EMAIL;
+}
+
 export interface ApiSuccessResponse<T> {
   data: T;
 }

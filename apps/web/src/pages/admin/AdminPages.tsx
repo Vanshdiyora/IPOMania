@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { isAdminEmail } from "@ipo-mania/shared";
 import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
 import { BarChart3, Building2, History, LogOut, Menu, RefreshCw, Settings, X } from "lucide-react";
 import { useAuth } from "../../auth/useAuth";
@@ -27,7 +28,7 @@ export function AdminRoute({ children }: { children: ReactNode }) {
       .select("role")
       .eq("id", user.id)
       .maybeSingle()
-      .then(({ data }) => setAdmin(data?.role === "ADMIN"));
+      .then(({ data }) => setAdmin(isAdminEmail(user.email) && data?.role === "ADMIN"));
   }, [user]);
   if (loading || (admin === null && user))
     return (

@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { isAdminEmail } from "@ipo-mania/shared";
 import { loginSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
 import { AuthPage } from "../auth/AuthPage";
@@ -28,9 +29,9 @@ export function LoginPage() {
   async function submit(values: LoginValues) {
     setErrorMessage("");
     try {
-      const { error } = await getSupabaseClient().auth.signInWithPassword(values);
+      const { data, error } = await getSupabaseClient().auth.signInWithPassword(values);
       if (error) throw error;
-      navigate(destination, { replace: true });
+      navigate(isAdminEmail(data.user?.email) ? "/admin" : destination, { replace: true });
     } catch {
       setErrorMessage("Email or password is incorrect. Check your details and try again.");
     }
