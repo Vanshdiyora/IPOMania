@@ -165,5 +165,5 @@ create trigger admin_settings_set_updated_at
 insert into public.admin_settings (setting_key, setting_value) values
   ('sync_schedule', '{"enabled":true,"cron":"30 3 * * *","timezone":"Asia/Kolkata","scheduledTime":"09:00"}'::jsonb),
   ('sync_limits', '{"manualRunsPerDay":1,"totalRunsPerDay":2}'::jsonb),
-  ('data_attribution', '{"upstox":"Upstox","iposMarkets":"ipos.markets"}'::jsonb)
+  ('data_attribution', '{"ipoGuru":"IPO Guru","ipoGuruUrl":"https://www.ipoguru.in"}'::jsonb)
 on conflict (setting_key) do nothing;

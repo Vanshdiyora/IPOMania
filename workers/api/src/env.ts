@@ -6,10 +6,9 @@ const environmentSchema = z.object({
   SUPABASE_ANON_KEY: z.string().min(1).optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   WEB_APP_ORIGIN: z.string().url().optional(),
-  UPSTOX_ACCESS_TOKEN: z.string().min(1).optional(),
-  UPSTOX_API_URL: z.string().url().default("https://api.upstox.com/v2/ipo"),
-  IPOS_MARKETS_API_URL: z.string().url().default("https://ipos.markets/api"),
+  IPO_GURU_API_URL: z.string().url().default("https://www.ipoguru.in/api/v2/ipos"),
   IPO_GURU_API_KEY: z.string().min(1).optional(),
+  IPO_SYNC_INTERVAL_HOURS: z.coerce.number().positive().max(168).default(3),
 });
 
 export type EnvironmentBindings = {
@@ -18,10 +17,9 @@ export type EnvironmentBindings = {
   SUPABASE_ANON_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   WEB_APP_ORIGIN?: string;
-  UPSTOX_ACCESS_TOKEN?: string;
-  UPSTOX_API_URL?: string;
-  IPOS_MARKETS_API_URL?: string;
+  IPO_GURU_API_URL?: string;
   IPO_GURU_API_KEY?: string;
+  IPO_SYNC_INTERVAL_HOURS?: number | string;
 };
 
 export function validateEnvironment(bindings: EnvironmentBindings) {
