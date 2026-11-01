@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { loginSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
-import { AuthPage, FieldError } from "../auth/AuthPage";
+import { AuthPage } from "../auth/AuthPage";
 import { Button } from "../components/ui/Button";
 import { Input, FormField } from "../components/ui/Input";
 import { getSupabaseClient } from "../lib/supabase";
@@ -20,7 +20,10 @@ export function LoginPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginValues>({ resolver: zodResolver(loginSchema) });
+  } = useForm<LoginValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
 
   async function submit(values: LoginValues) {
     setErrorMessage("");
@@ -66,7 +69,6 @@ export function LoginPage() {
             aria-describedby={errors.email ? "email-error" : undefined}
             {...register("email")}
           />
-          <FieldError id="email-error" message={errors.email?.message} />
         </FormField>
 
         <FormField label="Password" htmlFor="password" error={errors.password?.message}>
@@ -79,7 +81,6 @@ export function LoginPage() {
             aria-describedby={errors.password ? "password-error" : undefined}
             {...register("password")}
           />
-          <FieldError id="password-error" message={errors.password?.message} />
         </FormField>
 
         <div className="flex items-center justify-end">

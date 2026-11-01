@@ -18,7 +18,10 @@ export function RegisterPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterValues>({ resolver: zodResolver(registerSchema) });
+  } = useForm<RegisterValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { email: "", fullName: "", password: "", confirmPassword: "" },
+  });
 
   async function submit(values: RegisterValues) {
     setErrorMessage("");

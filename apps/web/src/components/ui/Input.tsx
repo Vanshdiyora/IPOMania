@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { cn } from "../../lib/utils";
 
@@ -22,9 +23,14 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   inputSize?: keyof typeof inputSizeClass;
 };
 
-export function Input({ className, inputSize = "md", ...props }: InputProps) {
-  return <input className={cn(inputBase, inputSizeClass[inputSize], className)} {...props} />;
-}
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  { className, inputSize = "md", ...props },
+  ref,
+) {
+  return (
+    <input ref={ref} className={cn(inputBase, inputSizeClass[inputSize], className)} {...props} />
+  );
+});
 
 // ─── Select ───────────────────────────────────────────────────────────────────
 type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
