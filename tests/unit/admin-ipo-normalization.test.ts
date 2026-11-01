@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { normalizeProviderIpo } from "../../workers/api/src/routes/admin-ipos";
+import {
+  normalizeProviderIpo,
+  ProviderRequestError,
+} from "../../workers/api/src/routes/admin-ipos";
 
 describe("admin IPO provider normalization", () => {
   it("normalizes a mainboard provider record", () => {
@@ -27,5 +30,11 @@ describe("admin IPO provider normalization", () => {
 
   it("rejects records without a stable provider identifier", () => {
     expect(normalizeProviderIpo({ company_name: "Missing Identifier" })).toBeNull();
+  });
+
+  it("preserves the provider HTTP status for structured sync errors", () => {
+    const error = new ProviderRequestError(429);
+    expect(error.status).toBe(429);
+    expect(error.message).toContain("status 429");
   });
 });

@@ -1,11 +1,28 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { isAdminEmail } from "@ipo-mania/shared";
 import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
-import { BarChart3, Building2, History, LogOut, Menu, RefreshCw, Settings, X } from "lucide-react";
+import {
+  BarChart3,
+  Building2,
+  Edit3,
+  History,
+  LogOut,
+  Menu,
+  RefreshCw,
+  Settings,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useAuth } from "../../auth/useAuth";
 import { apiRequest } from "../../lib/api";
 import { supabase } from "../../lib/supabase";
+import { Button } from "../../components/ui/Button";
+import { ConfirmationDialog } from "../../components/ui/ConfirmationDialog";
+import { FormSection } from "../../components/ui/FormSection";
+import { FormField, SearchInput, Select, Input } from "../../components/ui/Input";
+import { SideDrawer } from "../../components/ui/SideDrawer";
+import { Toast, ToastViewport, type ToastProps } from "../../components/ui/Toast";
 
 const nav = [
   ["Overview", "/admin", BarChart3],
@@ -171,6 +188,9 @@ export function AdminOverviewPage() {
     }
   };
   const counts = overview?.counts ?? {};
+  const syncCoolingDown = Boolean(
+    status?.nextAllowedAt && new Date(status.nextAllowedAt).getTime() > Date.now(),
+  );
   const cards = [
     ["Total IPOs", counts.total ?? 0],
     ["Upcoming", counts.upcoming ?? 0],
@@ -188,7 +208,12 @@ export function AdminOverviewPage() {
           </p>
         </div>
         <button
-          disabled={syncing || status?.remainingManualRuns === 0 || !status?.providerConfigured}
+          disabled={
+            syncing ||
+            syncCoolingDown ||
+            status?.remainingManualRuns === 0 ||
+            !status?.providerConfigured
+          }
           onClick={() => void sync()}
           className="inline-flex min-h-touch items-center justify-center rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white disabled:opacity-50"
         >
@@ -221,6 +246,11 @@ export function AdminOverviewPage() {
           <p className="text-sm text-slate-600">
             Manual runs remaining: {status?.remainingManualRuns ?? 0}
           </p>
+          {syncCoolingDown && (
+            <p className="mt-2 text-sm text-slate-600">
+              Next available: {new Date(status.nextAllowedAt).toLocaleString()}
+            </p>
+          )}
         </Card>
         <Card>
           <h3 className="font-bold">Recent activity</h3>
@@ -240,23 +270,46 @@ export function AdminOverviewPage() {
 
 export function AdminIposPage() {
   const { session } = useAuth();
-  const [rows, setRows] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
+  const emptyForm = {
     company_name: "",
     issue_type: "mainboard",
     ipo_status: "upcoming",
     symbol: "",
-  });
+  };
+  const [rows, setRows] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(emptyForm);
+  const [initialForm, setInitialForm] = useState(emptyForm);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [archiveId, setArchiveId] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const [toasts, setToasts] = useState<ToastProps[]>([]);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }, []);
+  const notify = (title: string, tone: ToastProps["tone"] = "info", description?: ReactNode) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((current) => [...current, { id, title, tone, description, onDismiss: dismissToast }]);
+  };
   const load = async () => {
     if (!session) return;
-    const result = await apiRequest<any>("/api/admin/ipos/catalog", session);
-    setRows(result.data ?? []);
+    setLoading(true);
+    try {
+      const result = await apiRequest<any>("/api/admin/ipos/catalog", session);
+      setRows(result.data ?? []);
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => {
     void load();
   }, [session]);
+
   const filtered = useMemo(
     () =>
       rows.filter(
@@ -266,131 +319,281 @@ export function AdminIposPage() {
       ),
     [rows, search],
   );
-  const create = async (event: React.FormEvent) => {
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setInitialForm(emptyForm);
+    setDrawerOpen(true);
+  };
+  const openEdit = (row: any) => {
+    const value = {
+      company_name: row.company_name ?? "",
+      issue_type: row.issue_type ?? "mainboard",
+      ipo_status: row.ipo_status ?? "upcoming",
+      symbol: row.symbol ?? "",
+    };
+    setEditingId(row.id);
+    setForm(value);
+    setInitialForm(value);
+    setDrawerOpen(true);
+  };
+  const closeDrawer = useCallback(() => {
+    if (JSON.stringify(form) !== JSON.stringify(initialForm)) setDiscardOpen(true);
+    else setDrawerOpen(false);
+  }, [form, initialForm]);
+  const save = async (event: FormEvent) => {
     event.preventDefault();
     if (!session) return;
-    await apiRequest("/api/admin/ipos/catalog", session, {
-      method: "POST",
-      body: JSON.stringify(form),
-    });
-    setShowForm(false);
-    await load();
+    setSaving(true);
+    try {
+      if (editingId) {
+        await apiRequest(`/api/admin/ipos/catalog/${editingId}`, session, {
+          method: "PATCH",
+          body: JSON.stringify(form),
+        });
+      } else {
+        await apiRequest("/api/admin/ipos/catalog", session, {
+          method: "POST",
+          body: JSON.stringify(form),
+        });
+      }
+      setDrawerOpen(false);
+      notify(editingId ? "IPO updated" : "IPO created", "success");
+      await load();
+    } catch (error) {
+      notify("Unable to save IPO", "error", error instanceof Error ? error.message : undefined);
+    } finally {
+      setSaving(false);
+    }
   };
-  const archive = async (id: string) => {
-    if (!session || !window.confirm("Archive this IPO instead of permanently deleting it?")) return;
-    await apiRequest(`/api/admin/ipos/catalog/${id}`, session, { method: "DELETE" });
-    await load();
+  const archive = async () => {
+    if (!session || !archiveId) return;
+    setArchiving(true);
+    try {
+      await apiRequest(`/api/admin/ipos/catalog/${archiveId}`, session, { method: "DELETE" });
+      setArchiveId(null);
+      notify("IPO archived", "success");
+      await load();
+    } catch (error) {
+      notify("Unable to archive IPO", "error", error instanceof Error ? error.message : undefined);
+    } finally {
+      setArchiving(false);
+    }
   };
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-bold">IPO catalog</h2>
           <p className="text-sm text-slate-500">{filtered.length} records</p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="min-h-touch rounded-lg bg-slate-950 px-4 font-semibold text-white"
-        >
-          Add IPO
-        </button>
+        <Button onClick={openCreate}>Add IPO</Button>
       </div>
-      <input
+      <SearchInput
+        aria-label="Search IPO catalog"
         value={search}
+        onClear={() => setSearch("")}
         onChange={(event) => setSearch(event.target.value)}
         placeholder="Search company or symbol"
-        className="w-full rounded-lg border px-4 py-3"
       />
-      {showForm && (
-        <form
-          onSubmit={create}
-          className="grid gap-4 rounded-xl border bg-white p-5 md:grid-cols-2"
-        >
-          <label>
-            Company name
-            <input
-              required
-              value={form.company_name}
-              onChange={(e) => setForm({ ...form, company_name: e.target.value })}
-              className="mt-1 w-full rounded border px-3 py-2"
-            />
-          </label>
-          <label>
-            Symbol
-            <input
-              value={form.symbol}
-              onChange={(e) => setForm({ ...form, symbol: e.target.value })}
-              className="mt-1 w-full rounded border px-3 py-2"
-            />
-          </label>
-          <label>
-            Issue type
-            <select
-              value={form.issue_type}
-              onChange={(e) => setForm({ ...form, issue_type: e.target.value })}
-              className="mt-1 w-full rounded border px-3 py-2"
-            >
-              <option value="mainboard">Mainboard</option>
-              <option value="SME">SME</option>
-            </select>
-          </label>
-          <label>
-            Status
-            <select
-              value={form.ipo_status}
-              onChange={(e) => setForm({ ...form, ipo_status: e.target.value })}
-              className="mt-1 w-full rounded border px-3 py-2"
-            >
-              <option value="upcoming">Upcoming</option>
-              <option value="open">Open</option>
-              <option value="closed">Closed</option>
-              <option value="listed">Listed</option>
-            </select>
-          </label>
-          <div className="flex gap-2 md:col-span-2">
-            <button className="min-h-touch rounded-lg bg-slate-950 px-5 font-semibold text-white">
-              Create IPO
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="min-h-touch rounded-lg border px-5"
-            >
-              Cancel
-            </button>
+
+      <div className="overflow-hidden rounded-xl border bg-white md:overflow-x-auto">
+        {loading ? (
+          <div className="p-8 text-center text-sm text-slate-500" role="status">
+            Loading IPO catalog…
           </div>
-        </form>
-      )}
-      <div className="overflow-x-auto rounded-xl border bg-white">
-        <table className="w-full min-w-[820px] text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Company</th>
-              <th className="px-4 py-3">Symbol</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Listing date</th>
-              <th className="px-4 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row) => (
-              <tr key={row.id} className="border-t">
-                <td className="px-4 py-3 font-semibold">{row.company_name}</td>
-                <td className="px-4 py-3">{row.symbol ?? "—"}</td>
-                <td className="px-4 py-3">{row.issue_type}</td>
-                <td className="px-4 py-3">{row.ipo_status}</td>
-                <td className="px-4 py-3">{row.listing_date ?? "—"}</td>
-                <td className="px-4 py-3">
-                  <button onClick={() => void archive(row.id)} className="text-red-700">
-                    Archive
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        ) : (
+          <>
+            <div className="divide-y md:hidden">
+              {filtered.map((row) => (
+                <article key={row.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-950">{row.company_name}</h3>
+                      <p className="text-sm text-slate-500">{row.symbol || "No symbol"}</p>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium capitalize">
+                      {row.ipo_status}
+                    </span>
+                  </div>
+                  <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <dt className="text-slate-500">Type</dt>
+                      <dd>{row.issue_type}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Listing date</dt>
+                      <dd>{row.listing_date ?? "—"}</dd>
+                    </div>
+                  </dl>
+                  <div className="mt-4 flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
+                      <Edit3 className="h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button size="sm" variant="danger-outline" onClick={() => setArchiveId(row.id)}>
+                      <Trash2 className="h-4 w-4" />
+                      Archive
+                    </Button>
+                  </div>
+                </article>
+              ))}
+              {!filtered.length && (
+                <div className="p-8 text-center text-sm text-slate-500">No IPOs found.</div>
+              )}
+            </div>
+            <table className="hidden min-w-[820px] w-full text-left text-sm md:table">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Company</th>
+                  <th className="px-4 py-3">Symbol</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Listing date</th>
+                  <th className="sticky right-0 bg-slate-50 px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row) => (
+                  <tr key={row.id} className="border-t">
+                    <td className="px-4 py-3 font-semibold">{row.company_name}</td>
+                    <td className="px-4 py-3">{row.symbol ?? "—"}</td>
+                    <td className="px-4 py-3 capitalize">{row.issue_type}</td>
+                    <td className="px-4 py-3 capitalize">{row.ipo_status}</td>
+                    <td className="px-4 py-3">{row.listing_date ?? "—"}</td>
+                    <td className="sticky right-0 bg-white px-4 py-2">
+                      <div className="flex justify-end gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(row)}>
+                          <Edit3 className="h-4 w-4" />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-700 hover:bg-red-50"
+                          onClick={() => setArchiveId(row.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Archive
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!filtered.length && (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-slate-500">
+                      No IPOs found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </>
+        )}
       </div>
+
+      <SideDrawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        title={editingId ? "Edit IPO" : "Add IPO"}
+        description="Manage the company and listing details shown in the catalog."
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={closeDrawer}>
+              Cancel
+            </Button>
+            <Button type="submit" form="ipo-catalog-form" disabled={saving}>
+              {saving ? "Saving…" : editingId ? "Save changes" : "Create IPO"}
+            </Button>
+          </div>
+        }
+      >
+        <form id="ipo-catalog-form" onSubmit={save} className="space-y-5">
+          <FormSection
+            title="Company details"
+            description="The primary information used to identify this IPO."
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                className="sm:col-span-2"
+                label="Company name"
+                htmlFor="company-name"
+                required
+              >
+                <Input
+                  id="company-name"
+                  autoFocus
+                  required
+                  value={form.company_name}
+                  onChange={(event) => setForm({ ...form, company_name: event.target.value })}
+                />
+              </FormField>
+              <FormField label="Symbol" htmlFor="ipo-symbol">
+                <Input
+                  id="ipo-symbol"
+                  value={form.symbol}
+                  onChange={(event) =>
+                    setForm({ ...form, symbol: event.target.value.toUpperCase() })
+                  }
+                />
+              </FormField>
+              <FormField label="Issue type" htmlFor="issue-type">
+                <Select
+                  id="issue-type"
+                  value={form.issue_type}
+                  onChange={(event) => setForm({ ...form, issue_type: event.target.value })}
+                >
+                  <option value="mainboard">Mainboard</option>
+                  <option value="SME">SME</option>
+                </Select>
+              </FormField>
+            </div>
+          </FormSection>
+          <FormSection title="Catalog status">
+            <FormField label="IPO status" htmlFor="ipo-status">
+              <Select
+                id="ipo-status"
+                value={form.ipo_status}
+                onChange={(event) => setForm({ ...form, ipo_status: event.target.value })}
+              >
+                <option value="upcoming">Upcoming</option>
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+                <option value="listed">Listed</option>
+              </Select>
+            </FormField>
+          </FormSection>
+        </form>
+      </SideDrawer>
+      <ConfirmationDialog
+        open={discardOpen}
+        title="Discard unsaved changes?"
+        description="Your changes will be lost if you close this drawer."
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        danger
+        onCancel={() => setDiscardOpen(false)}
+        onConfirm={() => {
+          setDiscardOpen(false);
+          setDrawerOpen(false);
+        }}
+      />
+      <ConfirmationDialog
+        open={Boolean(archiveId)}
+        title="Archive this IPO?"
+        description="It will be removed from the active catalog. This action can be reversed from the database."
+        confirmLabel={archiving ? "Archiving…" : "Archive IPO"}
+        danger
+        onCancel={() => !archiving && setArchiveId(null)}
+        onConfirm={() => void archive()}
+      />
+      <ToastViewport>
+        {toasts.map((toast) => (
+          <Toast key={toast.id} {...toast} />
+        ))}
+      </ToastViewport>
     </div>
   );
 }
@@ -448,6 +651,9 @@ export function AdminSyncPage() {
   const { session } = useAuth();
   const [status, setStatus] = useState<any>(null);
   const [message, setMessage] = useState("");
+  const syncCoolingDown = Boolean(
+    status?.nextAllowedAt && new Date(status.nextAllowedAt).getTime() > Date.now(),
+  );
   const load = async () => {
     if (session) setStatus((await apiRequest<any>("/api/admin/ipos/sync/status", session)).data);
   };
@@ -477,11 +683,7 @@ export function AdminSyncPage() {
           </div>
           <button
             disabled={
-              !status?.providerConfigured ||
-              status?.remainingManualRuns === 0 ||
-              Boolean(
-                status?.nextAllowedAt && new Date(status.nextAllowedAt).getTime() > Date.now(),
-              )
+              !status?.providerConfigured || status?.remainingManualRuns === 0 || syncCoolingDown
             }
             onClick={() => void sync()}
             className="min-h-touch rounded-lg bg-slate-950 px-4 font-semibold text-white disabled:opacity-50"
@@ -501,6 +703,11 @@ export function AdminSyncPage() {
           Runs used today: {status?.runsUsedToday ?? 0} · Manual runs remaining:{" "}
           {status?.remainingManualRuns ?? 0}
         </p>
+        {syncCoolingDown && (
+          <p className="mt-2 text-sm text-slate-600">
+            Next available: {new Date(status.nextAllowedAt).toLocaleString()}
+          </p>
+        )}
       </Card>
     </div>
   );

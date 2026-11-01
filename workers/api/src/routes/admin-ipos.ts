@@ -104,6 +104,13 @@ export function normalizeProviderIpo(row: Record<string, unknown>) {
   };
 }
 
+export class ProviderRequestError extends Error {
+  constructor(readonly status: number) {
+    super(`IPO Guru request failed with status ${status}`);
+    this.name = "ProviderRequestError";
+  }
+}
+
 async function fetchProvider(env: EnvironmentBindings) {
   const environment = validateEnvironment(env);
   if (!environment.IPO_GURU_API_KEY)
@@ -115,7 +122,7 @@ async function fetchProvider(env: EnvironmentBindings) {
     },
     signal: AbortSignal.timeout(20_000),
   });
-  if (!response.ok) throw new Error(`IPO Guru request failed with status ${response.status}`);
+  if (!response.ok) throw new ProviderRequestError(response.status);
   return { configured: true, rows: normalizedRows(await response.json()) };
 }
 
@@ -195,15 +202,27 @@ export async function runIpoSync(
   try {
     provider = await fetchProvider(env);
   } catch (error) {
+    const providerStatus = error instanceof ProviderRequestError ? error.status : null;
     const message = error instanceof Error ? error.message : "IPO Guru request failed";
     await supabase.from("ipo_sync_logs").insert({
       trigger_type: triggerType,
       provider: "IPO_GURU",
       status: "failed",
       error_message: message,
-      execution_summary: { step: "Fetching IPO list" },
+      execution_summary: { step: "Fetching IPO list", providerStatus },
       completed_at: new Date().toISOString(),
     });
+    if (providerStatus === 429)
+      return {
+        status: 429,
+        body: {
+          error: {
+            code: "PROVIDER_RATE_LIMITED",
+            message:
+              "IPO Guru is currently rate-limited or its request quota is exhausted. Try again later.",
+          },
+        },
+      };
     return {
       status: 502,
       body: {
