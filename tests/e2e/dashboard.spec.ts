@@ -172,7 +172,7 @@ async function prepareDashboard(page: Page) {
       },
     }),
   );
-  await page.route("**/api/ipos?*", (route) =>
+  await page.route(/\/api\/ipos(?:\/catalog)?(?:\?.*)?$/, (route) =>
     route.fulfill({
       json: { data: { ipos: [{ id: ipoId, company_name: "Dashboard Test IPO", symbol: "DASH" }] } },
     }),
@@ -258,7 +258,7 @@ test("dashboard marks aggregate metrics unavailable when analytics fails", async
   );
   await page.goto("/");
 
-  await expect(page.getByRole("alert")).toContainText("Analytics unavailable");
+  await expect(page.getByRole("alert").filter({ hasText: "Analytics unavailable" })).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Dashboard totals" }).getByText("Unavailable").first(),
   ).toBeVisible();
