@@ -34,6 +34,13 @@ import { PageHeader, StatCard } from "../../components/ui/PageHeader";
 import { StatusBadge } from "../../components/ui/Badge";
 import { ErrorNotice, EmptyState } from "../../components/ui/States";
 import { useToast } from "../../components/ui/ToastContext";
+import {
+  SkeletonCard,
+  SkeletonFormPage,
+  SkeletonStatCard,
+  SkeletonTable,
+} from "../../components/ui/Skeleton";
+import { LoadingState } from "../../components/LoadingState";
 
 const nav = [
   ["Overview", "/admin", BarChart3],
@@ -58,12 +65,9 @@ export function AdminRoute({ children }: { children: ReactNode }) {
       .maybeSingle()
       .then(({ data }) => setAdmin(isAdminEmail(user.email) && data?.role === "ADMIN"));
   }, [user]);
-  if (loading || (admin === null && user))
-    return (
-      <main className="grid min-h-screen place-items-center bg-slate-50">
-        Checking administrator access…
-      </main>
-    );
+  if (loading || (admin === null && user)) {
+    return <LoadingState label="Checking administrator access" fullPage />;
+  }
   if (!user || !session) return <Navigate to="/login" replace />;
   if (!admin)
     return (
@@ -79,6 +83,7 @@ export function AdminRoute({ children }: { children: ReactNode }) {
 
 export function AdminLayout() {
   const { signOut } = useAuth();
+  const { notify } = useToast();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const mobilePanelRef = useRef<HTMLDivElement>(null);
@@ -107,7 +112,11 @@ export function AdminLayout() {
         ))}
       </nav>
       <button
-        onClick={() => void signOut()}
+        onClick={() =>
+          void signOut()
+            .then(() => notify({ title: "Signed out", tone: "success" }))
+            .catch(() => notify({ title: "Sign out failed", tone: "error" }))
+        }
         className="mx-3 mb-5 flex min-h-touch items-center rounded-lg px-3 text-sm font-medium text-slate-200 hover:bg-navy-light"
       >
         <LogOut className="mr-3 h-4 w-4" />
@@ -187,7 +196,9 @@ export function AdminOverviewPage() {
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(true);
   const load = async () => {
+    setLoading(true);
     setLoadError(null);
     try {
       if (!session) return;
@@ -201,6 +212,8 @@ export function AdminOverviewPage() {
       setLoadError(
         error instanceof Error ? error : new Error("Unable to load administration data."),
       );
+    } finally {
+      setLoading(false);
     }
   };
   useEffect(() => {
@@ -282,7 +295,12 @@ export function AdminOverviewPage() {
       )}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {cards.map(([label, value]) => (
-          <StatCard key={String(label)} label={String(label)} value={String(value)} />
+          <StatCard
+            key={String(label)}
+            label={String(label)}
+            value={overview ? String(value) : "—"}
+            loading={loading && !overview}
+          />
         ))}
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
@@ -544,8 +562,16 @@ export function AdminIposPage() {
 
       <div className="overflow-hidden rounded-xl border bg-white md:overflow-x-auto">
         {loading ? (
-          <div className="p-8 text-center text-sm text-slate-500" role="status">
-            Loading IPO catalog…
+          <div role="status" aria-label="Loading IPO catalog" aria-busy="true">
+            <span className="sr-only">Loading IPO catalog…</span>
+            <div className="space-y-3 p-4 md:hidden">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+            <div className="hidden p-4 md:block">
+              <SkeletonTable rows={6} cols={7} />
+            </div>
           </div>
         ) : (
           <>
@@ -889,7 +915,22 @@ export function AdminHistoryPage() {
         </div>
       )}
       {history.isLoading ? (
-        <p role="status">Loading synchronization history…</p>
+        <div
+          role="status"
+          aria-label="Loading synchronization history"
+          aria-busy="true"
+          className="space-y-3"
+        >
+          <span className="sr-only">Loading synchronization history…</span>
+          <div className="space-y-3 md:hidden">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+          <div className="hidden md:block">
+            <SkeletonTable rows={6} cols={8} />
+          </div>
+        </div>
       ) : !rows.length ? (
         <EmptyState
           title="No synchronization runs found"
@@ -978,10 +1019,12 @@ export function AdminSyncPage() {
   const [status, setStatus] = useState<any>(null);
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(true);
   const syncCoolingDown = Boolean(
     status?.nextAllowedAt && new Date(status.nextAllowedAt).getTime() > Date.now(),
   );
   const load = async () => {
+    setLoading(true);
     setLoadError(null);
     try {
       if (session) setStatus((await apiRequest<any>("/api/admin/ipos/sync/status", session)).data);
@@ -989,6 +1032,8 @@ export function AdminSyncPage() {
       setLoadError(
         error instanceof Error ? error : new Error("Unable to load administration data."),
       );
+    } finally {
+      setLoading(false);
     }
   };
   useEffect(() => {
@@ -1034,11 +1079,17 @@ export function AdminSyncPage() {
           <div>
             <h2 className="text-xl font-bold">IPO Data Sync</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Provider: {status?.providerConfigured ? "Configured" : "Not configured"}
+              {loading
+                ? "Checking provider status…"
+                : loadError
+                  ? "Provider status unavailable"
+                  : `Provider: ${status?.providerConfigured ? "Configured" : "Not configured"}`}
             </p>
           </div>
           <ConfirmButton
             disabled={
+              loading ||
+              Boolean(loadError) ||
               status?.running ||
               !status?.providerConfigured ||
               status?.remainingManualRuns === 0 ||
@@ -1062,10 +1113,22 @@ export function AdminSyncPage() {
       </Card>
       <Card>
         <h3 className="font-bold">Quota status</h3>
-        <p className="mt-2 text-sm text-slate-600">
-          Runs used today: {status?.runsUsedToday ?? 0} · Manual runs remaining:{" "}
-          {status?.remainingManualRuns ?? 0}
-        </p>
+        {loading ? (
+          <div
+            role="status"
+            aria-label="Loading synchronization quota"
+            className="mt-3 space-y-2"
+          >
+            <span className="sr-only">Loading synchronization quota…</span>
+            <div className="skeleton h-4 w-2/3" />
+            <div className="skeleton h-4 w-1/2" />
+          </div>
+        ) : status ? (
+          <p className="mt-2 text-sm text-slate-600">
+            Runs used today: {status.runsUsedToday} · Manual runs remaining:{" "}
+            {status.remainingManualRuns}
+          </p>
+        ) : null}
         {syncCoolingDown && (
           <p className="mt-2 text-sm text-slate-600">
             Next available: {new Date(status.nextAllowedAt).toLocaleString()}
@@ -1090,7 +1153,7 @@ export function AdminSettingsPage() {
     queryFn: () =>
       apiRequest<{ data: { syncIntervalHours: number } }>("/api/admin/ipos/sync/status", session!),
   });
-  if (settings.isLoading || status.isLoading) return <p role="status">Loading settings…</p>;
+  if (settings.isLoading || status.isLoading) return <SkeletonFormPage sections={2} />;
   if (settings.error || status.error)
     return (
       <div>

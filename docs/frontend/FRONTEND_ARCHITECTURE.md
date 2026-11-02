@@ -22,6 +22,10 @@ touch-target styles apply throughout.
 Sidebar dashboard links match their exact routes, so a nested list page highlights only its own link.
 Account and application lists retain filter and page state in URL parameters. Their detail pages
 use the originating list URL when navigating back, with a safe parent fallback for direct links.
+The application table keeps IPO/company search visible while its advanced filters use a reusable,
+focus-managed side drawer with separate draft and applied URL-backed state. Searchable selects use
+the user's actual IPO, account, broker, category, and status records; list and CSV endpoints apply
+the same server-validated criteria, including multi-IPO selection.
 
 Protected IPO list and opening-date calendar routes show the shared admin-managed catalog by
 default, with server-side search, status filters, and pagination. Catalog details are read-only and
@@ -36,6 +40,7 @@ IPO list search, status and page state also live in URL parameters. Shared and p
 views use the same issue and date presentation without inventing unavailable market statistics.
 The admin catalog also keeps search, status, and pagination in its URL. Its View action carries
 that URL to the catalog detail page so Back returns to the filtered admin list.
+Dashboard detail links also carry their route context so Back returns to the signed-in home view.
 
 The authenticated home route shows the responsive dashboard and analytics page. TanStack Query
 loads bounded PostgreSQL aggregates, the canonical Phase 6 capital summary, and paginated IPO and

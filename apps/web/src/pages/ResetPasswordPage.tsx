@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { resetPasswordSchema } from "@ipo-mania/validation";
@@ -15,6 +15,7 @@ type ResetValues = z.infer<typeof resetPasswordSchema>;
 
 export function ResetPasswordPage() {
   const { notify } = useToast();
+  const startedRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [success, setSuccess] = useState(false);
@@ -29,6 +30,8 @@ export function ResetPasswordPage() {
   });
 
   useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
     const code = new URLSearchParams(window.location.search).get("code");
     window.history.replaceState({}, document.title, window.location.pathname);
     if (!code) {

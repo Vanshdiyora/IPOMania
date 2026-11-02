@@ -19,6 +19,14 @@ import { useToast } from "../../components/ui/ToastContext";
 import { Card } from "../../components/ui/Card";
 import { BackLink } from "../../components/ui/BackLink";
 import { ApiRequestError, apiRequest } from "../../lib/api";
+import {
+  SkeletonCard,
+  SkeletonDetailsPage,
+  SkeletonFormFields,
+  SkeletonStatCard,
+  SkeletonTable,
+  SkeletonTableRows,
+} from "../../components/ui/Skeleton";
 
 type AccountSummary = {
   total: number;
@@ -170,10 +178,20 @@ export function AccountDashboardPage() {
         </div>
       </header>
       {error ? <ErrorNotice error={error} /> : null}
-      <section className="grid gap-4 sm:grid-cols-3" aria-label="Account totals">
-        <SummaryCard label="Total accounts" value={summary?.total} loading={isLoading} />
-        <SummaryCard label="Active accounts" value={summary?.active} loading={isLoading} />
-        <SummaryCard label="Archived accounts" value={summary?.archived} loading={isLoading} />
+      <section className="grid gap-4 sm:grid-cols-3" aria-label="Account totals" aria-busy={isLoading}>
+        {isLoading ? (
+          <>
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+          </>
+        ) : (
+          <>
+            <SummaryCard label="Total accounts" value={summary?.total} loading={false} />
+            <SummaryCard label="Active accounts" value={summary?.active} loading={false} />
+            <SummaryCard label="Archived accounts" value={summary?.archived} loading={false} />
+          </>
+        )}
       </section>
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -377,13 +395,8 @@ export function AccountListPage() {
         </div>
       </Card>
       {error ? <ErrorNotice error={error} /> : null}
-      {isLoading ? (
-        <p role="status" className="text-base text-muted">
-          Loading accounts…
-        </p>
-      ) : null}
       <Card className="p-3 sm:p-5">
-        <div className="hidden overflow-hidden md:block">
+        <div className="hidden overflow-hidden md:block" aria-busy={isLoading}>
           <div ref={scrollRef} className="max-h-[36rem] overflow-auto">
             <table className="w-full min-w-[850px] table-fixed border-collapse text-left text-base">
               <thead className="sticky top-0 z-10 bg-canvas text-ink">
@@ -400,35 +413,51 @@ export function AccountListPage() {
                   </tr>
                 ))}
               </thead>
-              <tbody style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
-                {virtualRows.map((virtualRow) => {
-                  const row = table.getRowModel().rows[virtualRow.index];
-                  return (
-                    <tr
-                      key={row.id}
-                      className="absolute left-0 top-0 w-full border-b border-border bg-white"
-                      style={{
-                        height: `${virtualRow.size}px`,
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <td
-                          key={cell.id}
-                          className={`truncate px-3 py-4 ${["depository_type", "account_status", "created_at"].includes(cell.column.id) ? "text-center tabular-nums" : "text-left"}`}
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
+              <tbody
+                style={
+                  isLoading
+                    ? undefined
+                    : { height: `${virtualizer.getTotalSize()}px`, position: "relative" }
+                }
+              >
+                {isLoading ? (
+                  <SkeletonTableRows rows={6} cols={accountColumns.length} />
+                ) : (
+                  virtualRows.map((virtualRow) => {
+                    const row = table.getRowModel().rows[virtualRow.index];
+                    return (
+                      <tr
+                        key={row.id}
+                        className="absolute left-0 top-0 w-full border-b border-border bg-white"
+                        style={{
+                          height: `${virtualRow.size}px`,
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <td
+                            key={cell.id}
+                            className={`truncate px-3 py-4 ${["depository_type", "account_status", "created_at"].includes(cell.column.id) ? "text-center tabular-nums" : "text-left"}`}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
         </div>
-        <div className="space-y-3 md:hidden">
-          {accounts.map((account) => (
+        <div className="space-y-3 md:hidden" aria-busy={isLoading}>
+          {isLoading ? (
+            <div role="status" aria-label="Loading accounts" className="space-y-3">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          ) : accounts.map((account) => (
             <article key={account.id} className="rounded-lg border border-border p-4 text-base">
               <AccountDetailLink
                 account={account}
@@ -563,7 +592,12 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
       disabled={editing && (loadingAccount || Boolean(loadError) || !loadedAccount)}
       dirty={isDirty}
     >
-      {editing && loadingAccount ? <p role="status">Loading account…</p> : null}
+      {editing && loadingAccount ? (
+        <div role="status" aria-label="Loading account form" aria-busy="true">
+          <span className="sr-only">Loading account form…</span>
+          <SkeletonFormFields fields={6} />
+        </div>
+      ) : null}
       {loadError ? <ErrorNotice error={loadError} /> : null}
       <form id="account-form" className="space-y-5" noValidate onSubmit={handleSubmit(save)}>
         <FormSection title="Account details">
@@ -667,11 +701,7 @@ export function AccountDetailsPage() {
   });
   const account = data?.data;
   if (isLoading)
-    return (
-      <p role="status" className="text-base text-muted">
-        Loading account…
-      </p>
-    );
+    return <SkeletonDetailsPage rows={8} />;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -1072,9 +1102,18 @@ export function ImportHistoryPage() {
       </header>
       {error ? <ErrorNotice error={error} /> : null}
       {isLoading ? (
-        <p role="status" className="text-base text-muted">
-          Loading import history…
-        </p>
+        <div
+          role="status"
+          aria-label={importId ? "Loading import report" : "Loading import history"}
+          aria-busy="true"
+        >
+          <span className="sr-only">Loading import data…</span>
+          {importId ? (
+            <SkeletonDetailsPage rows={5} />
+          ) : (
+            <SkeletonTable rows={5} cols={5} />
+          )}
+        </div>
       ) : null}
       {detail ? (
         <Card>
@@ -1179,7 +1218,7 @@ function SummaryCard({
     <Card>
       <p className="text-base font-semibold text-muted">{label}</p>
       <p className="mt-3 text-4xl font-bold text-navy" aria-live="polite">
-        {loading ? "…" : (value ?? 0)}
+        {loading ? "…" : (value ?? "—")}
       </p>
     </Card>
   );

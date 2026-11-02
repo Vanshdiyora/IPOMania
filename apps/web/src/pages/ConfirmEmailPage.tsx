@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
 import { AuthPage } from "../auth/AuthPage";
@@ -8,11 +8,14 @@ import { useToast } from "../components/ui/ToastContext";
 
 export function ConfirmEmailPage() {
   const { notify } = useToast();
+  const startedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("Verifying your email address…");
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
     const code = new URLSearchParams(window.location.search).get("code");
     window.history.replaceState({}, document.title, window.location.pathname);
     if (!code) {

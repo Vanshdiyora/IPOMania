@@ -12,6 +12,7 @@ import { NavLink, Link } from "react-router-dom";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useAuth } from "../../auth/useAuth";
 import { cn } from "../../lib/utils";
+import { useToast } from "../ui/ToastContext";
 
 // ─── NavItem (top-level) ─────────────────────────────────────────────────────
 function NavItem({
@@ -140,6 +141,7 @@ export function Sidebar({
   onClose: () => void;
 }) {
   const { user, signOut } = useAuth();
+  const { notify } = useToast();
   const [signOutError, setSignOutError] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -306,7 +308,12 @@ export function Sidebar({
             onClick={() => {
               onNavigate();
               setSignOutError(false);
-              void signOut().catch(() => setSignOutError(true));
+              void signOut()
+                .then(() => notify({ title: "Signed out", tone: "success" }))
+                .catch(() => {
+                  setSignOutError(true);
+                  notify({ title: "Sign out failed", tone: "error" });
+                });
             }}
           >
             <LogOut aria-hidden="true" size={18} />

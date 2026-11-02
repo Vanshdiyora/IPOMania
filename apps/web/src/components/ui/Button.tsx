@@ -1,5 +1,6 @@
 import { cloneElement, isValidElement, type ButtonHTMLAttributes, type ReactElement } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { LoaderCircle } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 const buttonStyles = cva(
@@ -55,6 +56,7 @@ const buttonStyles = cva(
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
   VariantProps<typeof buttonStyles> & {
     asChild?: boolean;
+    loading?: boolean;
   };
 
 export function Button({
@@ -63,7 +65,9 @@ export function Button({
   variant,
   size,
   asChild = false,
+  loading = false,
   children,
+  disabled,
   ...props
 }: ButtonProps) {
   if (asChild && isValidElement(children)) {
@@ -74,7 +78,14 @@ export function Button({
   }
 
   return (
-    <button type={type} className={cn(buttonStyles({ variant, size }), className)} {...props}>
+    <button
+      type={type}
+      className={cn(buttonStyles({ variant, size }), className)}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...props}
+    >
+      {loading ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : null}
       {children}
     </button>
   );

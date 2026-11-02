@@ -784,6 +784,16 @@ export const applicationListQuerySchema = z
     page: z.coerce.number().int().min(1).default(1),
     page_size: z.coerce.number().int().min(1).max(100).default(25),
     ipo_id: z.uuid().optional(),
+    ipo_ids: z
+      .string()
+      .trim()
+      .regex(/^[0-9a-fA-F-]+(?:,[0-9a-fA-F-]+)*$/)
+      .transform((value) => value.split(","))
+      .refine(
+        (values) =>
+          values.length <= 100 && values.every((value) => z.uuid().safeParse(value).success),
+      )
+      .optional(),
     demat_account_id: z.uuid().optional(),
     broker: z.string().trim().max(120).optional(),
     category_id: z.uuid().optional(),
@@ -792,7 +802,8 @@ export const applicationListQuerySchema = z
     submission_from: z.iso.date().optional(),
     submission_to: z.iso.date().optional(),
     search: z.string().trim().max(160).optional(),
-    include_archived: z.enum(["true", "false"]).default("false"),
+    ipo_search: z.string().trim().max(160).optional(),
+    include_archived: z.enum(["true", "false", "all"]).default("false"),
   })
   .strict()
   .refine(

@@ -26,6 +26,14 @@ import {
 } from "@ipo-mania/validation";
 import { Card } from "../../components/ui/Card";
 import { ApiRequestError, apiRequest } from "../../lib/api";
+import { EmptyState, ErrorNotice } from "../../components/ui/States";
+import {
+  SkeletonCard,
+  SkeletonDetailsPage,
+  SkeletonStatCard,
+  SkeletonTable,
+  SkeletonTableRows,
+} from "../../components/ui/Skeleton";
 
 type RelatedApplication = CapitalApplication & {
   ipo?:
@@ -144,6 +152,7 @@ export function MandateDetailsPage() {
         title="Mandate details"
         description="Manually maintain the mandate status and reference. Approval does not record a completed debit."
       />
+      {detail.isLoading ? <SkeletonDetailsPage rows={6} /> : null}
       {detail.error ? <ErrorNotice error={detail.error} /> : null}
       {mandate ? (
         <>
@@ -239,6 +248,9 @@ export function MandateDetailsPage() {
           </FormDrawer>
         </>
       ) : null}
+      {!detail.isLoading && !detail.error && !mandate ? (
+        <EmptyState title="Mandate not found" description="This record may have been removed." />
+      ) : null}
       <Link className={linkClass} to="/mandates">
         Back to mandates
       </Link>
@@ -312,6 +324,7 @@ export function AllotmentDetailsPage() {
         title="Allotment details"
         description="Maintain allotment, price, and expected refund data against the original application."
       />
+      {detail.isLoading ? <SkeletonDetailsPage rows={6} /> : null}
       {detail.error ? <ErrorNotice error={detail.error} /> : null}
       {allotment ? (
         <>
@@ -429,6 +442,9 @@ export function AllotmentDetailsPage() {
           </FormDrawer>
         </>
       ) : null}
+      {!detail.isLoading && !detail.error && !allotment ? (
+        <EmptyState title="Allotment not found" description="This record may have been removed." />
+      ) : null}
       <Link className={linkClass} to="/allotments">
         Back to allotments
       </Link>
@@ -493,9 +509,12 @@ export function CreateMandatePage() {
               label="Application"
               error={validation.errors.application_id}
               value={applicationId}
+              disabled={applications.isLoading || Boolean(applications.error)}
               onChange={(event) => setApplicationId(event.target.value)}
             >
-              <option value="">Choose an application</option>
+              <option value="">
+                {applications.isLoading ? "Loading applications…" : "Choose an application"}
+              </option>
               {(applications.data?.data.applications ?? []).map((application) => (
                 <option key={application.id} value={application.id}>
                   {applicationTitle(application)} ·{" "}
@@ -526,6 +545,11 @@ export function CreateMandatePage() {
           </div>
         </FormSection>
         {applications.error ? <ErrorNotice error={applications.error} /> : null}
+        {applications.error ? (
+          <Button variant="outline" onClick={() => void applications.refetch()}>
+            Retry applications
+          </Button>
+        ) : null}
         {create.error ? <ErrorNotice error={create.error} /> : null}
       </form>
     </RouteFormDrawer>
@@ -596,9 +620,12 @@ export function CreateAllotmentPage() {
               error={validation.errors.application_id}
               fieldClassName="sm:col-span-2"
               value={applicationId}
+              disabled={applications.isLoading || Boolean(applications.error)}
               onChange={(event) => setApplicationId(event.target.value)}
             >
-              <option value="">Choose an application</option>
+              <option value="">
+                {applications.isLoading ? "Loading applications…" : "Choose an application"}
+              </option>
               {(applications.data?.data.applications ?? []).map((application) => (
                 <option key={application.id} value={application.id}>
                   {applicationTitle(application)} · {application.shares} shares requested
@@ -668,6 +695,11 @@ export function CreateAllotmentPage() {
           </div>
         </FormSection>
         {applications.error ? <ErrorNotice error={applications.error} /> : null}
+        {applications.error ? (
+          <Button variant="outline" onClick={() => void applications.refetch()}>
+            Retry applications
+          </Button>
+        ) : null}
         {create.error ? <ErrorNotice error={create.error} /> : null}
       </form>
     </RouteFormDrawer>
@@ -693,7 +725,16 @@ export function CapitalTrackerPage() {
       />
       <FinancialFilters filters={filters} onChange={setFilters} />
       {summaryQuery.error ? <ErrorNotice error={summaryQuery.error} /> : null}
-      {summaries.length === 0 ? (
+      {summaryQuery.isLoading ? (
+        <div role="status" aria-label="Loading capital summary" aria-busy="true">
+          <span className="sr-only">Loading capital summary…</span>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <SkeletonStatCard key={index} />
+            ))}
+          </div>
+        </div>
+      ) : summaryQuery.error && !summaryQuery.data ? null : summaries.length === 0 ? (
         <Card>
           <p className="text-muted">
             No financial activity has been recorded yet. Record an eligible application to begin
@@ -801,7 +842,12 @@ export function FinancialTransactionHistoryPage() {
       <LedgerEventForm />
       <Card>
         <h2 className="text-xl font-bold text-ink">Ledger events</h2>
-        {rows.length === 0 ? (
+        {ledgerQuery.isLoading ? (
+          <div role="status" aria-label="Loading ledger events" aria-busy="true" className="mt-4">
+            <span className="sr-only">Loading ledger events…</span>
+            <SkeletonTable rows={5} cols={4} />
+          </div>
+        ) : rows.length === 0 ? (
           <p className="mt-3 text-muted">No transactions match these filters.</p>
         ) : (
           <div className="mt-4 overflow-x-auto">
@@ -896,8 +942,10 @@ export function RefundTrackerPage() {
                 <th className="p-3">Refund status</th>
               </tr>
             </thead>
-            <tbody>
-              {rows.map((allotment) => (
+            <tbody aria-busy={allotmentQuery.isLoading}>
+              {allotmentQuery.isLoading ? (
+                <SkeletonTableRows rows={5} cols={4} />
+              ) : rows.map((allotment) => (
                 <tr className="border-b border-border last:border-0" key={allotment.id}>
                   <td className="p-3">
                     <Link className={linkClass} to={`/allotments/${allotment.id}`}>
@@ -924,7 +972,7 @@ export function RefundTrackerPage() {
               ))}
             </tbody>
           </table>
-          {rows.length === 0 ? (
+          {!allotmentQuery.isLoading && !allotmentQuery.error && rows.length === 0 ? (
             <p className="p-3 text-muted">No refunds match these filters.</p>
           ) : null}
         </div>
@@ -967,7 +1015,14 @@ function MandateList({ showAll }: { showAll: boolean }) {
       <Card>
         <h2 className="text-xl font-bold text-ink">Mandates</h2>
         <div className="mt-4 divide-y divide-border">
-          {rows.map((mandate) => (
+          {mandatesQuery.isLoading ? (
+            <div role="status" aria-label="Loading mandates" aria-busy="true" className="space-y-3">
+              <span className="sr-only">Loading mandates…</span>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          ) : rows.map((mandate) => (
             <div
               className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0"
               key={mandate.id}
@@ -995,7 +1050,7 @@ function MandateList({ showAll }: { showAll: boolean }) {
               </div>
             </div>
           ))}
-          {rows.length === 0 ? (
+          {!mandatesQuery.isLoading && !mandatesQuery.error && rows.length === 0 ? (
             <p className="py-2 text-muted">No mandates match these filters.</p>
           ) : null}
         </div>
@@ -1040,7 +1095,14 @@ function AllotmentList({ showAll }: { showAll: boolean }) {
       <Card>
         <h2 className="text-xl font-bold text-ink">Allotments</h2>
         <div className="mt-4 divide-y divide-border">
-          {rows.map((allotment) => (
+          {allotmentsQuery.isLoading ? (
+            <div role="status" aria-label="Loading allotments" aria-busy="true" className="space-y-3">
+              <span className="sr-only">Loading allotments…</span>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          ) : rows.map((allotment) => (
             <div
               className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0"
               key={allotment.id}
@@ -1061,7 +1123,7 @@ function AllotmentList({ showAll }: { showAll: boolean }) {
               </span>
             </div>
           ))}
-          {rows.length === 0 ? (
+          {!allotmentsQuery.isLoading && !allotmentsQuery.error && rows.length === 0 ? (
             <p className="py-2 text-muted">No allotments match these filters.</p>
           ) : null}
         </div>
@@ -1174,9 +1236,12 @@ function LedgerEventForm() {
               error={validation.errors.application_id}
               fieldClassName="sm:col-span-2"
               value={applicationId}
+              disabled={applications.isLoading || Boolean(applications.error)}
               onChange={(event) => setApplicationId(event.target.value)}
             >
-              <option value="">Choose application</option>
+              <option value="">
+                {applications.isLoading ? "Loading applications…" : "Choose application"}
+              </option>
               {(applications.data?.data.applications ?? []).map((application) => (
                 <option key={application.id} value={application.id}>
                   {applicationTitle(application)}

@@ -15,7 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   BriefcaseBusiness,
   Building2,
@@ -41,6 +41,7 @@ import { Button } from "../components/ui/Button";
 import { Badge, StatusBadge } from "../components/ui/Badge";
 import { LoadingState } from "../components/LoadingState";
 import { SkeletonStatCard } from "../components/ui/Skeleton";
+import { useToast } from "../components/ui/ToastContext";
 import { ApiRequestError, apiRequest, downloadApiFile } from "../lib/api";
 import { WelcomePage } from "./WelcomePage";
 
@@ -88,6 +89,8 @@ export function DashboardHomePage() {
 }
 
 export function DashboardPage() {
+  const location = useLocation();
+  const { notify } = useToast();
   const { session, markSessionExpired } = useAuth();
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [exportError, setExportError] = useState("");
@@ -152,8 +155,13 @@ export function DashboardPage() {
       return downloadApiFile(`/api/analytics/export?${params}`, session!);
     },
     onMutate: () => setExportError(""),
-    onError: (error) =>
-      setExportError(error instanceof Error ? error.message : "The report could not be exported."),
+    onSuccess: (_result, format) =>
+      notify({ title: `${format.toUpperCase()} report downloaded`, tone: "success" }),
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "The report could not be exported.";
+      setExportError(message);
+      notify({ title: "Report export failed", description: message, tone: "error" });
+    },
   });
 
   const queryError =
@@ -485,6 +493,7 @@ export function DashboardPage() {
                       <Link
                         className="font-semibold text-ink hover:text-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
                         to={`/ipos/catalog/${ipo.ipo_id}`}
+                        state={{ from: `${location.pathname}${location.search}` }}
                       >
                         {ipo.company_name}
                         {ipo.symbol ? ` (${ipo.symbol})` : ""}
@@ -824,6 +833,7 @@ export function DashboardPage() {
                             ? `/ipos/catalog/${ipo.ipo_id}`
                             : `/ipos/${ipo.ipo_id}`
                         }
+                        state={{ from: `${location.pathname}${location.search}` }}
                       >
                         {ipo.company_name}
                         {ipo.symbol ? ` (${ipo.symbol})` : ""}
@@ -892,6 +902,7 @@ export function DashboardPage() {
                       <Link
                         className="font-semibold text-ink hover:text-action transition-colors"
                         to={`/applications/${application.application_id}`}
+                        state={{ from: `${location.pathname}${location.search}` }}
                       >
                         {application.company_name} ({application.symbol})
                       </Link>

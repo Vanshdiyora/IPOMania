@@ -30,6 +30,7 @@ export function LoginPage() {
     try {
       const { data, error } = await getSupabaseClient().auth.signInWithPassword(values);
       if (error) throw error;
+      notify({ title: "Signed in", tone: "success" });
       navigate(isAdminEmail(data.user?.email) ? "/admin" : destination, { replace: true });
     } catch {
       notify({
@@ -84,7 +85,7 @@ export function LoginPage() {
           </Link>
         </div>
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
+        <Button type="submit" className="w-full" loading={isSubmitting}>
           {isSubmitting ? "Signing in…" : "Sign in"}
         </Button>
       </form>

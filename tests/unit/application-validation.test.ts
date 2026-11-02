@@ -3,6 +3,7 @@ import {
   applicationBulkCreateSchema,
   applicationBulkStatusSchema,
   applicationCreateSchema,
+  applicationListQuerySchema,
   ipoCategorySchema,
 } from "@ipo-mania/validation";
 
@@ -63,5 +64,20 @@ describe("application boundary validation", () => {
     expect(
       applicationBulkStatusSchema.safeParse({ application_ids: [validApplication.ipo_id] }).success,
     ).toBe(false);
+  });
+
+  it("validates multi-IPO search filters and the explicit all-records archive view", () => {
+    const parsed = applicationListQuerySchema.parse({
+      ipo_ids: `${validApplication.ipo_id},aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa`,
+      ipo_search: "Example company",
+      include_archived: "all",
+    });
+    expect(parsed.ipo_ids).toEqual([
+      validApplication.ipo_id,
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    ]);
+    expect(parsed.ipo_search).toBe("Example company");
+    expect(parsed.include_archived).toBe("all");
+    expect(applicationListQuerySchema.safeParse({ ipo_ids: "not-a-uuid" }).success).toBe(false);
   });
 });

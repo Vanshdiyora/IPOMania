@@ -2,25 +2,14 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./useAuth";
 import { Button } from "../components/ui/Button";
 import { Clock, LogIn } from "lucide-react";
+import { LoadingState } from "../components/LoadingState";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { loading, user, sessionExpired } = useAuth();
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div
-        className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas"
-        role="status"
-        aria-live="polite"
-      >
-        <div className="relative">
-          <div className="h-10 w-10 rounded-full border-4 border-border" />
-          <div className="absolute inset-0 h-10 w-10 animate-spin rounded-full border-4 border-action border-t-transparent" />
-        </div>
-        <p className="text-sm font-medium text-muted">Checking your session…</p>
-      </div>
-    );
+    return <LoadingState label="Checking your session" fullPage />;
   }
 
   if (sessionExpired) {

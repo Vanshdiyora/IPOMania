@@ -11,6 +11,7 @@ import { FormField, Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
 import { useToast } from "../components/ui/ToastContext";
 import { ApiRequestError, apiRequest } from "../lib/api";
+import { SkeletonFormFields } from "../components/ui/Skeleton";
 
 type Profile = {
   id: string;
@@ -26,6 +27,8 @@ export function ProfilePage() {
   const { notify } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [deleting, setDeleting] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
   const {
@@ -36,8 +39,13 @@ export function ProfilePage() {
   } = useForm<ProfileValues>({ resolver: zodResolver(profileUpdateSchema) });
 
   useEffect(() => {
-    if (!session) return;
+    if (!session) {
+      setProfileLoading(false);
+      return;
+    }
     let active = true;
+    setProfileLoading(true);
+    setErrorMessage("");
     void apiRequest<ProfileResponse>("/api/me/profile", session)
       .then(({ data }) => {
         if (!active) return;
@@ -51,11 +59,14 @@ export function ProfilePage() {
         } else {
           setErrorMessage("We could not load your profile. Please try again.");
         }
+      })
+      .finally(() => {
+        if (active) setProfileLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [session, reset, markSessionExpired]);
+  }, [session, reset, markSessionExpired, loadAttempt]);
 
   async function save(values: ProfileValues) {
     if (!session) return;
@@ -136,21 +147,28 @@ export function ProfilePage() {
             )}
           </div>
 
-          <form className="space-y-4" onSubmit={handleSubmit(save)} noValidate>
-            <FormField label="Full Name" htmlFor="full_name" error={errors.full_name?.message}>
-              <Input
-                id="full_name"
-                autoComplete="name"
-                placeholder="e.g. Rahul Sharma"
-                aria-invalid={Boolean(errors.full_name)}
-                {...register("full_name")}
-              />
-            </FormField>
+          {profileLoading ? (
+            <div role="status" aria-label="Loading profile" aria-busy="true">
+              <span className="sr-only">Loading profile…</span>
+              <SkeletonFormFields fields={1} />
+            </div>
+          ) : (
+            <form className="space-y-4" onSubmit={handleSubmit(save)} noValidate>
+              <FormField label="Full Name" htmlFor="full_name" error={errors.full_name?.message}>
+                <Input
+                  id="full_name"
+                  autoComplete="name"
+                  placeholder="e.g. Rahul Sharma"
+                  aria-invalid={Boolean(errors.full_name)}
+                  {...register("full_name")}
+                />
+              </FormField>
 
-            <Button type="submit" disabled={isSubmitting} className="shadow-xs">
-              {isSubmitting ? "Saving changes…" : "Save changes"}
-            </Button>
-          </form>
+              <Button type="submit" loading={isSubmitting} className="shadow-xs">
+                {isSubmitting ? "Saving changes…" : "Save changes"}
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
 
@@ -198,12 +216,17 @@ export function ProfilePage() {
       </Card>
 
       {errorMessage && (
-        <div
-          className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm font-medium text-danger"
-          role="alert"
-        >
-          <AlertTriangle size={16} />
-          <span>{errorMessage}</span>
+        <div className="space-y-3">
+          <div
+            className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm font-medium text-danger"
+            role="alert"
+          >
+            <AlertTriangle size={16} />
+            <span>{errorMessage}</span>
+          </div>
+          <Button variant="outline" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
+            Retry profile
+          </Button>
         </div>
       )}
     </div>

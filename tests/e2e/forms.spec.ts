@@ -473,6 +473,45 @@ test("admin catalog view returns to the filtered management list", async ({ page
   await expect(page.getByRole("searchbox", { name: "Search IPO catalog" })).toHaveValue("Catalog");
 });
 
+test("application search and IPO filter update the actual list request", async ({ page }) => {
+  await prepare(page);
+  await page.route("**/api/applications?*", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          applications: [],
+          pagination: { page: 1, page_size: 50, total: 0, total_pages: 1 },
+        },
+      },
+    }),
+  );
+  await page.goto("/applications/list");
+  const searchRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname === "/api/applications" && url.searchParams.get("ipo_search") === "Form";
+  });
+  await page.getByRole("textbox", { name: "Search IPO or company name" }).fill("Form");
+  await searchRequest;
+
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await page.getByRole("button", { name: "Select IPOs" }).click();
+  const optionSearch = page.getByPlaceholder("Search IPOs...");
+  await expect(optionSearch).toBeFocused();
+  await optionSearch.press("Tab");
+  await expect(page.getByRole("option", { name: /Form test company/ })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Filters" })).toBeVisible();
+  await page.getByRole("button", { name: "Select IPOs" }).click();
+  await page.getByRole("option", { name: /Form test company/ }).click();
+  const filteredRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname === "/api/applications" && url.searchParams.get("ipo_ids") === recordId;
+  });
+  await page.getByRole("button", { name: /Apply filters/ }).click();
+  await filteredRequest;
+  await expect(page).toHaveURL(new RegExp(`ipo_ids=${recordId}`));
+});
+
 test("category switching protects unsaved rule changes", async ({ page }) => {
   await prepare(page);
   await page.goto(`/ipos/${recordId}/categories`);

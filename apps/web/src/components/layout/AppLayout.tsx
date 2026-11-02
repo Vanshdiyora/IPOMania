@@ -5,9 +5,10 @@ import { useAuth } from "../../auth/useAuth";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 import { useToast } from "../ui/ToastContext";
+import { LoadingState } from "../LoadingState";
 
 export function AppLayout() {
-  const { user } = useAuth();
+  const { loading, user } = useAuth();
   const location = useLocation();
   const { pathname, state } = location;
   const navigate = useNavigate();
@@ -58,6 +59,10 @@ export function AppLayout() {
       document.body.style.overflow = previousOverflow;
     };
   }, [mobileMenuOpen]);
+
+  if (pathname === "/" && loading) {
+    return <LoadingState label="Restoring your session" fullPage />;
+  }
 
   if (pathname === "/" && !user) {
     return (

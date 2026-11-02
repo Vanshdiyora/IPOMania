@@ -29,7 +29,13 @@ import { StatusBadge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { EmptyState } from "../../components/ui/States";
-import { SkeletonCard } from "../../components/ui/Skeleton";
+import {
+  SkeletonCard,
+  SkeletonFormPage,
+  SkeletonIpoDetails,
+  SkeletonPage,
+  Skeleton,
+} from "../../components/ui/Skeleton";
 import { ActiveFilterChips } from "../../components/filters/ActiveFilterChips";
 import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
 import { ApiRequestError, apiRequest } from "../../lib/api";
@@ -296,11 +302,13 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
       </FilterDrawer>
       {error ? <ErrorNotice error={error} /> : null}
       {isLoading ? (
-        <div role="status" aria-label="Loading IPO records" className="grid gap-4">
-          <span className="sr-only">Loading IPO records…</span>
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
+        <SkeletonPage label="Loading IPO records">
+          <div className="grid gap-4">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        </SkeletonPage>
       ) : null}
       {!isLoading && !error && ipos.length === 0 ? (
         <Card>
@@ -368,7 +376,7 @@ export function IpoCatalogDetailsPage() {
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!),
   });
-  if (isLoading) return <p role="status">Loading IPO details…</p>;
+  if (isLoading) return <SkeletonIpoDetails />;
   if (error) return <ErrorNotice error={error} />;
   const ipo = data?.data;
   if (!ipo) return <p role="alert">IPO record not found.</p>;
@@ -376,7 +384,7 @@ export function IpoCatalogDetailsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <BackLink fallback="/ipos" allowedPath={/^\/(ipos|ipo-calendar|admin\/ipos)$/} />
+        <BackLink fallback="/ipos" allowedPath={/^\/(ipos|ipo-calendar|admin\/ipos|dashboard)?$/} />
         <h1 className="mt-3 text-3xl font-bold text-navy">{ipo.company_name}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-3 text-muted">
           <span>
@@ -423,7 +431,7 @@ export function IpoDetailsPage() {
   });
   const ipo = ipoQuery.data?.data;
 
-  if (ipoQuery.isLoading) return <p role="status">Loading IPO details…</p>;
+  if (ipoQuery.isLoading) return <SkeletonIpoDetails />;
   if (ipoQuery.error) return <ErrorNotice error={ipoQuery.error} />;
   if (!ipo) return <p role="alert">IPO record not found.</p>;
 
@@ -432,7 +440,10 @@ export function IpoDetailsPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <BackLink fallback="/ipos?source=personal" allowedPath={/^\/(ipos|ipo-calendar)$/} />
+          <BackLink
+            fallback="/ipos?source=personal"
+            allowedPath={/^\/(ipos|ipo-calendar|dashboard)?$/}
+          />
           <p className="text-sm font-semibold uppercase tracking-wide text-muted">{ipo.symbol}</p>
           <h1 className="mt-1 text-3xl font-bold text-navy">{ipo.company_name}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-muted">
@@ -481,20 +492,40 @@ export function IpoDetailsPage() {
             Manage rules
           </Link>
         </div>
-        {categoriesQuery.error ? <ErrorNotice error={categoriesQuery.error} /> : null}
-        <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-          {categories.map((category) => {
-            const current = latestCategories.get(category);
-            return (
-              <li key={category} className="rounded-lg border border-border p-3">
-                <span className="font-semibold text-ink">{category}</span>
-                <span className="ml-2 text-sm text-muted">
-                  {current ? `Rule version ${current.rule_version}` : "Rules not configured"}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+        {categoriesQuery.error ? (
+          <div className="mt-4 space-y-3">
+            <ErrorNotice error={categoriesQuery.error} />
+            <Button variant="outline" onClick={() => void categoriesQuery.refetch()}>
+              Retry category rules
+            </Button>
+          </div>
+        ) : categoriesQuery.isLoading ? (
+          <div role="status" aria-label="Loading category rules" aria-busy="true">
+            <span className="sr-only">Loading category rules…</span>
+            <ul aria-hidden="true" className="mt-4 grid gap-2 sm:grid-cols-2">
+              {categories.map((category) => (
+                <li key={category} className="rounded-lg border border-border p-3">
+                  <Skeleton className="h-4 w-1/3" />
+                  <Skeleton className="mt-2 h-4 w-2/3" />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+            {categories.map((category) => {
+              const current = latestCategories.get(category);
+              return (
+                <li key={category} className="rounded-lg border border-border p-3">
+                  <span className="font-semibold text-ink">{category}</span>
+                  <span className="ml-2 text-sm text-muted">
+                    {current ? `Rule version ${current.rule_version}` : "Rules not configured"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </Card>
     </div>
   );
@@ -553,7 +584,7 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
     }
   });
 
-  if (editing && existing.isLoading) return <p role="status">Loading IPO record…</p>;
+  if (editing && existing.isLoading) return <SkeletonFormPage />;
   if (editing && existing.error) return <ErrorNotice error={existing.error} />;
 
   return (
@@ -738,8 +769,18 @@ export function IpoCategoryConfigurationPage() {
     createRule.mutate(parsed.data);
   };
 
-  if (ipoQuery.isLoading) return <p role="status">Loading IPO…</p>;
+  if (ipoQuery.isLoading || rulesQuery.isLoading) return <SkeletonFormPage />;
   if (ipoQuery.error) return <ErrorNotice error={ipoQuery.error} />;
+  if (rulesQuery.error) {
+    return (
+      <div className="space-y-3">
+        <ErrorNotice error={rulesQuery.error} />
+        <Button variant="outline" onClick={() => void rulesQuery.refetch()}>
+          Retry category rules
+        </Button>
+      </div>
+    );
+  }
   if (!ipoQuery.data) return <p role="alert">IPO record not found.</p>;
   const ipo = ipoQuery.data.data;
 

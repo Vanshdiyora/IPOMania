@@ -231,6 +231,34 @@ describe("application API", () => {
     }
   });
 
+  it("filters parent application rows for IPO name and broker in list and export", async () => {
+    const requests = installMock({ exportRows: true });
+    for (const path of [
+      "/api/applications?ipo_search=Example&broker=Broker",
+      "/api/applications/export?ipo_search=Example&broker=Broker",
+    ]) {
+      const response = await createApp().request(
+        path,
+        { headers: { Authorization: "Bearer test-token" } },
+        bindings,
+      );
+      expect(response.status, path).toBe(200);
+    }
+
+    const applicationReads = requests.filter(
+      (request) =>
+        request.method === "GET" && new URL(request.url).pathname.endsWith("/applications"),
+    );
+    expect(applicationReads).toHaveLength(2);
+    for (const request of applicationReads) {
+      const url = new URL(request.url);
+      expect(url.searchParams.get("select")).toContain("ipos!inner(");
+      expect(url.searchParams.get("select")).toContain("demat_accounts!inner(");
+      expect(url.searchParams.get("ipos.or")).toContain("company_name.ilike");
+      expect(url.searchParams.get("demat_accounts.broker_name")).toContain("ilike.");
+    }
+  });
+
   it("creates an owned application with exact amount and an immutable calculation snapshot", async () => {
     const requests = installMock();
     const response = await createApp().request(
