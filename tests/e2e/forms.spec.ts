@@ -230,8 +230,12 @@ test("IPO validation, back navigation and optional fields work inside the drawer
   await page.goBack();
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.getByRole("button", { name: "Keep editing" }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await expect(page.getByLabel("Company name")).toHaveValue("Unsaved company");
-  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Add IPO" })
+    .getByRole("button", { name: "Cancel" })
+    .click();
   await page.getByRole("button", { name: "Discard changes" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.goto(`/ipos/${recordId}/edit`);
