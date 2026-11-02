@@ -26,7 +26,7 @@ import {
 } from "@ipo-mania/validation";
 import { Card } from "../../components/ui/Card";
 import { ApiRequestError, apiRequest } from "../../lib/api";
-import { EmptyState, ErrorNotice } from "../../components/ui/States";
+import { EmptyState } from "../../components/ui/States";
 import {
   SkeletonCard,
   SkeletonDetailsPage,
@@ -153,7 +153,9 @@ export function MandateDetailsPage() {
         description="Manually maintain the mandate status and reference. Approval does not record a completed debit."
       />
       {detail.isLoading ? <SkeletonDetailsPage rows={6} /> : null}
-      {detail.error ? <ErrorNotice error={detail.error} /> : null}
+      {detail.error ? (
+        <ErrorNotice error={detail.error} onRetry={() => void detail.refetch()} />
+      ) : null}
       {mandate ? (
         <>
           <RecordContext application={relatedApplication(mandate.application)} />
@@ -325,7 +327,9 @@ export function AllotmentDetailsPage() {
         description="Maintain allotment, price, and expected refund data against the original application."
       />
       {detail.isLoading ? <SkeletonDetailsPage rows={6} /> : null}
-      {detail.error ? <ErrorNotice error={detail.error} /> : null}
+      {detail.error ? (
+        <ErrorNotice error={detail.error} onRetry={() => void detail.refetch()} />
+      ) : null}
       {allotment ? (
         <>
           <RecordContext application={relatedApplication(allotment.application)} />
@@ -544,11 +548,8 @@ export function CreateMandatePage() {
             />
           </div>
         </FormSection>
-        {applications.error ? <ErrorNotice error={applications.error} /> : null}
         {applications.error ? (
-          <Button variant="outline" onClick={() => void applications.refetch()}>
-            Retry applications
-          </Button>
+          <ErrorNotice error={applications.error} onRetry={() => void applications.refetch()} />
         ) : null}
         {create.error ? <ErrorNotice error={create.error} /> : null}
       </form>
@@ -694,11 +695,8 @@ export function CreateAllotmentPage() {
             />
           </div>
         </FormSection>
-        {applications.error ? <ErrorNotice error={applications.error} /> : null}
         {applications.error ? (
-          <Button variant="outline" onClick={() => void applications.refetch()}>
-            Retry applications
-          </Button>
+          <ErrorNotice error={applications.error} onRetry={() => void applications.refetch()} />
         ) : null}
         {create.error ? <ErrorNotice error={create.error} /> : null}
       </form>
@@ -724,7 +722,9 @@ export function CapitalTrackerPage() {
         description="Track application value, authorized mandates, blocked funds, actual debits, refunds, and investment performance separately."
       />
       <FinancialFilters filters={filters} onChange={setFilters} />
-      {summaryQuery.error ? <ErrorNotice error={summaryQuery.error} /> : null}
+      {summaryQuery.error ? (
+        <ErrorNotice error={summaryQuery.error} onRetry={() => void summaryQuery.refetch()} />
+      ) : null}
       {summaryQuery.isLoading ? (
         <div role="status" aria-label="Loading capital summary" aria-busy="true">
           <span className="sr-only">Loading capital summary…</span>
@@ -838,7 +838,9 @@ export function FinancialTransactionHistoryPage() {
           setPage(1);
         }}
       />
-      {ledgerQuery.error ? <ErrorNotice error={ledgerQuery.error} /> : null}
+      {ledgerQuery.error ? (
+        <ErrorNotice error={ledgerQuery.error} onRetry={() => void ledgerQuery.refetch()} />
+      ) : null}
       <LedgerEventForm />
       <Card>
         <h2 className="text-xl font-bold text-ink">Ledger events</h2>
@@ -847,7 +849,7 @@ export function FinancialTransactionHistoryPage() {
             <span className="sr-only">Loading ledger events…</span>
             <SkeletonTable rows={5} cols={4} />
           </div>
-        ) : rows.length === 0 ? (
+        ) : ledgerQuery.error && !ledgerQuery.data ? null : rows.length === 0 ? (
           <p className="mt-3 text-muted">No transactions match these filters.</p>
         ) : (
           <div className="mt-4 overflow-x-auto">
@@ -930,7 +932,9 @@ export function RefundTrackerPage() {
           <option value="NOT_REQUIRED">Not required</option>
         </select>
       </label>
-      {allotmentQuery.error ? <ErrorNotice error={allotmentQuery.error} /> : null}
+      {allotmentQuery.error ? (
+        <ErrorNotice error={allotmentQuery.error} onRetry={() => void allotmentQuery.refetch()} />
+      ) : null}
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
@@ -945,31 +949,33 @@ export function RefundTrackerPage() {
             <tbody aria-busy={allotmentQuery.isLoading}>
               {allotmentQuery.isLoading ? (
                 <SkeletonTableRows rows={5} cols={4} />
-              ) : rows.map((allotment) => (
-                <tr className="border-b border-border last:border-0" key={allotment.id}>
-                  <td className="p-3">
-                    <Link className={linkClass} to={`/allotments/${allotment.id}`}>
-                      {applicationTitle(relatedApplication(allotment.application))}
-                    </Link>
-                    <p className="text-muted">
-                      {accountTitle(relatedApplication(allotment.application))}
-                    </p>
-                  </td>
-                  <td className="p-3">
-                    {money(
-                      relatedApplication(allotment.application)?.application_amount ?? "0",
-                      relatedApplication(allotment.application)?.currency ?? "INR",
-                    )}
-                  </td>
-                  <td className="p-3">
-                    {money(
-                      allotment.refund_amount,
-                      relatedApplication(allotment.application)?.currency ?? "INR",
-                    )}
-                  </td>
-                  <td className="p-3">{humanize(allotment.refund_status)}</td>
-                </tr>
-              ))}
+              ) : (
+                rows.map((allotment) => (
+                  <tr className="border-b border-border last:border-0" key={allotment.id}>
+                    <td className="p-3">
+                      <Link className={linkClass} to={`/allotments/${allotment.id}`}>
+                        {applicationTitle(relatedApplication(allotment.application))}
+                      </Link>
+                      <p className="text-muted">
+                        {accountTitle(relatedApplication(allotment.application))}
+                      </p>
+                    </td>
+                    <td className="p-3">
+                      {money(
+                        relatedApplication(allotment.application)?.application_amount ?? "0",
+                        relatedApplication(allotment.application)?.currency ?? "INR",
+                      )}
+                    </td>
+                    <td className="p-3">
+                      {money(
+                        allotment.refund_amount,
+                        relatedApplication(allotment.application)?.currency ?? "INR",
+                      )}
+                    </td>
+                    <td className="p-3">{humanize(allotment.refund_status)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
           {!allotmentQuery.isLoading && !allotmentQuery.error && rows.length === 0 ? (
@@ -1011,7 +1017,9 @@ function MandateList({ showAll }: { showAll: boolean }) {
           setPage(1);
         }}
       />
-      {mandatesQuery.error ? <ErrorNotice error={mandatesQuery.error} /> : null}
+      {mandatesQuery.error ? (
+        <ErrorNotice error={mandatesQuery.error} onRetry={() => void mandatesQuery.refetch()} />
+      ) : null}
       <Card>
         <h2 className="text-xl font-bold text-ink">Mandates</h2>
         <div className="mt-4 divide-y divide-border">
@@ -1022,34 +1030,36 @@ function MandateList({ showAll }: { showAll: boolean }) {
               <SkeletonCard />
               <SkeletonCard />
             </div>
-          ) : rows.map((mandate) => (
-            <div
-              className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0"
-              key={mandate.id}
-            >
-              <div>
-                <Link
-                  className="text-lg font-semibold text-action underline"
-                  to={`/mandates/${mandate.id}`}
-                >
-                  {applicationTitle(relatedApplication(mandate.application))}
-                </Link>
-                <p className="text-sm text-muted">
-                  {mandate.mandate_reference} ·{" "}
-                  {accountTitle(relatedApplication(mandate.application))}
-                </p>
+          ) : (
+            rows.map((mandate) => (
+              <div
+                className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0"
+                key={mandate.id}
+              >
+                <div>
+                  <Link
+                    className="text-lg font-semibold text-action underline"
+                    to={`/mandates/${mandate.id}`}
+                  >
+                    {applicationTitle(relatedApplication(mandate.application))}
+                  </Link>
+                  <p className="text-sm text-muted">
+                    {mandate.mandate_reference} ·{" "}
+                    {accountTitle(relatedApplication(mandate.application))}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold tabular-nums">
+                    {money(
+                      mandate.mandate_amount,
+                      relatedApplication(mandate.application)?.currency ?? "INR",
+                    )}
+                  </p>
+                  <p className="text-sm text-muted">{humanize(mandate.mandate_status)}</p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="font-semibold tabular-nums">
-                  {money(
-                    mandate.mandate_amount,
-                    relatedApplication(mandate.application)?.currency ?? "INR",
-                  )}
-                </p>
-                <p className="text-sm text-muted">{humanize(mandate.mandate_status)}</p>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
           {!mandatesQuery.isLoading && !mandatesQuery.error && rows.length === 0 ? (
             <p className="py-2 text-muted">No mandates match these filters.</p>
           ) : null}
@@ -1091,38 +1101,47 @@ function AllotmentList({ showAll }: { showAll: boolean }) {
           setPage(1);
         }}
       />
-      {allotmentsQuery.error ? <ErrorNotice error={allotmentsQuery.error} /> : null}
+      {allotmentsQuery.error ? (
+        <ErrorNotice error={allotmentsQuery.error} onRetry={() => void allotmentsQuery.refetch()} />
+      ) : null}
       <Card>
         <h2 className="text-xl font-bold text-ink">Allotments</h2>
         <div className="mt-4 divide-y divide-border">
           {allotmentsQuery.isLoading ? (
-            <div role="status" aria-label="Loading allotments" aria-busy="true" className="space-y-3">
+            <div
+              role="status"
+              aria-label="Loading allotments"
+              aria-busy="true"
+              className="space-y-3"
+            >
               <span className="sr-only">Loading allotments…</span>
               <SkeletonCard />
               <SkeletonCard />
               <SkeletonCard />
             </div>
-          ) : rows.map((allotment) => (
-            <div
-              className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0"
-              key={allotment.id}
-            >
-              <div>
-                <Link
-                  className="text-lg font-semibold text-action underline"
-                  to={`/allotments/${allotment.id}`}
-                >
-                  {applicationTitle(relatedApplication(allotment.application))}
-                </Link>
-                <p className="text-sm text-muted">
-                  {allotment.allotted_shares} shares · Refund {humanize(allotment.refund_status)}
-                </p>
+          ) : (
+            rows.map((allotment) => (
+              <div
+                className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0"
+                key={allotment.id}
+              >
+                <div>
+                  <Link
+                    className="text-lg font-semibold text-action underline"
+                    to={`/allotments/${allotment.id}`}
+                  >
+                    {applicationTitle(relatedApplication(allotment.application))}
+                  </Link>
+                  <p className="text-sm text-muted">
+                    {allotment.allotted_shares} shares · Refund {humanize(allotment.refund_status)}
+                  </p>
+                </div>
+                <span className="rounded-full bg-[#EAF0F6] px-3 py-2 text-sm font-semibold text-navy">
+                  {humanize(allotment.allotment_status)}
+                </span>
               </div>
-              <span className="rounded-full bg-[#EAF0F6] px-3 py-2 text-sm font-semibold text-navy">
-                {humanize(allotment.allotment_status)}
-              </span>
-            </div>
-          ))}
+            ))
+          )}
           {!allotmentsQuery.isLoading && !allotmentsQuery.error && rows.length === 0 ? (
             <p className="py-2 text-muted">No allotments match these filters.</p>
           ) : null}
@@ -1319,6 +1338,9 @@ function LedgerEventForm() {
               onChange={(event) => setAuditReference(event.target.value)}
             />
           </div>
+          {applications.error ? (
+            <ErrorNotice error={applications.error} onRetry={() => void applications.refetch()} />
+          ) : null}
           {create.error ? <ErrorNotice error={create.error} /> : null}
         </form>
       </FormDrawer>
@@ -1353,9 +1375,12 @@ function FinancialFilters({
           <select
             className={inputClass}
             value={filters.ipo_id}
+            disabled={ipos.isLoading || Boolean(ipos.error)}
             onChange={(event) => onChange({ ...filters, ipo_id: event.target.value })}
           >
-            <option value="">All IPOs</option>
+            <option value="">
+              {ipos.isLoading ? "Loading IPOs…" : ipos.error ? "IPO list unavailable" : "All IPOs"}
+            </option>
             {(ipos.data?.data.ipos ?? []).map((ipo) => (
               <option key={ipo.id} value={ipo.id}>
                 {ipo.company_name} ({ipo.symbol})
@@ -1368,9 +1393,16 @@ function FinancialFilters({
           <select
             className={inputClass}
             value={filters.account_id}
+            disabled={accounts.isLoading || Boolean(accounts.error)}
             onChange={(event) => onChange({ ...filters, account_id: event.target.value })}
           >
-            <option value="">All accounts</option>
+            <option value="">
+              {accounts.isLoading
+                ? "Loading accounts…"
+                : accounts.error
+                  ? "Account list unavailable"
+                  : "All accounts"}
+            </option>
             {(accounts.data?.data.accounts ?? []).map((account) => (
               <option key={account.id} value={account.id}>
                 {account.holder_name} · {account.broker_name}
@@ -1420,6 +1452,22 @@ function FinancialFilters({
           />
         </label>
       </div>
+      {ipos.error ? (
+        <div className="mt-4 space-y-2">
+          <ErrorNotice error={ipos.error} />
+          <Button variant="outline" onClick={() => void ipos.refetch()}>
+            Retry IPO options
+          </Button>
+        </div>
+      ) : null}
+      {accounts.error ? (
+        <div className="mt-4 space-y-2">
+          <ErrorNotice error={accounts.error} />
+          <Button variant="outline" onClick={() => void accounts.refetch()}>
+            Retry account options
+          </Button>
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -1523,7 +1571,7 @@ function PaginationNav({
   );
 }
 
-function ErrorNotice({ error }: { error: unknown }) {
+function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const message =
     error instanceof ApiRequestError
       ? error.message
@@ -1531,12 +1579,17 @@ function ErrorNotice({ error }: { error: unknown }) {
         ? error.message
         : "The request could not be completed.";
   return (
-    <p
+    <div
       role="alert"
       className="rounded-lg border border-[#F1D9B3] bg-[#FFF9EF] p-3 text-sm text-danger"
     >
-      {message}
-    </p>
+      <p>{message}</p>
+      {onRetry ? (
+        <Button variant="outline" className="mt-2 border-danger/30 text-danger" onClick={onRetry}>
+          Retry
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

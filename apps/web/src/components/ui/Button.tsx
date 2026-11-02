@@ -9,7 +9,7 @@ const buttonStyles = cva(
     "text-base font-semibold tracking-tight",
     "transition-all duration-150 ease-smooth",
     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus",
-    "disabled:pointer-events-none disabled:opacity-50",
+    "disabled:pointer-events-none disabled:border disabled:border-border disabled:bg-surface-subtle disabled:text-muted disabled:shadow-none",
     "select-none",
   ],
   {

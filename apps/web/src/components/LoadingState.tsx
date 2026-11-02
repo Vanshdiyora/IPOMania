@@ -25,6 +25,7 @@ export function LoadingState({
         )}
         role="status"
         aria-live="polite"
+        aria-label={label}
       >
         <div className="relative">
           <div className="h-12 w-12 rounded-full border-4 border-border" />
@@ -44,6 +45,7 @@ export function LoadingState({
         className={cn("inline-flex items-center gap-2 text-sm text-muted", className)}
         role="status"
         aria-live="polite"
+        aria-label={label}
       >
         <LoaderCircle aria-hidden="true" className="animate-spin text-action" size={14} />
         <span>{label}</span>
@@ -56,6 +58,7 @@ export function LoadingState({
       className={cn("flex min-h-32 flex-col items-center justify-center gap-3", className)}
       role="status"
       aria-live="polite"
+      aria-label={label}
     >
       <LoaderCircle aria-hidden="true" className="animate-spin text-action" size={28} />
       <p className="text-sm font-medium text-muted">{label}</p>

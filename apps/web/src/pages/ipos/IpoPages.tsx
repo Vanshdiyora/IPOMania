@@ -128,7 +128,7 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
     ...(search ? { search } : {}),
     ...(status ? { status } : {}),
   });
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
       "ipos",
       personal ? "personal" : "catalog",
@@ -300,7 +300,7 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
           </div>
         </FilterSection>
       </FilterDrawer>
-      {error ? <ErrorNotice error={error} /> : null}
+      {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       {isLoading ? (
         <SkeletonPage label="Loading IPO records">
           <div className="grid gap-4">
@@ -371,13 +371,13 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
 export function IpoCatalogDetailsPage() {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["ipo-catalog", ipoId],
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!),
   });
   if (isLoading) return <SkeletonIpoDetails />;
-  if (error) return <ErrorNotice error={error} />;
+  if (error) return <ErrorNotice error={error} onRetry={() => void refetch()} />;
   const ipo = data?.data;
   if (!ipo) return <p role="alert">IPO record not found.</p>;
 
@@ -432,7 +432,8 @@ export function IpoDetailsPage() {
   const ipo = ipoQuery.data?.data;
 
   if (ipoQuery.isLoading) return <SkeletonIpoDetails />;
-  if (ipoQuery.error) return <ErrorNotice error={ipoQuery.error} />;
+  if (ipoQuery.error)
+    return <ErrorNotice error={ipoQuery.error} onRetry={() => void ipoQuery.refetch()} />;
   if (!ipo) return <p role="alert">IPO record not found.</p>;
 
   const latestCategories = latestByCategory(categoriesQuery.data?.data.configurations ?? []);
@@ -494,10 +495,10 @@ export function IpoDetailsPage() {
         </div>
         {categoriesQuery.error ? (
           <div className="mt-4 space-y-3">
-            <ErrorNotice error={categoriesQuery.error} />
-            <Button variant="outline" onClick={() => void categoriesQuery.refetch()}>
-              Retry category rules
-            </Button>
+            <ErrorNotice
+              error={categoriesQuery.error}
+              onRetry={() => void categoriesQuery.refetch()}
+            />
           </div>
         ) : categoriesQuery.isLoading ? (
           <div role="status" aria-label="Loading category rules" aria-busy="true">
@@ -585,7 +586,8 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
   });
 
   if (editing && existing.isLoading) return <SkeletonFormPage />;
-  if (editing && existing.error) return <ErrorNotice error={existing.error} />;
+  if (editing && existing.error)
+    return <ErrorNotice error={existing.error} onRetry={() => void existing.refetch()} />;
 
   return (
     <RouteFormDrawer
@@ -770,14 +772,12 @@ export function IpoCategoryConfigurationPage() {
   };
 
   if (ipoQuery.isLoading || rulesQuery.isLoading) return <SkeletonFormPage />;
-  if (ipoQuery.error) return <ErrorNotice error={ipoQuery.error} />;
+  if (ipoQuery.error)
+    return <ErrorNotice error={ipoQuery.error} onRetry={() => void ipoQuery.refetch()} />;
   if (rulesQuery.error) {
     return (
       <div className="space-y-3">
-        <ErrorNotice error={rulesQuery.error} />
-        <Button variant="outline" onClick={() => void rulesQuery.refetch()}>
-          Retry category rules
-        </Button>
+        <ErrorNotice error={rulesQuery.error} onRetry={() => void rulesQuery.refetch()} />
       </div>
     );
   }
@@ -1064,7 +1064,6 @@ export function IpoCategoryConfigurationPage() {
           </Button>
         </form>
       </Card>
-      {rulesQuery.error ? <ErrorNotice error={rulesQuery.error} /> : null}
       <ConfirmationDialog
         open={pendingCategory !== null}
         title="Discard category changes?"
@@ -1206,6 +1205,15 @@ export function QuotaCalculatorPage() {
           {requestError}
         </p>
       ) : null}
+      {iposQuery.error ? (
+        <ErrorNotice error={iposQuery.error} onRetry={() => void iposQuery.refetch()} />
+      ) : null}
+      {accountsQuery.error ? (
+        <ErrorNotice error={accountsQuery.error} onRetry={() => void accountsQuery.refetch()} />
+      ) : null}
+      {categoriesQuery.error ? (
+        <ErrorNotice error={categoriesQuery.error} onRetry={() => void categoriesQuery.refetch()} />
+      ) : null}
       <Card>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-sm font-semibold text-ink">
@@ -1213,9 +1221,16 @@ export function QuotaCalculatorPage() {
             <select
               className={inputClass}
               value={ipoId}
+              disabled={iposQuery.isLoading || Boolean(iposQuery.error)}
               onChange={(event) => setIpoId(event.target.value)}
             >
-              <option value="">Choose an IPO</option>
+              <option value="">
+                {iposQuery.isLoading
+                  ? "Loading IPOs…"
+                  : iposQuery.error
+                    ? "IPO list unavailable"
+                    : "Choose an IPO"}
+              </option>
               {ipoOptions.map((ipo) => (
                 <option key={ipo.id} value={ipo.id}>
                   {ipo.company_name} ({ipo.symbol})
@@ -1228,9 +1243,16 @@ export function QuotaCalculatorPage() {
             <select
               className={inputClass}
               value={dematAccountId}
+              disabled={accountsQuery.isLoading || Boolean(accountsQuery.error)}
               onChange={(event) => setDematAccountId(event.target.value)}
             >
-              <option value="">Choose an account</option>
+              <option value="">
+                {accountsQuery.isLoading
+                  ? "Loading accounts…"
+                  : accountsQuery.error
+                    ? "Account list unavailable"
+                    : "Choose an account"}
+              </option>
               {accountOptions.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.holder_name} · {account.broker_name} · {account.masked_demat_identifier}
@@ -1243,6 +1265,7 @@ export function QuotaCalculatorPage() {
             <select
               className={inputClass}
               value={category}
+              disabled={!ipoId || categoriesQuery.isLoading || Boolean(categoriesQuery.error)}
               onChange={(event) => setCategory(event.target.value as IpoCategoryCode)}
             >
               {categories.map((value) => (
@@ -1675,13 +1698,18 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ErrorNotice({ error }: { error: unknown }) {
+function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const message =
     error instanceof ApiRequestError ? error.message : "The request could not be completed.";
   return (
-    <p role="alert" className="rounded-lg bg-[#FDECEC] p-4 text-danger">
-      {message}
-    </p>
+    <div role="alert" className="rounded-lg bg-[#FDECEC] p-4 text-danger">
+      <p>{message}</p>
+      {onRetry ? (
+        <Button variant="outline" className="mt-2 border-danger/30 text-danger" onClick={onRetry}>
+          Retry
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

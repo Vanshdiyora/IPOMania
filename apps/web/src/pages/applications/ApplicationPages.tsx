@@ -228,7 +228,7 @@ function useOwnedLists() {
 
 export function ApplicationDashboardPage() {
   const { session } = useAuth();
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["applications", "dashboard"],
     enabled: Boolean(session),
     queryFn: () => apiRequest<ApplicationSummaryResponse>("/api/applications/summary", session!),
@@ -260,7 +260,7 @@ export function ApplicationDashboardPage() {
           </Link>
         </div>
       </header>
-      {error ? <ErrorMessage error={error} /> : null}
+      {error ? <ErrorMessage error={error} onRetry={() => void refetch()} /> : null}
       <section
         className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
         aria-label="Application totals"
@@ -412,7 +412,7 @@ export function ApplicationListPage() {
     ...(appliedFilters.submissionFrom ? { submission_from: appliedFilters.submissionFrom } : {}),
     ...(appliedFilters.submissionTo ? { submission_to: appliedFilters.submissionTo } : {}),
   });
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["applications", params.toString()],
     enabled: Boolean(session),
     queryFn: () => apiRequest<ApplicationListResponse>(`/api/applications?${params}`, session!),
@@ -587,7 +587,7 @@ export function ApplicationListPage() {
           setFiltersOpen(false);
         }}
       />
-      {error ? <ErrorMessage error={error} /> : null}
+      {error ? <ErrorMessage error={error} onRetry={() => void refetch()} /> : null}
       {lists.error ? (
         <div className="space-y-2">
           <ErrorMessage error={lists.error} />
@@ -879,7 +879,9 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
             <SkeletonFormFields fields={6} />
           </div>
         ) : null}
-        {detail.error ? <ErrorMessage error={detail.error} /> : null}
+        {detail.error ? (
+          <ErrorMessage error={detail.error} onRetry={() => void detail.refetch()} />
+        ) : null}
         <div hidden={editing && (detail.isLoading || Boolean(detail.error))}>
           {lists.error ? <ErrorMessage error={lists.error} /> : null}
           {lists.error ? (
@@ -1117,7 +1119,8 @@ export function ApplicationDetailsPage() {
   });
   const item = detail.data?.data;
   if (detail.isLoading) return <SkeletonDetailsPage rows={10} />;
-  if (detail.error) return <ErrorMessage error={detail.error} />;
+  if (detail.error)
+    return <ErrorMessage error={detail.error} onRetry={() => void detail.refetch()} />;
   if (!item) return <p>Application not found.</p>;
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -1671,7 +1674,7 @@ export function ApplicationImportPage() {
 export function ApplicationImportHistoryPage() {
   const { session } = useAuth();
   const { importId } = useParams();
-  const { data, error, isLoading } = useQuery({
+  const { data, error, isLoading, refetch } = useQuery({
     queryKey: ["application-imports", importId ?? "history"],
     enabled: Boolean(session && !importId),
     queryFn: () => apiRequest<ImportHistoryResponse>(`/api/imports/history`, session!),
@@ -1691,7 +1694,7 @@ export function ApplicationImportHistoryPage() {
           Import applications
         </Link>
       </header>
-      {error ? <ErrorMessage error={error} /> : null}
+      {error ? <ErrorMessage error={error} onRetry={() => void refetch()} /> : null}
       {importId ? (
         <ImportReport importId={importId} />
       ) : (
@@ -1780,7 +1783,8 @@ function ImportReport({ importId }: { importId: string }) {
       }),
   });
   if (report.isLoading) return <SkeletonDetailsPage rows={6} />;
-  if (report.error) return <ErrorMessage error={report.error} />;
+  if (report.error)
+    return <ErrorMessage error={report.error} onRetry={() => void report.refetch()} />;
   const item = report.data?.data;
   if (!item) return null;
   return (
@@ -1870,10 +1874,15 @@ function errorMessage(error: unknown) {
     : "The request failed.";
 }
 
-function ErrorMessage({ error }: { error: unknown }) {
+function ErrorMessage({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   return (
-    <p role="alert" className="rounded-lg border border-danger/30 bg-white p-3 text-danger">
-      {errorMessage(error)}
-    </p>
+    <div role="alert" className="rounded-lg border border-danger/30 bg-white p-3 text-danger">
+      <p>{errorMessage(error)}</p>
+      {onRetry ? (
+        <Button variant="outline" className="mt-2 border-danger/30 text-danger" onClick={onRetry}>
+          Retry
+        </Button>
+      ) : null}
+    </div>
   );
 }

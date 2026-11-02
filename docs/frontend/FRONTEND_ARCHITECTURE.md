@@ -22,6 +22,9 @@ touch-target styles apply throughout.
 Sidebar dashboard links match their exact routes, so a nested list page highlights only its own link.
 Account and application lists retain filter and page state in URL parameters. Their detail pages
 use the originating list URL when navigating back, with a safe parent fallback for direct links.
+The application list has an IPO name search toolbar, active filter chips, and a mobile-friendly
+filter drawer with searchable IPO, account, broker, category, status, and date controls. Applied
+filters drive both the paginated list and CSV export.
 The application table keeps IPO/company search visible while its advanced filters use a reusable,
 focus-managed side drawer with separate draft and applied URL-backed state. Searchable selects use
 the user's actual IPO, account, broker, category, and status records; list and CSV endpoints apply
@@ -51,3 +54,10 @@ page. Monetary totals remain decimal strings in cards and exports; chart-only nu
 for approximate visual scale and is explicitly labeled.
 Routing errors and unmatched paths render the not-found page. Unhandled React rendering errors are
 logged locally and replaced by an accessible recovery view.
+
+Backend-backed routes use shared skeleton layouts while queries load, explicit retry actions when
+queries fail, and empty states only after a successful response. This applies to IPO, account,
+application, capital-management, admin, profile, and dashboard data. Async filter options expose
+their loading state and remain unavailable until populated; save actions show a busy state. Session
+restoration also has a shared loading view so protected routes and the public landing page do not
+flash incorrect content.

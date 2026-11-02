@@ -27,9 +27,12 @@ tokens, and database credentials are not returned.
 | `POST /api/imports/:importId/reverse`     | Archive unchanged applications created by a confirmed import             |
 
 List query parameters: `page` (1), `page_size` (25, max 100), `ipo_id`,
+`ipo_ids` (comma-separated, up to 100 UUIDs), `ipo_search` (IPO company name or symbol),
 `demat_account_id`, `broker`, `category_id`, `application_status`, `mandate_status`,
 `submission_from`, `submission_to`, `search` (application number/external reference), and
-`include_archived` (`false` or `true`).
+`include_archived` (`false`, `true`, or `all`). List and export share these filters.
+IPO name and broker filters use inner joins so the joined match restricts the parent application
+rows as well as the embedded data. `ipo_ids` and `ipo_search` can be combined.
 
 List, export, and detail reads use the `applications_category_owner_issue_fk` relationship to
 display the category selected on the application. The database also has category relationships

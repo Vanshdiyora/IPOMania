@@ -127,7 +127,7 @@ export function ResetPasswordPage() {
             />
           </FormField>
 
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <Button type="submit" className="w-full" loading={isSubmitting}>
             {isSubmitting ? "Updating…" : "Update password"}
           </Button>
         </form>

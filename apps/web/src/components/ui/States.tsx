@@ -120,7 +120,15 @@ export function ErrorState({
 }
 
 /** Inline error notice (for API call failures) */
-export function ErrorNotice({ error, className }: { error: unknown; className?: string }) {
+export function ErrorNotice({
+  error,
+  className,
+  onRetry,
+}: {
+  error: unknown;
+  className?: string;
+  onRetry?: () => void;
+}) {
   const message =
     error instanceof Error ? error.message : "Something went wrong. Please try again.";
 
@@ -133,7 +141,18 @@ export function ErrorNotice({ error, className }: { error: unknown; className?: 
       )}
     >
       <AlertCircle className="mt-0.5 shrink-0" size={16} aria-hidden="true" />
-      <p>{message}</p>
+      <div className="min-w-0 flex-1">
+        <p>{message}</p>
+        {onRetry ? (
+          <button
+            type="button"
+            className="mt-2 min-h-touch rounded-md font-semibold underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
+            onClick={onRetry}
+          >
+            Try again
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

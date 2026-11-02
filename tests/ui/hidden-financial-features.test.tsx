@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { Sidebar } from "../../apps/web/src/components/layout/Sidebar";
 import { router } from "../../apps/web/src/app/router";
+import { ToastProvider } from "../../apps/web/src/components/ui/Toast";
 
 vi.mock("../../apps/web/src/auth/useAuth", () => ({
   useAuth: () => ({
@@ -17,9 +18,11 @@ vi.mock("../../apps/web/src/auth/useAuth", () => ({
 describe("temporarily hidden financial screens", () => {
   it("removes financial navigation while keeping core navigation", () => {
     render(
-      <MemoryRouter>
-        <Sidebar mobileOpen={false} onNavigate={() => {}} onClose={() => {}} />
-      </MemoryRouter>,
+      <ToastProvider>
+        <MemoryRouter>
+          <Sidebar mobileOpen={false} onNavigate={() => {}} onClose={() => {}} />
+        </MemoryRouter>
+      </ToastProvider>,
     );
 
     expect(screen.getByRole("button", { name: "Applications" })).toBeInTheDocument();

@@ -34,12 +34,7 @@ import { PageHeader, StatCard } from "../../components/ui/PageHeader";
 import { StatusBadge } from "../../components/ui/Badge";
 import { ErrorNotice, EmptyState } from "../../components/ui/States";
 import { useToast } from "../../components/ui/ToastContext";
-import {
-  SkeletonCard,
-  SkeletonFormPage,
-  SkeletonStatCard,
-  SkeletonTable,
-} from "../../components/ui/Skeleton";
+import { SkeletonCard, SkeletonFormPage, SkeletonTable } from "../../components/ui/Skeleton";
 import { LoadingState } from "../../components/LoadingState";
 
 const nav = [
@@ -281,7 +276,7 @@ export function AdminOverviewPage() {
             description="Fetch the latest provider records and update the shared IPO catalog."
             confirmLabel="Start synchronization"
             danger={false}
-            className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-4 py-2 font-semibold text-white disabled:opacity-50"
+            className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-4 py-2 font-semibold text-white"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
             Fetch Latest IPO Data
@@ -307,13 +302,30 @@ export function AdminOverviewPage() {
         <Card>
           <h3 className="font-bold">Synchronization</h3>
           <p className="mt-3 text-sm text-slate-600">
-            Status: {status?.latest?.status ?? (status?.running ? "Running" : "Not run")}
+            Status:{" "}
+            {loading && !status
+              ? "Checking…"
+              : loadError && !status
+                ? "Unavailable"
+                : (status?.latest?.status ?? (status?.running ? "Running" : "Not run"))}
           </p>
           <p className="text-sm text-slate-600">
-            Provider: {status?.providerConfigured ? "Configured" : "Setup required"}
+            Provider:{" "}
+            {loading && !status
+              ? "Checking…"
+              : loadError && !status
+                ? "Unavailable"
+                : status?.providerConfigured
+                  ? "Configured"
+                  : "Setup required"}
           </p>
           <p className="text-sm text-slate-600">
-            Manual runs remaining: {status?.remainingManualRuns ?? 0}
+            Manual runs remaining:{" "}
+            {loading && !status
+              ? "—"
+              : loadError && !status
+                ? "Unavailable"
+                : (status?.remainingManualRuns ?? 0)}
           </p>
           {syncCoolingDown && (
             <p className="mt-2 text-sm text-slate-600">
@@ -323,14 +335,27 @@ export function AdminOverviewPage() {
         </Card>
         <Card>
           <h3 className="font-bold">Recent activity</h3>
-          {(overview?.recentSyncs ?? []).slice(0, 5).map((log: any) => (
-            <div key={log.id} className="mt-3 flex justify-between border-t pt-3 text-sm">
-              <span>
-                {log.trigger_type} · {log.provider}
-              </span>
-              <span>{log.status}</span>
+          {loading && !overview ? (
+            <div role="status" aria-label="Loading recent activity" className="mt-3 space-y-3">
+              <span className="sr-only">Loading recent activity…</span>
+              <div className="skeleton h-9 w-full" />
+              <div className="skeleton h-9 w-full" />
+              <div className="skeleton h-9 w-full" />
             </div>
-          ))}
+          ) : overview?.recentSyncs?.length ? (
+            overview.recentSyncs.slice(0, 5).map((log: any) => (
+              <div key={log.id} className="mt-3 flex justify-between border-t pt-3 text-sm">
+                <span>
+                  {log.trigger_type} · {log.provider}
+                </span>
+                <span>{log.status}</span>
+              </div>
+            ))
+          ) : (
+            <p className="mt-3 text-sm text-muted">
+              {loadError ? "Recent activity is unavailable." : "No synchronization activity yet."}
+            </p>
+          )}
         </Card>
       </div>
     </div>
@@ -1100,7 +1125,7 @@ export function AdminSyncPage() {
             description="Fetch the latest provider records and update the shared IPO catalog."
             confirmLabel="Start synchronization"
             danger={false}
-            className="min-h-touch rounded-lg bg-slate-950 px-4 font-semibold text-white disabled:opacity-50"
+            className="min-h-touch rounded-lg bg-navy px-4 font-semibold text-white"
           >
             Fetch Latest IPO Data
           </ConfirmButton>
@@ -1114,11 +1139,7 @@ export function AdminSyncPage() {
       <Card>
         <h3 className="font-bold">Quota status</h3>
         {loading ? (
-          <div
-            role="status"
-            aria-label="Loading synchronization quota"
-            className="mt-3 space-y-2"
-          >
+          <div role="status" aria-label="Loading synchronization quota" className="mt-3 space-y-2">
             <span className="sr-only">Loading synchronization quota…</span>
             <div className="skeleton h-4 w-2/3" />
             <div className="skeleton h-4 w-1/2" />

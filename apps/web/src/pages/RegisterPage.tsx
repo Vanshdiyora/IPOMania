@@ -111,7 +111,7 @@ export function RegisterPage() {
           />
         </FormField>
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
+        <Button type="submit" className="w-full" loading={isSubmitting}>
           {isSubmitting ? "Creating account…" : "Create account"}
         </Button>
       </form>

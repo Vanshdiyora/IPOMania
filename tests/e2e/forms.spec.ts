@@ -393,6 +393,8 @@ for (const width of [390, 1440]) {
       }
       if (path.endsWith("settings"))
         await expect(page.getByText("Interval: 3 hours")).toBeVisible();
+      if (path.endsWith("/sync"))
+        await expect(page.getByRole("button", { name: "Fetch Latest IPO Data" })).toBeEnabled();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       );
@@ -473,6 +475,27 @@ test("admin catalog view returns to the filtered management list", async ({ page
   await expect(page.getByRole("searchbox", { name: "Search IPO catalog" })).toHaveValue("Catalog");
 });
 
+test("disabled synchronization actions retain readable contrast", async ({ page }) => {
+  await prepare(page, true);
+  await page.route("**/api/admin/ipos/sync/status", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          providerConfigured: false,
+          syncIntervalHours: 3,
+          remainingManualRuns: 0,
+          runsUsedToday: 0,
+          running: false,
+          nextAllowedAt: null,
+        },
+      },
+    }),
+  );
+  await page.goto("/admin/sync");
+  await expect(page.getByRole("button", { name: "Fetch Latest IPO Data" })).toBeDisabled();
+  expect(await auditAccessibility(page)).toEqual([]);
+});
+
 test("application search and IPO filter update the actual list request", async ({ page }) => {
   await prepare(page);
   await page.route("**/api/applications?*", (route) =>
@@ -510,6 +533,28 @@ test("application search and IPO filter update the actual list request", async (
   await page.getByRole("button", { name: /Apply filters/ }).click();
   await filteredRequest;
   await expect(page).toHaveURL(new RegExp(`ipo_ids=${recordId}`));
+});
+
+test("application filter options remain visible in the mobile drawer", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await prepare(page);
+  await page.route("**/api/applications?*", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          applications: [],
+          pagination: { page: 1, page_size: 50, total: 0, total_pages: 1 },
+        },
+      },
+    }),
+  );
+  await page.goto("/applications/list");
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await page.getByRole("button", { name: "All statuses", exact: true }).click();
+  const box = await page.getByRole("listbox", { name: "Status" }).boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(800);
 });
 
 test("category switching protects unsaved rule changes", async ({ page }) => {

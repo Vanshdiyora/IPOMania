@@ -121,7 +121,7 @@ export function RouteFormDrawer({
             <Button variant="outline" disabled={busy || closing} onClick={requestClose}>
               Cancel
             </Button>
-            <Button type="submit" form={formId} disabled={busy || disabled || closing}>
+            <Button type="submit" form={formId} loading={busy} disabled={disabled || closing}>
               {busy ? "Saving…" : submitLabel}
             </Button>
           </div>

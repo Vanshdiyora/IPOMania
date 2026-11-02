@@ -145,7 +145,7 @@ function AccountDetailLink({
 
 export function AccountDashboardPage() {
   const { session, markSessionExpired } = useAuth();
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["accounts", "summary"],
     enabled: Boolean(session),
     queryFn: () =>
@@ -177,8 +177,12 @@ export function AccountDashboardPage() {
           </Link>
         </div>
       </header>
-      {error ? <ErrorNotice error={error} /> : null}
-      <section className="grid gap-4 sm:grid-cols-3" aria-label="Account totals" aria-busy={isLoading}>
+      {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
+      <section
+        className="grid gap-4 sm:grid-cols-3"
+        aria-label="Account totals"
+        aria-busy={isLoading}
+      >
         {isLoading ? (
           <>
             <SkeletonStatCard />
@@ -255,7 +259,7 @@ export function AccountListPage() {
     ...(createdFrom ? { created_from: `${createdFrom}T00:00:00.000Z` } : {}),
     ...(createdTo ? { created_to: `${createdTo}T23:59:59.999Z` } : {}),
   });
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["accounts", "list", queryString.toString()],
     enabled: Boolean(session),
     queryFn: () =>
@@ -394,7 +398,7 @@ export function AccountListPage() {
           </button>
         </div>
       </Card>
-      {error ? <ErrorNotice error={error} /> : null}
+      {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       <Card className="p-3 sm:p-5">
         <div className="hidden overflow-hidden md:block" aria-busy={isLoading}>
           <div ref={scrollRef} className="max-h-[36rem] overflow-auto">
@@ -457,30 +461,32 @@ export function AccountListPage() {
               <SkeletonCard />
               <SkeletonCard />
             </div>
-          ) : accounts.map((account) => (
-            <article key={account.id} className="rounded-lg border border-border p-4 text-base">
-              <AccountDetailLink
-                account={account}
-                className="text-lg font-bold text-action underline"
-              >
-                {account.holder_name}
-              </AccountDetailLink>
-              <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-y-2">
-                <dt className="font-semibold">Broker</dt>
-                <dd>{account.broker_name}</dd>
-                <dt className="font-semibold">Depository</dt>
-                <dd>{account.depository_type}</dd>
-                <dt className="font-semibold">Masked ID</dt>
-                <dd className="break-all">{account.masked_demat_identifier}</dd>
-                <dt className="font-semibold">Status</dt>
-                <dd className="capitalize">
-                  {account.archived_at ? "archived" : account.account_status}
-                </dd>
-                <dt className="font-semibold">Created</dt>
-                <dd>{formatDate(account.created_at)}</dd>
-              </dl>
-            </article>
-          ))}
+          ) : (
+            accounts.map((account) => (
+              <article key={account.id} className="rounded-lg border border-border p-4 text-base">
+                <AccountDetailLink
+                  account={account}
+                  className="text-lg font-bold text-action underline"
+                >
+                  {account.holder_name}
+                </AccountDetailLink>
+                <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-y-2">
+                  <dt className="font-semibold">Broker</dt>
+                  <dd>{account.broker_name}</dd>
+                  <dt className="font-semibold">Depository</dt>
+                  <dd>{account.depository_type}</dd>
+                  <dt className="font-semibold">Masked ID</dt>
+                  <dd className="break-all">{account.masked_demat_identifier}</dd>
+                  <dt className="font-semibold">Status</dt>
+                  <dd className="capitalize">
+                    {account.archived_at ? "archived" : account.account_status}
+                  </dd>
+                  <dt className="font-semibold">Created</dt>
+                  <dd>{formatDate(account.created_at)}</dd>
+                </dl>
+              </article>
+            ))
+          )}
         </div>
         {!isLoading && accounts.length === 0 ? (
           <p className="py-8 text-center text-base text-muted">No accounts match these filters.</p>
@@ -517,6 +523,7 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
     data: loadedAccount,
     error: loadError,
     isLoading: loadingAccount,
+    refetch: refetchAccount,
   } = useQuery({
     queryKey: ["accounts", accountId],
     enabled: Boolean(session && editing && accountId),
@@ -598,8 +605,14 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
           <SkeletonFormFields fields={6} />
         </div>
       ) : null}
-      {loadError ? <ErrorNotice error={loadError} /> : null}
-      <form id="account-form" className="space-y-5" noValidate onSubmit={handleSubmit(save)}>
+      {loadError ? <ErrorNotice error={loadError} onRetry={() => void refetchAccount()} /> : null}
+      <form
+        id="account-form"
+        className="space-y-5"
+        hidden={editing && (loadingAccount || Boolean(loadError))}
+        noValidate
+        onSubmit={handleSubmit(save)}
+      >
         <FormSection title="Account details">
           <div className="grid gap-5 sm:grid-cols-2">
             <FormInput
@@ -667,7 +680,7 @@ export function AccountDetailsPage() {
   const client = useQueryClient();
   const navigate = useNavigate();
   const { notify } = useToast();
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["accounts", accountId],
     enabled: Boolean(session && accountId),
     queryFn: () => apiRequest<AccountResponse>(`/api/accounts/${accountId}`, session!),
@@ -700,8 +713,7 @@ export function AccountDetailsPage() {
     },
   });
   const account = data?.data;
-  if (isLoading)
-    return <SkeletonDetailsPage rows={8} />;
+  if (isLoading) return <SkeletonDetailsPage rows={8} />;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -721,7 +733,7 @@ export function AccountDetailsPage() {
           </Link>
         ) : null}
       </header>
-      {error ? <ErrorNotice error={error} /> : null}
+      {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       {account ? (
         <Card>
           <dl className="grid gap-5 sm:grid-cols-2">
@@ -1031,7 +1043,7 @@ export function ImportHistoryPage() {
   const { importId } = useParams();
   const client = useQueryClient();
   const { notify } = useToast();
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: importId ? ["account-imports", importId] : ["account-imports", "history"],
     enabled: Boolean(session),
     queryFn: () =>
@@ -1100,7 +1112,7 @@ export function ImportHistoryPage() {
           Start a new import
         </Link>
       </header>
-      {error ? <ErrorNotice error={error} /> : null}
+      {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       {isLoading ? (
         <div
           role="status"
@@ -1108,11 +1120,7 @@ export function ImportHistoryPage() {
           aria-busy="true"
         >
           <span className="sr-only">Loading import data…</span>
-          {importId ? (
-            <SkeletonDetailsPage rows={5} />
-          ) : (
-            <SkeletonTable rows={5} cols={5} />
-          )}
+          {importId ? <SkeletonDetailsPage rows={5} /> : <SkeletonTable rows={5} cols={5} />}
         </div>
       ) : null}
       {detail ? (
@@ -1254,16 +1262,23 @@ function DetailItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ErrorNotice({ error }: { error: unknown }) {
+function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   return (
-    <p
+    <div
       role="alert"
       className="rounded-lg border border-red-200 bg-red-50 p-4 text-base text-danger"
     >
-      {error instanceof ApiRequestError
-        ? error.message
-        : "We could not load the requested data. Please try again."}
-    </p>
+      <p>
+        {error instanceof ApiRequestError
+          ? error.message
+          : "We could not load the requested data. Please try again."}
+      </p>
+      {onRetry ? (
+        <Button variant="outline" className="mt-2 border-danger/30 text-danger" onClick={onRetry}>
+          Retry
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

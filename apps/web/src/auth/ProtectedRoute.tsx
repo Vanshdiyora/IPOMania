@@ -9,7 +9,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
 
   if (loading) {
-    return <LoadingState label="Checking your session" fullPage />;
+    return <LoadingState label="Checking your session" />;
   }
 
   if (sessionExpired) {

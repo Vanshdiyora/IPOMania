@@ -19,12 +19,7 @@ export function Skeleton({ className }: SkeletonProps) {
 
 export function SkeletonPage({ label, children, className }: SkeletonPageProps) {
   return (
-    <div
-      role="status"
-      aria-label={label}
-      aria-busy="true"
-      className={cn("space-y-6", className)}
-    >
+    <div role="status" aria-label={label} aria-busy="true" className={cn("space-y-6", className)}>
       <span className="sr-only">{label}</span>
       <div aria-hidden="true" className="space-y-6">
         {children}

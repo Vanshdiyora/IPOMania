@@ -54,8 +54,14 @@ export function SearchableSelect({
     if (!rect) return;
     const viewportPadding = 12;
     const width = Math.min(Math.max(rect.width, 300), window.innerWidth - viewportPadding * 2);
+    const panelHeight = Math.min(380, window.innerHeight - viewportPadding * 2);
+    const roomBelow = window.innerHeight - rect.bottom - viewportPadding;
+    const top =
+      roomBelow >= panelHeight || roomBelow >= rect.top - viewportPadding
+        ? Math.min(rect.bottom + 8, window.innerHeight - panelHeight - viewportPadding)
+        : Math.max(viewportPadding, rect.top - panelHeight - 8);
     setPosition({
-      top: Math.min(rect.bottom + 8, window.innerHeight - 120),
+      top: Math.max(viewportPadding, top),
       left: Math.min(
         Math.max(viewportPadding, rect.left),
         window.innerWidth - width - viewportPadding,
@@ -190,8 +196,13 @@ export function SearchableSelect({
                 triggerRef.current?.focus();
               }
             }}
-            className="fixed z-[70] overflow-hidden rounded-xl border border-border bg-white shadow-xl"
-            style={{ top: position.top, left: position.left, width: position.width }}
+            className="fixed z-[70] overflow-y-auto rounded-xl border border-border bg-white shadow-xl"
+            style={{
+              top: position.top,
+              left: position.left,
+              width: position.width,
+              maxHeight: "calc(100dvh - 24px)",
+            }}
           >
             <div className="border-b border-border p-3">
               <label className="sr-only" htmlFor={`${listId}-search`}>
