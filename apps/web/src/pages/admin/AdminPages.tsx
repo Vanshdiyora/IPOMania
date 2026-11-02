@@ -1,13 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useModalLayer } from "../../components/ui/useModalLayer";
 import { useQuery } from "@tanstack/react-query";
@@ -41,7 +33,9 @@ import { Pagination } from "../../components/ui/Pagination";
 import { PageHeader, StatCard } from "../../components/ui/PageHeader";
 import { StatusBadge } from "../../components/ui/Badge";
 import { ErrorNotice, EmptyState } from "../../components/ui/States";
-import { Toast, ToastViewport, type ToastProps } from "../../components/ui/Toast";
+import { useToast } from "../../components/ui/ToastContext";
+import { SkeletonCard, SkeletonFormPage, SkeletonTable } from "../../components/ui/Skeleton";
+import { LoadingState } from "../../components/LoadingState";
 
 const nav = [
   ["Overview", "/admin", BarChart3],
@@ -66,12 +60,9 @@ export function AdminRoute({ children }: { children: ReactNode }) {
       .maybeSingle()
       .then(({ data }) => setAdmin(isAdminEmail(user.email) && data?.role === "ADMIN"));
   }, [user]);
-  if (loading || (admin === null && user))
-    return (
-      <main className="grid min-h-screen place-items-center bg-slate-50">
-        Checking administrator access…
-      </main>
-    );
+  if (loading || (admin === null && user)) {
+    return <LoadingState label="Checking administrator access" fullPage />;
+  }
   if (!user || !session) return <Navigate to="/login" replace />;
   if (!admin)
     return (
@@ -87,6 +78,7 @@ export function AdminRoute({ children }: { children: ReactNode }) {
 
 export function AdminLayout() {
   const { signOut } = useAuth();
+  const { notify } = useToast();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const mobilePanelRef = useRef<HTMLDivElement>(null);
@@ -115,7 +107,11 @@ export function AdminLayout() {
         ))}
       </nav>
       <button
-        onClick={() => void signOut()}
+        onClick={() =>
+          void signOut()
+            .then(() => notify({ title: "Signed out", tone: "success" }))
+            .catch(() => notify({ title: "Sign out failed", tone: "error" }))
+        }
         className="mx-3 mb-5 flex min-h-touch items-center rounded-lg px-3 text-sm font-medium text-slate-200 hover:bg-navy-light"
       >
         <LogOut className="mr-3 h-4 w-4" />
@@ -189,12 +185,15 @@ function Card({ children }: { children: ReactNode }) {
 
 export function AdminOverviewPage() {
   const { session } = useAuth();
+  const { notify } = useToast();
   const [overview, setOverview] = useState<any>(null);
   const [status, setStatus] = useState<any>(null);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(true);
   const load = async () => {
+    setLoading(true);
     setLoadError(null);
     try {
       if (!session) return;
@@ -208,6 +207,8 @@ export function AdminOverviewPage() {
       setLoadError(
         error instanceof Error ? error : new Error("Unable to load administration data."),
       );
+    } finally {
+      setLoading(false);
     }
   };
   useEffect(() => {
@@ -219,12 +220,20 @@ export function AdminOverviewPage() {
     setMessage("Fetching provider data and saving records…");
     try {
       const result = await apiRequest<any>("/api/admin/ipos/sync", session, { method: "POST" });
-      setMessage(
-        `Completed: ${result.data?.recordsInserted ?? 0} inserted, ${result.data?.recordsUpdated ?? 0} updated.`,
-      );
+      setMessage("");
+      notify({
+        title: "IPO synchronization complete",
+        description: `${result.data?.recordsInserted ?? 0} inserted, ${result.data?.recordsUpdated ?? 0} updated.`,
+        tone: "success",
+      });
       await load();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Synchronization failed.");
+      setMessage("");
+      notify({
+        title: "IPO synchronization failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        tone: "error",
+      });
     } finally {
       setSyncing(false);
     }
@@ -267,7 +276,7 @@ export function AdminOverviewPage() {
             description="Fetch the latest provider records and update the shared IPO catalog."
             confirmLabel="Start synchronization"
             danger={false}
-            className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-4 py-2 font-semibold text-white disabled:opacity-50"
+            className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-4 py-2 font-semibold text-white"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
             Fetch Latest IPO Data
@@ -281,20 +290,42 @@ export function AdminOverviewPage() {
       )}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {cards.map(([label, value]) => (
-          <StatCard key={String(label)} label={String(label)} value={String(value)} />
+          <StatCard
+            key={String(label)}
+            label={String(label)}
+            value={overview ? String(value) : "—"}
+            loading={loading && !overview}
+          />
         ))}
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
           <h3 className="font-bold">Synchronization</h3>
           <p className="mt-3 text-sm text-slate-600">
-            Status: {status?.latest?.status ?? (status?.running ? "Running" : "Not run")}
+            Status:{" "}
+            {loading && !status
+              ? "Checking…"
+              : loadError && !status
+                ? "Unavailable"
+                : (status?.latest?.status ?? (status?.running ? "Running" : "Not run"))}
           </p>
           <p className="text-sm text-slate-600">
-            Provider: {status?.providerConfigured ? "Configured" : "Setup required"}
+            Provider:{" "}
+            {loading && !status
+              ? "Checking…"
+              : loadError && !status
+                ? "Unavailable"
+                : status?.providerConfigured
+                  ? "Configured"
+                  : "Setup required"}
           </p>
           <p className="text-sm text-slate-600">
-            Manual runs remaining: {status?.remainingManualRuns ?? 0}
+            Manual runs remaining:{" "}
+            {loading && !status
+              ? "—"
+              : loadError && !status
+                ? "Unavailable"
+                : (status?.remainingManualRuns ?? 0)}
           </p>
           {syncCoolingDown && (
             <p className="mt-2 text-sm text-slate-600">
@@ -304,14 +335,27 @@ export function AdminOverviewPage() {
         </Card>
         <Card>
           <h3 className="font-bold">Recent activity</h3>
-          {(overview?.recentSyncs ?? []).slice(0, 5).map((log: any) => (
-            <div key={log.id} className="mt-3 flex justify-between border-t pt-3 text-sm">
-              <span>
-                {log.trigger_type} · {log.provider}
-              </span>
-              <span>{log.status}</span>
+          {loading && !overview ? (
+            <div role="status" aria-label="Loading recent activity" className="mt-3 space-y-3">
+              <span className="sr-only">Loading recent activity…</span>
+              <div className="skeleton h-9 w-full" />
+              <div className="skeleton h-9 w-full" />
+              <div className="skeleton h-9 w-full" />
             </div>
-          ))}
+          ) : overview?.recentSyncs?.length ? (
+            overview.recentSyncs.slice(0, 5).map((log: any) => (
+              <div key={log.id} className="mt-3 flex justify-between border-t pt-3 text-sm">
+                <span>
+                  {log.trigger_type} · {log.provider}
+                </span>
+                <span>{log.status}</span>
+              </div>
+            ))
+          ) : (
+            <p className="mt-3 text-sm text-muted">
+              {loadError ? "Recent activity is unavailable." : "No synchronization activity yet."}
+            </p>
+          )}
         </Card>
       </div>
     </div>
@@ -320,6 +364,7 @@ export function AdminOverviewPage() {
 
 export function AdminIposPage() {
   const { session } = useAuth();
+  const { notify } = useToast();
   const location = useLocation();
   const [listParams, setListParams] = useSearchParams();
   const search = listParams.get("search") ?? "";
@@ -378,15 +423,6 @@ export function AdminIposPage() {
   const pageSize = 20;
   const [archiveId, setArchiveId] = useState<string | null>(null);
   const [archiving, setArchiving] = useState(false);
-  const [toasts, setToasts] = useState<ToastProps[]>([]);
-
-  const dismissToast = useCallback((id: string) => {
-    setToasts((current) => current.filter((toast) => toast.id !== id));
-  }, []);
-  const notify = (title: string, tone: ToastProps["tone"] = "info", description?: ReactNode) => {
-    const id = `${Date.now()}-${Math.random()}`;
-    setToasts((current) => [...current, { id, title, tone, description, onDismiss: dismissToast }]);
-  };
   const load = async () => {
     if (!session) return;
     setLoading(true);
@@ -475,12 +511,13 @@ export function AdminIposPage() {
         });
       }
       setDrawerOpen(false);
-      notify(editingId ? "IPO updated" : "IPO created", "success");
+      notify({ title: editingId ? "IPO updated" : "IPO created", tone: "success" });
       await load();
     } catch (error) {
-      setSaveError(
-        error instanceof Error ? error.message : "Unable to save IPO. Please try again.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Unable to save IPO. Please try again.";
+      setSaveError(message);
+      notify({ title: "Unable to save IPO", description: message, tone: "error" });
     } finally {
       setSaving(false);
     }
@@ -491,10 +528,14 @@ export function AdminIposPage() {
     try {
       await apiRequest(`/api/admin/ipos/catalog/${archiveId}`, session, { method: "DELETE" });
       setArchiveId(null);
-      notify("IPO archived", "success");
+      notify({ title: "IPO archived", tone: "success" });
       await load();
     } catch (error) {
-      notify("Unable to archive IPO", "error", error instanceof Error ? error.message : undefined);
+      notify({
+        title: "Unable to archive IPO",
+        description: error instanceof Error ? error.message : undefined,
+        tone: "error",
+      });
     } finally {
       setArchiving(false);
     }
@@ -546,8 +587,16 @@ export function AdminIposPage() {
 
       <div className="overflow-hidden rounded-xl border bg-white md:overflow-x-auto">
         {loading ? (
-          <div className="p-8 text-center text-sm text-slate-500" role="status">
-            Loading IPO catalog…
+          <div role="status" aria-label="Loading IPO catalog" aria-busy="true">
+            <span className="sr-only">Loading IPO catalog…</span>
+            <div className="space-y-3 p-4 md:hidden">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+            <div className="hidden p-4 md:block">
+              <SkeletonTable rows={6} cols={7} />
+            </div>
           </div>
         ) : (
           <>
@@ -824,11 +873,6 @@ export function AdminIposPage() {
         onCancel={() => !archiving && setArchiveId(null)}
         onConfirm={() => void archive()}
       />
-      <ToastViewport>
-        {toasts.map((toast) => (
-          <Toast key={toast.id} {...toast} />
-        ))}
-      </ToastViewport>
     </div>
   );
 }
@@ -896,7 +940,22 @@ export function AdminHistoryPage() {
         </div>
       )}
       {history.isLoading ? (
-        <p role="status">Loading synchronization history…</p>
+        <div
+          role="status"
+          aria-label="Loading synchronization history"
+          aria-busy="true"
+          className="space-y-3"
+        >
+          <span className="sr-only">Loading synchronization history…</span>
+          <div className="space-y-3 md:hidden">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+          <div className="hidden md:block">
+            <SkeletonTable rows={6} cols={8} />
+          </div>
+        </div>
       ) : !rows.length ? (
         <EmptyState
           title="No synchronization runs found"
@@ -981,13 +1040,16 @@ export function AdminHistoryPage() {
 
 export function AdminSyncPage() {
   const { session } = useAuth();
+  const { notify } = useToast();
   const [status, setStatus] = useState<any>(null);
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(true);
   const syncCoolingDown = Boolean(
     status?.nextAllowedAt && new Date(status.nextAllowedAt).getTime() > Date.now(),
   );
   const load = async () => {
+    setLoading(true);
     setLoadError(null);
     try {
       if (session) setStatus((await apiRequest<any>("/api/admin/ipos/sync/status", session)).data);
@@ -995,6 +1057,8 @@ export function AdminSyncPage() {
       setLoadError(
         error instanceof Error ? error : new Error("Unable to load administration data."),
       );
+    } finally {
+      setLoading(false);
     }
   };
   useEffect(() => {
@@ -1005,12 +1069,20 @@ export function AdminSyncPage() {
     setMessage("Fetching IPO list and saving records…");
     try {
       const r = await apiRequest<any>("/api/admin/ipos/sync", session, { method: "POST" });
-      setMessage(
-        `Completed: ${r.data?.recordsInserted ?? 0} inserted, ${r.data?.recordsUpdated ?? 0} updated.`,
-      );
+      setMessage("");
+      notify({
+        title: "IPO synchronization complete",
+        description: `${r.data?.recordsInserted ?? 0} inserted, ${r.data?.recordsUpdated ?? 0} updated.`,
+        tone: "success",
+      });
       await load();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Synchronization failed.");
+      setMessage("");
+      notify({
+        title: "IPO synchronization failed",
+        description: e instanceof Error ? e.message : "Please try again.",
+        tone: "error",
+      });
     }
   };
   return (
@@ -1032,11 +1104,17 @@ export function AdminSyncPage() {
           <div>
             <h2 className="text-xl font-bold">IPO Data Sync</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Provider: {status?.providerConfigured ? "Configured" : "Not configured"}
+              {loading
+                ? "Checking provider status…"
+                : loadError
+                  ? "Provider status unavailable"
+                  : `Provider: ${status?.providerConfigured ? "Configured" : "Not configured"}`}
             </p>
           </div>
           <ConfirmButton
             disabled={
+              loading ||
+              Boolean(loadError) ||
               status?.running ||
               !status?.providerConfigured ||
               status?.remainingManualRuns === 0 ||
@@ -1047,7 +1125,7 @@ export function AdminSyncPage() {
             description="Fetch the latest provider records and update the shared IPO catalog."
             confirmLabel="Start synchronization"
             danger={false}
-            className="min-h-touch rounded-lg bg-slate-950 px-4 font-semibold text-white disabled:opacity-50"
+            className="min-h-touch rounded-lg bg-navy px-4 font-semibold text-white"
           >
             Fetch Latest IPO Data
           </ConfirmButton>
@@ -1060,10 +1138,18 @@ export function AdminSyncPage() {
       </Card>
       <Card>
         <h3 className="font-bold">Quota status</h3>
-        <p className="mt-2 text-sm text-slate-600">
-          Runs used today: {status?.runsUsedToday ?? 0} · Manual runs remaining:{" "}
-          {status?.remainingManualRuns ?? 0}
-        </p>
+        {loading ? (
+          <div role="status" aria-label="Loading synchronization quota" className="mt-3 space-y-2">
+            <span className="sr-only">Loading synchronization quota…</span>
+            <div className="skeleton h-4 w-2/3" />
+            <div className="skeleton h-4 w-1/2" />
+          </div>
+        ) : status ? (
+          <p className="mt-2 text-sm text-slate-600">
+            Runs used today: {status.runsUsedToday} · Manual runs remaining:{" "}
+            {status.remainingManualRuns}
+          </p>
+        ) : null}
         {syncCoolingDown && (
           <p className="mt-2 text-sm text-slate-600">
             Next available: {new Date(status.nextAllowedAt).toLocaleString()}
@@ -1088,7 +1174,7 @@ export function AdminSettingsPage() {
     queryFn: () =>
       apiRequest<{ data: { syncIntervalHours: number } }>("/api/admin/ipos/sync/status", session!),
   });
-  if (settings.isLoading || status.isLoading) return <p role="status">Loading settings…</p>;
+  if (settings.isLoading || status.isLoading) return <SkeletonFormPage sections={2} />;
   if (settings.error || status.error)
     return (
       <div>

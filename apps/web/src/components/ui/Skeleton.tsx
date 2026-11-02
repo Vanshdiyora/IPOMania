@@ -6,9 +6,35 @@ interface SkeletonProps {
   lines?: number;
 }
 
+interface SkeletonPageProps {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}
+
 /** Single-element skeleton pulse */
 export function Skeleton({ className }: SkeletonProps) {
   return <div className={cn("skeleton", className)} aria-hidden="true" />;
+}
+
+export function SkeletonPage({ label, children, className }: SkeletonPageProps) {
+  return (
+    <div role="status" aria-label={label} aria-busy="true" className={cn("space-y-6", className)}>
+      <span className="sr-only">{label}</span>
+      <div aria-hidden="true" className="space-y-6">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function SkeletonPageHeader() {
+  return (
+    <div aria-hidden="true" className="space-y-3">
+      <Skeleton className="h-8 w-2/5 max-w-72" />
+      <Skeleton className="h-4 w-3/5 max-w-xl" />
+    </div>
+  );
 }
 
 /** Multi-line skeleton paragraph */
@@ -55,10 +81,31 @@ export function SkeletonStatCard({ className }: { className?: string }) {
   );
 }
 
-/** Table skeleton */
-export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
+export function SkeletonStatGrid({ count = 4 }: { count?: number }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-border" aria-hidden="true">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {Array.from({ length: count }).map((_, index) => (
+        <SkeletonStatCard key={index} />
+      ))}
+    </div>
+  );
+}
+
+/** Table skeleton */
+export function SkeletonTable({
+  rows = 5,
+  cols = 4,
+  className,
+}: {
+  rows?: number;
+  cols?: number;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn("overflow-hidden rounded-xl border border-border bg-surface", className)}
+      aria-hidden="true"
+    >
       <div className="border-b border-border bg-canvas px-4 py-3">
         <div className="flex gap-4">
           {Array.from({ length: cols }).map((_, i) => (
@@ -74,5 +121,106 @@ export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: nu
         </div>
       ))}
     </div>
+  );
+}
+
+export function SkeletonTableRows({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, row) => (
+        <tr key={row} aria-hidden="true" className="border-b border-border last:border-0">
+          {Array.from({ length: cols }).map((_, column) => (
+            <td key={column} className="px-3 py-4">
+              <Skeleton className={cn("h-4 w-full", column === 0 && "max-w-40")} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
+export function SkeletonListPage({ rows = 4 }: { rows?: number }) {
+  return (
+    <SkeletonPage label="Loading records">
+      <SkeletonPageHeader />
+      <Skeleton className="h-24 w-full rounded-xl" />
+      <div className="grid gap-4">
+        {Array.from({ length: rows }).map((_, index) => (
+          <SkeletonCard key={index} />
+        ))}
+      </div>
+    </SkeletonPage>
+  );
+}
+
+export function SkeletonDetailsPage({ rows = 6 }: { rows?: number }) {
+  return (
+    <SkeletonPage label="Loading details">
+      <SkeletonPageHeader />
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-card">
+        <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+          {Array.from({ length: rows }).map((_, index) => (
+            <div key={index} className="space-y-2">
+              <Skeleton className="h-3 w-1/3" />
+              <Skeleton className="h-5 w-4/5" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </SkeletonPage>
+  );
+}
+
+export function SkeletonFormPage({ sections = 3 }: { sections?: number }) {
+  return (
+    <SkeletonPage label="Loading form">
+      <SkeletonPageHeader />
+      {Array.from({ length: sections }).map((_, index) => (
+        <div
+          key={index}
+          className="space-y-5 rounded-xl border border-border bg-surface p-6 shadow-card"
+        >
+          <Skeleton className="h-5 w-1/3" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Skeleton className="h-11 w-full rounded-lg" />
+            <Skeleton className="h-11 w-full rounded-lg" />
+            <Skeleton className="h-11 w-full rounded-lg" />
+            <Skeleton className="h-11 w-full rounded-lg" />
+          </div>
+        </div>
+      ))}
+    </SkeletonPage>
+  );
+}
+
+export function SkeletonFormFields({ fields = 4 }: { fields?: number }) {
+  return (
+    <div aria-hidden="true" className="grid gap-4 sm:grid-cols-2">
+      {Array.from({ length: fields }).map((_, index) => (
+        <div key={index} className="space-y-2">
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-11 w-full rounded-lg" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function SkeletonIpoDetails() {
+  return (
+    <SkeletonPage label="Loading IPO details">
+      <SkeletonPageHeader />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <SkeletonStatCard key={index} />
+        ))}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+    </SkeletonPage>
   );
 }

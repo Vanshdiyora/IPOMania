@@ -15,9 +15,18 @@ import { Button } from "../../components/ui/Button";
 import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
 import { RouteFormDrawer } from "../../components/ui/FormDrawer";
 import { FormSection } from "../../components/ui/FormSection";
+import { useToast } from "../../components/ui/ToastContext";
 import { Card } from "../../components/ui/Card";
 import { BackLink } from "../../components/ui/BackLink";
 import { ApiRequestError, apiRequest } from "../../lib/api";
+import {
+  SkeletonCard,
+  SkeletonDetailsPage,
+  SkeletonFormFields,
+  SkeletonStatCard,
+  SkeletonTable,
+  SkeletonTableRows,
+} from "../../components/ui/Skeleton";
 
 type AccountSummary = {
   total: number;
@@ -136,7 +145,7 @@ function AccountDetailLink({
 
 export function AccountDashboardPage() {
   const { session, markSessionExpired } = useAuth();
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["accounts", "summary"],
     enabled: Boolean(session),
     queryFn: () =>
@@ -168,11 +177,25 @@ export function AccountDashboardPage() {
           </Link>
         </div>
       </header>
-      {error ? <ErrorNotice error={error} /> : null}
-      <section className="grid gap-4 sm:grid-cols-3" aria-label="Account totals">
-        <SummaryCard label="Total accounts" value={summary?.total} loading={isLoading} />
-        <SummaryCard label="Active accounts" value={summary?.active} loading={isLoading} />
-        <SummaryCard label="Archived accounts" value={summary?.archived} loading={isLoading} />
+      {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
+      <section
+        className="grid gap-4 sm:grid-cols-3"
+        aria-label="Account totals"
+        aria-busy={isLoading}
+      >
+        {isLoading ? (
+          <>
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+          </>
+        ) : (
+          <>
+            <SummaryCard label="Total accounts" value={summary?.total} loading={false} />
+            <SummaryCard label="Active accounts" value={summary?.active} loading={false} />
+            <SummaryCard label="Archived accounts" value={summary?.archived} loading={false} />
+          </>
+        )}
       </section>
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -236,7 +259,7 @@ export function AccountListPage() {
     ...(createdFrom ? { created_from: `${createdFrom}T00:00:00.000Z` } : {}),
     ...(createdTo ? { created_to: `${createdTo}T23:59:59.999Z` } : {}),
   });
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["accounts", "list", queryString.toString()],
     enabled: Boolean(session),
     queryFn: () =>
@@ -375,14 +398,9 @@ export function AccountListPage() {
           </button>
         </div>
       </Card>
-      {error ? <ErrorNotice error={error} /> : null}
-      {isLoading ? (
-        <p role="status" className="text-base text-muted">
-          Loading accounts…
-        </p>
-      ) : null}
+      {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       <Card className="p-3 sm:p-5">
-        <div className="hidden overflow-hidden md:block">
+        <div className="hidden overflow-hidden md:block" aria-busy={isLoading}>
           <div ref={scrollRef} className="max-h-[36rem] overflow-auto">
             <table className="w-full min-w-[850px] table-fixed border-collapse text-left text-base">
               <thead className="sticky top-0 z-10 bg-canvas text-ink">
@@ -399,58 +417,76 @@ export function AccountListPage() {
                   </tr>
                 ))}
               </thead>
-              <tbody style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
-                {virtualRows.map((virtualRow) => {
-                  const row = table.getRowModel().rows[virtualRow.index];
-                  return (
-                    <tr
-                      key={row.id}
-                      className="absolute left-0 top-0 w-full border-b border-border bg-white"
-                      style={{
-                        height: `${virtualRow.size}px`,
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <td
-                          key={cell.id}
-                          className={`truncate px-3 py-4 ${["depository_type", "account_status", "created_at"].includes(cell.column.id) ? "text-center tabular-nums" : "text-left"}`}
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
+              <tbody
+                style={
+                  isLoading
+                    ? undefined
+                    : { height: `${virtualizer.getTotalSize()}px`, position: "relative" }
+                }
+              >
+                {isLoading ? (
+                  <SkeletonTableRows rows={6} cols={accountColumns.length} />
+                ) : (
+                  virtualRows.map((virtualRow) => {
+                    const row = table.getRowModel().rows[virtualRow.index];
+                    return (
+                      <tr
+                        key={row.id}
+                        className="absolute left-0 top-0 w-full border-b border-border bg-white"
+                        style={{
+                          height: `${virtualRow.size}px`,
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <td
+                            key={cell.id}
+                            className={`truncate px-3 py-4 ${["depository_type", "account_status", "created_at"].includes(cell.column.id) ? "text-center tabular-nums" : "text-left"}`}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
         </div>
-        <div className="space-y-3 md:hidden">
-          {accounts.map((account) => (
-            <article key={account.id} className="rounded-lg border border-border p-4 text-base">
-              <AccountDetailLink
-                account={account}
-                className="text-lg font-bold text-action underline"
-              >
-                {account.holder_name}
-              </AccountDetailLink>
-              <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-y-2">
-                <dt className="font-semibold">Broker</dt>
-                <dd>{account.broker_name}</dd>
-                <dt className="font-semibold">Depository</dt>
-                <dd>{account.depository_type}</dd>
-                <dt className="font-semibold">Masked ID</dt>
-                <dd className="break-all">{account.masked_demat_identifier}</dd>
-                <dt className="font-semibold">Status</dt>
-                <dd className="capitalize">
-                  {account.archived_at ? "archived" : account.account_status}
-                </dd>
-                <dt className="font-semibold">Created</dt>
-                <dd>{formatDate(account.created_at)}</dd>
-              </dl>
-            </article>
-          ))}
+        <div className="space-y-3 md:hidden" aria-busy={isLoading}>
+          {isLoading ? (
+            <div role="status" aria-label="Loading accounts" className="space-y-3">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          ) : (
+            accounts.map((account) => (
+              <article key={account.id} className="rounded-lg border border-border p-4 text-base">
+                <AccountDetailLink
+                  account={account}
+                  className="text-lg font-bold text-action underline"
+                >
+                  {account.holder_name}
+                </AccountDetailLink>
+                <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-y-2">
+                  <dt className="font-semibold">Broker</dt>
+                  <dd>{account.broker_name}</dd>
+                  <dt className="font-semibold">Depository</dt>
+                  <dd>{account.depository_type}</dd>
+                  <dt className="font-semibold">Masked ID</dt>
+                  <dd className="break-all">{account.masked_demat_identifier}</dd>
+                  <dt className="font-semibold">Status</dt>
+                  <dd className="capitalize">
+                    {account.archived_at ? "archived" : account.account_status}
+                  </dd>
+                  <dt className="font-semibold">Created</dt>
+                  <dd>{formatDate(account.created_at)}</dd>
+                </dl>
+              </article>
+            ))
+          )}
         </div>
         {!isLoading && accounts.length === 0 ? (
           <p className="py-8 text-center text-base text-muted">No accounts match these filters.</p>
@@ -481,12 +517,13 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
   const { session, markSessionExpired } = useAuth();
   const { accountId } = useParams();
   const navigate = useNavigate();
+  const { notify } = useToast();
   const client = useQueryClient();
-  const [formError, setFormError] = useState("");
   const {
     data: loadedAccount,
     error: loadError,
     isLoading: loadingAccount,
+    refetch: refetchAccount,
   } = useQuery({
     queryKey: ["accounts", accountId],
     enabled: Boolean(session && editing && accountId),
@@ -523,7 +560,6 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
 
   async function save(values: ValidAccountValues) {
     if (!session) return;
-    setFormError("");
     try {
       const path = editing ? `/api/accounts/${accountId}` : "/api/accounts";
       await apiRequest<AccountResponse>(path, session, {
@@ -541,11 +577,14 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
       });
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 401) markSessionExpired();
-      if (error instanceof ApiRequestError && error.status === 409) {
-        setFormError(error.message);
-      } else {
-        setFormError("We could not save this account. Check the fields and try again.");
-      }
+      notify({
+        title: editing ? "Account could not be updated" : "Account could not be created",
+        description:
+          error instanceof ApiRequestError && error.status === 409
+            ? error.message
+            : "We could not save this account. Check the fields and try again.",
+        tone: "error",
+      });
     }
   }
 
@@ -560,9 +599,20 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
       disabled={editing && (loadingAccount || Boolean(loadError) || !loadedAccount)}
       dirty={isDirty}
     >
-      {editing && loadingAccount ? <p role="status">Loading account…</p> : null}
-      {loadError ? <ErrorNotice error={loadError} /> : null}
-      <form id="account-form" className="space-y-5" noValidate onSubmit={handleSubmit(save)}>
+      {editing && loadingAccount ? (
+        <div role="status" aria-label="Loading account form" aria-busy="true">
+          <span className="sr-only">Loading account form…</span>
+          <SkeletonFormFields fields={6} />
+        </div>
+      ) : null}
+      {loadError ? <ErrorNotice error={loadError} onRetry={() => void refetchAccount()} /> : null}
+      <form
+        id="account-form"
+        className="space-y-5"
+        hidden={editing && (loadingAccount || Boolean(loadError))}
+        noValidate
+        onSubmit={handleSubmit(save)}
+      >
         <FormSection title="Account details">
           <div className="grid gap-5 sm:grid-cols-2">
             <FormInput
@@ -619,11 +669,6 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
           error={errors.notes?.message}
           {...register("notes")}
         />
-        {formError ? (
-          <p role="alert" className="text-base text-danger">
-            {formError}
-          </p>
-        ) : null}
       </form>
     </RouteFormDrawer>
   );
@@ -634,8 +679,8 @@ export function AccountDetailsPage() {
   const { accountId } = useParams();
   const client = useQueryClient();
   const navigate = useNavigate();
-  const [actionError, setActionError] = useState("");
-  const { data, isLoading, error } = useQuery({
+  const { notify } = useToast();
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["accounts", accountId],
     enabled: Boolean(session && accountId),
     queryFn: () => apiRequest<AccountResponse>(`/api/accounts/${accountId}`, session!),
@@ -647,20 +692,28 @@ export function AccountDetailsPage() {
       }),
     onSuccess: async (_result, method) => {
       await client.invalidateQueries({ queryKey: ["accounts"] });
+      notify({
+        title:
+          method === "archive"
+            ? "Account archived"
+            : method === "restore"
+              ? "Account restored"
+              : "Account deleted",
+        tone: "success",
+      });
       if (method === "delete") navigate("/accounts/list");
     },
     onError: (reason) => {
       if (reason instanceof ApiRequestError && reason.status === 401) markSessionExpired();
-      setActionError(reason instanceof Error ? reason.message : "The account action failed.");
+      notify({
+        title: "Account action failed",
+        description: reason instanceof Error ? reason.message : "The account action failed.",
+        tone: "error",
+      });
     },
   });
   const account = data?.data;
-  if (isLoading)
-    return (
-      <p role="status" className="text-base text-muted">
-        Loading account…
-      </p>
-    );
+  if (isLoading) return <SkeletonDetailsPage rows={8} />;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -680,7 +733,7 @@ export function AccountDetailsPage() {
           </Link>
         ) : null}
       </header>
-      {error ? <ErrorNotice error={error} /> : null}
+      {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       {account ? (
         <Card>
           <dl className="grid gap-5 sm:grid-cols-2">
@@ -704,11 +757,6 @@ export function AccountDetailsPage() {
               <DetailItem label="Notes" value={account.notes || "No notes"} />
             </div>
           </dl>
-          {actionError ? (
-            <p role="alert" className="mt-5 text-base text-danger">
-              {actionError}
-            </p>
-          ) : null}
           <div className="mt-6 flex flex-wrap gap-3 border-t border-border pt-5">
             {!account.archived_at ? (
               <ConfirmButton
@@ -761,7 +809,7 @@ export function AccountImportPage() {
   >([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<ImportPreviewResponse["data"] | null>(null);
-  const [errorMessage, setErrorMessage] = useState("");
+  const { notify } = useToast();
   const upload = useMutation({
     mutationFn: async (includeMapping: boolean) => {
       if (!session || !file) throw new Error("Choose a spreadsheet first.");
@@ -790,13 +838,14 @@ export function AccountImportPage() {
         }
         setMapping(defaults);
       }
-      setErrorMessage("");
     },
     onError: (error) => {
       if (error instanceof ApiRequestError && error.status === 401) markSessionExpired();
-      setErrorMessage(
-        error instanceof Error ? error.message : "The spreadsheet could not be uploaded.",
-      );
+      notify({
+        title: "Spreadsheet could not be uploaded",
+        description: error instanceof Error ? error.message : "Please try again.",
+        tone: "error",
+      });
     },
   });
   const confirm = useMutation({
@@ -811,11 +860,16 @@ export function AccountImportPage() {
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ["accounts"] });
       await client.invalidateQueries({ queryKey: ["account-imports"] });
+      notify({ title: "Account import confirmed", tone: "success" });
       if (preview?.import?.id) navigate(`/accounts/import-history/${preview.import.id}`);
     },
     onError: (error) => {
       if (error instanceof ApiRequestError && error.status === 401) markSessionExpired();
-      setErrorMessage(error instanceof Error ? error.message : "The import could not be saved.");
+      notify({
+        title: "Account import could not be saved",
+        description: error instanceof Error ? error.message : "Please try again.",
+        tone: "error",
+      });
     },
   });
 
@@ -843,7 +897,6 @@ export function AccountImportPage() {
             setFile(selected);
             setHeaders([]);
             setPreview(null);
-            setErrorMessage("");
           }}
         />
         {file ? (
@@ -981,11 +1034,6 @@ export function AccountImportPage() {
           </div>
         </Card>
       ) : null}
-      {errorMessage ? (
-        <p role="alert" className="rounded-lg bg-red-50 p-4 text-base text-danger">
-          {errorMessage}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -993,7 +1041,9 @@ export function AccountImportPage() {
 export function ImportHistoryPage() {
   const { session, markSessionExpired } = useAuth();
   const { importId } = useParams();
-  const { data, isLoading, error } = useQuery({
+  const client = useQueryClient();
+  const { notify } = useToast();
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: importId ? ["account-imports", importId] : ["account-imports", "history"],
     enabled: Boolean(session),
     queryFn: () =>
@@ -1007,16 +1057,21 @@ export function ImportHistoryPage() {
   }, [error, markSessionExpired]);
   const detail = importId ? (data as ImportDetailResponse | undefined)?.data : undefined;
   const imports = importId ? [] : ((data as ImportHistoryResponse | undefined)?.data.imports ?? []);
-  const [actionError, setActionError] = useState("");
   const reverse = useMutation({
     mutationFn: () =>
       apiRequest(`/api/accounts/import/${importId}/reverse`, session!, { method: "POST" }),
-    onSuccess: () => window.location.reload(),
+    onSuccess: async () => {
+      notify({ title: "Import reversed", tone: "success" });
+      await client.invalidateQueries({ queryKey: ["account-imports"] });
+      await client.invalidateQueries({ queryKey: ["accounts"] });
+    },
     onError: (reason) => {
       if (reason instanceof ApiRequestError && reason.status === 401) markSessionExpired();
-      setActionError(
-        reason instanceof Error ? reason.message : "The import could not be reversed.",
-      );
+      notify({
+        title: "Import could not be reversed",
+        description: reason instanceof Error ? reason.message : "Please try again.",
+        tone: "error",
+      });
     },
   });
 
@@ -1057,11 +1112,16 @@ export function ImportHistoryPage() {
           Start a new import
         </Link>
       </header>
-      {error ? <ErrorNotice error={error} /> : null}
+      {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       {isLoading ? (
-        <p role="status" className="text-base text-muted">
-          Loading import history…
-        </p>
+        <div
+          role="status"
+          aria-label={importId ? "Loading import report" : "Loading import history"}
+          aria-busy="true"
+        >
+          <span className="sr-only">Loading import data…</span>
+          {importId ? <SkeletonDetailsPage rows={5} /> : <SkeletonTable rows={5} cols={5} />}
+        </div>
       ) : null}
       {detail ? (
         <Card>
@@ -1089,11 +1149,6 @@ export function ImportHistoryPage() {
               </ConfirmButton>
             ) : null}
           </div>
-          {actionError ? (
-            <p role="alert" className="mt-4 text-danger">
-              {actionError}
-            </p>
-          ) : null}
           <div className="mt-5 overflow-auto">
             <table className="min-w-full text-left text-base">
               <thead>
@@ -1171,7 +1226,7 @@ function SummaryCard({
     <Card>
       <p className="text-base font-semibold text-muted">{label}</p>
       <p className="mt-3 text-4xl font-bold text-navy" aria-live="polite">
-        {loading ? "…" : (value ?? 0)}
+        {loading ? "…" : (value ?? "—")}
       </p>
     </Card>
   );
@@ -1207,16 +1262,23 @@ function DetailItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ErrorNotice({ error }: { error: unknown }) {
+function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   return (
-    <p
+    <div
       role="alert"
       className="rounded-lg border border-red-200 bg-red-50 p-4 text-base text-danger"
     >
-      {error instanceof ApiRequestError
-        ? error.message
-        : "We could not load the requested data. Please try again."}
-    </p>
+      <p>
+        {error instanceof ApiRequestError
+          ? error.message
+          : "We could not load the requested data. Please try again."}
+      </p>
+      {onRetry ? (
+        <Button variant="outline" className="mt-2 border-danger/30 text-danger" onClick={onRetry}>
+          Retry
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

@@ -5,19 +5,24 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { Sidebar } from "../../apps/web/src/components/layout/Sidebar";
+import { ToastProvider } from "../../apps/web/src/components/ui/Toast";
+
+const { signOutMock } = vi.hoisted(() => ({ signOutMock: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock("../../apps/web/src/auth/useAuth", () => ({
   useAuth: () => ({
     user: { email: "user@example.test" },
-    signOut: vi.fn(),
+    signOut: signOutMock,
   }),
 }));
 
 function renderSidebar(path: string, group: string) {
   render(
-    <MemoryRouter initialEntries={[path]}>
-      <Sidebar mobileOpen={false} onNavigate={() => {}} onClose={() => {}} />
-    </MemoryRouter>,
+    <ToastProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Sidebar mobileOpen={false} onNavigate={() => {}} onClose={() => {}} />
+      </MemoryRouter>
+    </ToastProvider>,
   );
   fireEvent.click(screen.getByRole("button", { name: group }));
   return within(screen.getByRole("navigation", { name: "Main navigation" }));
@@ -35,5 +40,11 @@ describe("sidebar active links", () => {
     expect(navigation.getByRole("link", { name: active })).toHaveAttribute("aria-current", "page");
     expect(navigation.getByRole("link", { name: inactive })).not.toHaveAttribute("aria-current");
     expect(navigation.getAllByRole("link", { current: "page" })).toHaveLength(1);
+  });
+
+  it("announces successful sign out in a toast", async () => {
+    renderSidebar("/accounts", "Demat Accounts");
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(await screen.findByText("Signed out")).toBeInTheDocument();
   });
 });

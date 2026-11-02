@@ -1,5 +1,4 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { isAdminEmail } from "@ipo-mania/shared";
@@ -8,14 +7,15 @@ import type { z } from "@ipo-mania/validation";
 import { AuthPage } from "../auth/AuthPage";
 import { Button } from "../components/ui/Button";
 import { Input, FormField } from "../components/ui/Input";
+import { useToast } from "../components/ui/ToastContext";
 import { getSupabaseClient } from "../lib/supabase";
 
 type LoginValues = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
-  const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
+  const { notify } = useToast();
   const destination = (location.state as { from?: string } | null)?.from ?? "/dashboard";
   const {
     register,
@@ -27,13 +27,17 @@ export function LoginPage() {
   });
 
   async function submit(values: LoginValues) {
-    setErrorMessage("");
     try {
       const { data, error } = await getSupabaseClient().auth.signInWithPassword(values);
       if (error) throw error;
+      notify({ title: "Signed in", tone: "success" });
       navigate(isAdminEmail(data.user?.email) ? "/admin" : destination, { replace: true });
     } catch {
-      setErrorMessage("Email or password is incorrect. Check your details and try again.");
+      notify({
+        title: "Sign in failed",
+        description: "Email or password is incorrect. Check your details and try again.",
+        tone: "error",
+      });
     }
   }
 
@@ -51,15 +55,6 @@ export function LoginPage() {
       }
     >
       <form className="space-y-5" onSubmit={handleSubmit(submit)} noValidate>
-        {errorMessage && (
-          <div
-            role="alert"
-            className="rounded-lg border border-danger-border bg-danger-bg p-3 text-sm text-danger"
-          >
-            {errorMessage}
-          </div>
-        )}
-
         <FormField label="Email address" htmlFor="email" error={errors.email?.message}>
           <Input
             id="email"
@@ -90,7 +85,7 @@ export function LoginPage() {
           </Link>
         </div>
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
+        <Button type="submit" className="w-full" loading={isSubmitting}>
           {isSubmitting ? "Signing in…" : "Sign in"}
         </Button>
       </form>

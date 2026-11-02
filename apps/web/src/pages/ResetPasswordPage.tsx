@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { resetPasswordSchema } from "@ipo-mania/validation";
@@ -9,10 +9,13 @@ import { Button } from "../components/ui/Button";
 import { Input, FormField } from "../components/ui/Input";
 import { getSupabaseClient } from "../lib/supabase";
 import { CheckCircle } from "lucide-react";
+import { useToast } from "../components/ui/ToastContext";
 
 type ResetValues = z.infer<typeof resetPasswordSchema>;
 
 export function ResetPasswordPage() {
+  const { notify } = useToast();
+  const startedRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [success, setSuccess] = useState(false);
@@ -27,10 +30,13 @@ export function ResetPasswordPage() {
   });
 
   useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
     const code = new URLSearchParams(window.location.search).get("code");
     window.history.replaceState({}, document.title, window.location.pathname);
     if (!code) {
       setErrorMessage("This password reset link is invalid or has expired. Request a new one.");
+      notify({ title: "Password reset link is invalid", tone: "error" });
       return;
     }
     try {
@@ -40,13 +46,15 @@ export function ResetPasswordPage() {
           if (error) throw error;
           setReady(true);
         })
-        .catch(() =>
-          setErrorMessage("This password reset link is invalid or has expired. Request a new one."),
-        );
+        .catch(() => {
+          setErrorMessage("This password reset link is invalid or has expired. Request a new one.");
+          notify({ title: "Password reset link is invalid", tone: "error" });
+        });
     } catch {
       setErrorMessage("Password reset is not configured. Please contact support.");
+      notify({ title: "Password reset unavailable", tone: "error" });
     }
-  }, []);
+  }, [notify]);
 
   async function submit(values: ResetValues) {
     setErrorMessage("");
@@ -56,8 +64,10 @@ export function ResetPasswordPage() {
       });
       if (error) throw error;
       setSuccess(true);
+      notify({ title: "Password updated", tone: "success" });
     } catch {
       setErrorMessage("We could not update your password. Request a new reset link and try again.");
+      notify({ title: "Password update failed", tone: "error" });
     }
   }
 
@@ -117,7 +127,7 @@ export function ResetPasswordPage() {
             />
           </FormField>
 
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <Button type="submit" className="w-full" loading={isSubmitting}>
             {isSubmitting ? "Updating…" : "Update password"}
           </Button>
         </form>

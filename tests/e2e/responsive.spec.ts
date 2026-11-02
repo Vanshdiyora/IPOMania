@@ -1,13 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const viewports = [
-  { width: 320, height: 720 },
-  { width: 375, height: 812 },
+  { width: 360, height: 780 },
+  { width: 390, height: 844 },
   { width: 430, height: 932 },
   { width: 768, height: 1024 },
-  { width: 1366, height: 768 },
+  { width: 1024, height: 768 },
+  { width: 1280, height: 800 },
   { width: 1440, height: 900 },
-  { width: 1920, height: 1080 },
 ];
 
 const userId = "11111111-1111-4111-8111-111111111111";

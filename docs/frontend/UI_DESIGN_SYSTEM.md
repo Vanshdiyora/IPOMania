@@ -51,6 +51,9 @@ contrast against WCAG 2.2 AA in their actual states.
   and synchronization confirmation; it prevents repeated confirmation while processing and
   presents retryable errors in the dialog. Keep imports, authentication, and settings in their
   appropriate dedicated workflows.
+- Show completed or failed user actions, including create, update, archive, import, and export
+  results, through the shared toast viewport. Keep field validation and persistent page-level
+  loading/data errors inline where users need them to resolve or retry the current form.
 - Use `formValuesFromRecord` when loading an API record into a strict write form: IDs, ownership,
   and server timestamps must not become form fields. Keep financial values as decimal strings.
   `toIsoDateTime` tolerates incomplete editing values without throwing during rendering; Zod
@@ -78,3 +81,6 @@ The Phase 3 database/RLS, concurrency, and repository-wide formatting gate remai
 - Admin catalog search, status and page state live in the URL. Its View action opens the shared
   detail page with a return link to the exact management list state. Archive confirmation names
   the selected company.
+- A single app-level toast viewport presents create, update, archive, import, synchronization,
+  authentication, and password-reset outcomes. Dialog and form errors may also remain inline for
+  correction, while the action outcome appears as a toast.

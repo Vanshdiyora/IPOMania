@@ -1,6 +1,6 @@
 import { toIsoDateTime } from "../../lib/formValues";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
   DematAccount,
@@ -20,7 +20,24 @@ import { applicationCreateSchema, applicationUpdateSchema } from "@ipo-mania/val
 import { Card } from "../../components/ui/Card";
 import { BackLink } from "../../components/ui/BackLink";
 import { Pagination } from "../../components/ui/Pagination";
+import { useToast } from "../../components/ui/ToastContext";
+import {
+  ActiveFilterChips,
+  type ActiveFilterChip,
+} from "../../components/filters/ActiveFilterChips";
+import {
+  ApplicationFilterDrawer,
+  type ApplicationFilters,
+} from "../../components/applications/ApplicationFilterDrawer";
+import { ApplicationSearchToolbar } from "../../components/applications/ApplicationSearchToolbar";
 import { ApiRequestError, apiRequest } from "../../lib/api";
+import {
+  SkeletonDetailsPage,
+  SkeletonFormFields,
+  SkeletonStatCard,
+  SkeletonTable,
+  SkeletonTableRows,
+} from "../../components/ui/Skeleton";
 
 type ApplicationListResponse = {
   data: {
@@ -37,8 +54,12 @@ type ApplicationListResponse = {
 type ApplicationSummaryResponse = {
   data: { total: number; application_status_counts: Record<string, number> };
 };
-type IpoListResponse = { data: { ipos: IpoRecord[] } };
-type AccountListResponse = { data: { accounts: DematAccount[] } };
+type IpoListResponse = {
+  data: { ipos: IpoRecord[]; pagination?: { page: number; total_pages: number } };
+};
+type AccountListResponse = {
+  data: { accounts: DematAccount[]; pagination?: { page: number; totalPages: number } };
+};
 type CategoryResponse = { data: { configurations: IpoCategoryConfiguration[] } };
 type ApplicationResponse = {
   data: IpoApplication & {
@@ -103,30 +124,111 @@ const fieldClass =
 const linkClass =
   "inline-flex min-h-touch items-center justify-center rounded-lg border border-border bg-white px-4 py-2 font-semibold text-ink hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
 const statuses = ["DRAFT", "SUBMITTED", "UNDER_PROCESSING", "REJECTED", "FAILED", "COMPLETED"];
+const defaultApplicationFilters: ApplicationFilters = {
+  ipoIds: [],
+  dematAccountId: "",
+  broker: "",
+  archiveStatus: "active",
+  reference: "",
+  categoryId: "",
+  applicationStatus: "",
+  submissionFrom: "",
+  submissionTo: "",
+};
+
+function filtersFromParams(params: URLSearchParams): ApplicationFilters {
+  const legacyIpoId = params.get("ipo_id");
+  return {
+    ipoIds: (params.get("ipo_ids")?.split(",") ?? (legacyIpoId ? [legacyIpoId] : [])).filter(
+      Boolean,
+    ),
+    dematAccountId: params.get("demat_account_id") ?? "",
+    broker: params.get("broker") ?? "",
+    archiveStatus:
+      params.get("include_archived") === "true"
+        ? "archived"
+        : params.get("include_archived") === "all"
+          ? "all"
+          : "active",
+    reference: params.get("search") ?? "",
+    categoryId: params.get("category_id") ?? "",
+    applicationStatus: params.get("application_status") ?? "",
+    submissionFrom: params.get("submission_from") ?? "",
+    submissionTo: params.get("submission_to") ?? "",
+  };
+}
+
+function filterCount(filters: ApplicationFilters) {
+  return [
+    filters.ipoIds.length,
+    filters.dematAccountId,
+    filters.broker,
+    filters.archiveStatus !== "active",
+    filters.reference,
+    filters.categoryId,
+    filters.applicationStatus,
+    filters.submissionFrom || filters.submissionTo,
+  ].filter(Boolean).length;
+}
 
 function useOwnedLists() {
   const { session } = useAuth();
   const ipos = useQuery({
     queryKey: ["ipos", "application-options"],
     enabled: Boolean(session),
-    queryFn: () => apiRequest<IpoListResponse>("/api/ipos?page_size=100", session!),
+    queryFn: async () => {
+      const first = await apiRequest<IpoListResponse>("/api/ipos?page_size=100", session!);
+      const totalPages = first.data.pagination?.total_pages ?? 1;
+      if (totalPages <= 1) return first;
+      const pages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) =>
+          apiRequest<IpoListResponse>(`/api/ipos?page=${index + 2}&page_size=100`, session!),
+        ),
+      );
+      return {
+        data: {
+          ...first.data,
+          ipos: [first.data.ipos, ...pages.map((page) => page.data.ipos)].flat(),
+        },
+      };
+    },
   });
   const accounts = useQuery({
     queryKey: ["accounts", "application-options"],
     enabled: Boolean(session),
-    queryFn: () => apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!),
+    queryFn: async () => {
+      const first = await apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!);
+      const totalPages = first.data.pagination?.totalPages ?? 1;
+      if (totalPages <= 1) return first;
+      const pages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) =>
+          apiRequest<AccountListResponse>(`/api/accounts?page=${index + 2}&pageSize=100`, session!),
+        ),
+      );
+      return {
+        data: {
+          ...first.data,
+          accounts: [first.data.accounts, ...pages.map((page) => page.data.accounts)].flat(),
+        },
+      };
+    },
   });
   return {
     ipos: ipos.data?.data.ipos ?? [],
     accounts: accounts.data?.data.accounts ?? [],
     loading: ipos.isLoading || accounts.isLoading,
+    optionLoading: {
+      ipos: ipos.isLoading,
+      accounts: accounts.isLoading,
+    },
     error: ipos.error ?? accounts.error,
+    refetch: () => Promise.all([ipos.refetch(), accounts.refetch()]),
   };
 }
 
 export function ApplicationDashboardPage() {
   const { session } = useAuth();
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["applications", "dashboard"],
     enabled: Boolean(session),
     queryFn: () => apiRequest<ApplicationSummaryResponse>("/api/applications/summary", session!),
@@ -158,14 +260,27 @@ export function ApplicationDashboardPage() {
           </Link>
         </div>
       </header>
-      {error ? <ErrorMessage error={error} /> : null}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Application totals">
-        {totals.map(([label, value]) => (
-          <Card key={label}>
-            <p className="text-base font-semibold text-muted">{label}</p>
-            <p className="mt-2 text-3xl font-bold text-navy">{isLoading ? "…" : (value ?? 0)}</p>
-          </Card>
-        ))}
+      {error ? <ErrorMessage error={error} onRetry={() => void refetch()} /> : null}
+      <section
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        aria-label="Application totals"
+        aria-busy={isLoading}
+      >
+        {isLoading ? (
+          <>
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+          </>
+        ) : (
+          totals.map(([label, value]) => (
+            <Card key={label}>
+              <p className="text-base font-semibold text-muted">{label}</p>
+              <p className="mt-2 text-3xl font-bold text-navy">{error ? "—" : (value ?? 0)}</p>
+            </Card>
+          ))
+        )}
       </section>
       <Card>
         <h2 className="text-xl font-bold text-ink">Keep each status up to date</h2>
@@ -185,38 +300,63 @@ export function ApplicationDashboardPage() {
 
 export function ApplicationListPage() {
   const { session } = useAuth();
+  const { notify } = useToast();
   const location = useLocation();
   const [listParams, setListParams] = useSearchParams();
   const pageValue = Number(listParams.get("page"));
   const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
-  const ipoId = listParams.get("ipo_id") ?? "";
-  const accountId = listParams.get("demat_account_id") ?? "";
-  const categoryId = listParams.get("category_id") ?? "";
-  const applicationStatus = listParams.get("application_status") ?? "";
-  const broker = listParams.get("broker") ?? "";
-  const search = listParams.get("search") ?? "";
-  const includeArchived = listParams.get("include_archived") ?? "false";
-  const from = listParams.get("submission_from") ?? "";
-  const to = listParams.get("submission_to") ?? "";
-  const updateFilter = (key: string, value: string) => {
-    setListParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value && !(key === "include_archived" && value === "false")) next.set(key, value);
-        else next.delete(key);
-        next.delete("page");
-        return next;
-      },
-      { replace: true },
-    );
-  };
-  const changePage = (nextPage: number) => {
-    setListParams((previous) => {
-      const next = new URLSearchParams(previous);
-      if (nextPage > 1) next.set("page", String(nextPage));
-      else next.delete("page");
-      return next;
+  const appliedFilters = filtersFromParams(listParams);
+  const ipoSearch = listParams.get("ipo_search") ?? "";
+  const [searchInput, setSearchInput] = useState(ipoSearch);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [draftFilters, setDraftFilters] = useState<ApplicationFilters>(appliedFilters);
+  const updateListParams = useCallback(
+    (changes: Record<string, string | null>, replace = true) => {
+      setListParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          Object.entries(changes).forEach(([key, value]) => {
+            if (value) next.set(key, value);
+            else next.delete(key);
+          });
+          if (!("page" in changes)) next.delete("page");
+          return next;
+        },
+        { replace },
+      );
+    },
+    [setListParams],
+  );
+  const applyFilters = (filters: ApplicationFilters) => {
+    updateListParams({
+      ipo_id: null,
+      ipo_ids: filters.ipoIds.length ? filters.ipoIds.join(",") : null,
+      demat_account_id: filters.dematAccountId || null,
+      broker: filters.broker || null,
+      include_archived:
+        filters.archiveStatus === "active"
+          ? null
+          : filters.archiveStatus === "archived"
+            ? "true"
+            : "all",
+      search: filters.reference || null,
+      category_id: filters.categoryId || null,
+      application_status: filters.applicationStatus || null,
+      submission_from: filters.submissionFrom || null,
+      submission_to: filters.submissionTo || null,
     });
+  };
+  useEffect(() => setSearchInput(ipoSearch), [ipoSearch]);
+  useEffect(() => {
+    if (searchInput === ipoSearch) return;
+    const timer = window.setTimeout(
+      () => updateListParams({ ipo_search: searchInput || null }),
+      300,
+    );
+    return () => window.clearTimeout(timer);
+  }, [searchInput, ipoSearch, updateListParams]);
+  const changePage = (nextPage: number) => {
+    updateListParams({ page: nextPage > 1 ? String(nextPage) : null }, false);
   };
   const lists = useOwnedLists();
   const categoriesQuery = useQuery({
@@ -233,7 +373,6 @@ export function ApplicationListPage() {
   });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState("");
-  const [bulkStatusMessage, setBulkStatusMessage] = useState("");
   const bulkStatusMutation = useMutation({
     mutationFn: () =>
       apiRequest("/api/applications/bulk/status", session!, {
@@ -242,29 +381,112 @@ export function ApplicationListPage() {
       }),
     onSuccess: async () => {
       setSelectedIds([]);
-      setBulkStatusMessage("Selected applications updated.");
+      notify({ title: "Selected applications updated", tone: "success" });
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
     },
+    onError: (error) =>
+      notify({
+        title: "Applications could not be updated",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   const params = new URLSearchParams({
     page: String(page),
     page_size: "50",
-    include_archived: includeArchived,
-    ...(ipoId ? { ipo_id: ipoId } : {}),
-    ...(accountId ? { demat_account_id: accountId } : {}),
-    ...(categoryId ? { category_id: categoryId } : {}),
-    ...(applicationStatus ? { application_status: applicationStatus } : {}),
-    ...(broker ? { broker } : {}),
-    ...(search ? { search } : {}),
-    ...(from ? { submission_from: from } : {}),
-    ...(to ? { submission_to: to } : {}),
+    include_archived:
+      appliedFilters.archiveStatus === "archived"
+        ? "true"
+        : appliedFilters.archiveStatus === "all"
+          ? "all"
+          : "false",
+    ...(appliedFilters.ipoIds.length ? { ipo_ids: appliedFilters.ipoIds.join(",") } : {}),
+    ...(appliedFilters.dematAccountId ? { demat_account_id: appliedFilters.dematAccountId } : {}),
+    ...(appliedFilters.categoryId ? { category_id: appliedFilters.categoryId } : {}),
+    ...(appliedFilters.applicationStatus
+      ? { application_status: appliedFilters.applicationStatus }
+      : {}),
+    ...(appliedFilters.broker ? { broker: appliedFilters.broker } : {}),
+    ...(appliedFilters.reference ? { search: appliedFilters.reference } : {}),
+    ...(ipoSearch ? { ipo_search: ipoSearch } : {}),
+    ...(appliedFilters.submissionFrom ? { submission_from: appliedFilters.submissionFrom } : {}),
+    ...(appliedFilters.submissionTo ? { submission_to: appliedFilters.submissionTo } : {}),
   });
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["applications", params.toString()],
     enabled: Boolean(session),
     queryFn: () => apiRequest<ApplicationListResponse>(`/api/applications?${params}`, session!),
   });
   const rows = data?.data.applications ?? [];
+  const activeFilterCount = filterCount(appliedFilters);
+  const ipoOptions = lists.ipos.map((ipo) => ({
+    value: ipo.id,
+    label: ipo.symbol ? `${ipo.symbol} — ${ipo.company_name}` : ipo.company_name,
+    badge: ipo.status ? prettyStatus(ipo.status) : undefined,
+  }));
+  const accountOptions = lists.accounts.map((account) => ({
+    value: account.id,
+    label: account.holder_name,
+    description: `${account.broker_name} · ${account.masked_demat_identifier}`,
+  }));
+  const brokerOptions = Array.from(
+    new Set(lists.accounts.map((account) => account.broker_name).filter(Boolean)),
+  ).map((name) => ({ value: name, label: name }));
+  const categoryOptions = (categoriesQuery.data ?? []).map((category) => ({
+    value: category.id,
+    label: category.category,
+  }));
+  const filterChips: ActiveFilterChip[] = [
+    ...appliedFilters.ipoIds.map((id) => ({
+      key: `ipo:${id}`,
+      label: ipoOptions.find((option) => option.value === id)?.label ?? "IPO",
+    })),
+    ...(appliedFilters.dematAccountId
+      ? [
+          {
+            key: "dematAccountId",
+            label:
+              accountOptions.find((option) => option.value === appliedFilters.dematAccountId)
+                ?.label ?? "Demat account",
+          },
+        ]
+      : []),
+    ...(appliedFilters.broker
+      ? [{ key: "broker", label: `Broker: ${appliedFilters.broker}` }]
+      : []),
+    ...(appliedFilters.archiveStatus !== "active"
+      ? [
+          {
+            key: "archiveStatus",
+            label: appliedFilters.archiveStatus === "archived" ? "Archived records" : "All records",
+          },
+        ]
+      : []),
+    ...(appliedFilters.reference
+      ? [{ key: "reference", label: `Reference: ${appliedFilters.reference}` }]
+      : []),
+    ...(appliedFilters.categoryId
+      ? [
+          {
+            key: "categoryId",
+            label:
+              categoryOptions.find((option) => option.value === appliedFilters.categoryId)?.label ??
+              "Category",
+          },
+        ]
+      : []),
+    ...(appliedFilters.applicationStatus
+      ? [{ key: "applicationStatus", label: prettyStatus(appliedFilters.applicationStatus) }]
+      : []),
+    ...(appliedFilters.submissionFrom || appliedFilters.submissionTo
+      ? [
+          {
+            key: "submissionDate",
+            label: `${appliedFilters.submissionFrom || "Any date"} – ${appliedFilters.submissionTo || "Any date"}`,
+          },
+        ]
+      : []),
+  ];
   const queryClient = useQueryClient();
   async function exportCsv() {
     const response = await fetch(
@@ -294,9 +516,15 @@ export function ApplicationListPage() {
           <Button
             variant="outline"
             onClick={() =>
-              void exportCsv().catch((reason: unknown) =>
-                window.alert(reason instanceof Error ? reason.message : "Export failed."),
-              )
+              void exportCsv()
+                .then(() => notify({ title: "Application CSV downloaded", tone: "success" }))
+                .catch((reason: unknown) =>
+                  notify({
+                    title: "Export failed",
+                    description: errorMessage(reason),
+                    tone: "error",
+                  }),
+                )
             }
           >
             Export CSV
@@ -306,126 +534,76 @@ export function ApplicationListPage() {
           </Link>
         </div>
       </header>
-      <Card>
-        <h2 className="text-xl font-bold text-ink">Search and filter</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="font-semibold">
-            IPO
-            <select
-              className={fieldClass}
-              value={ipoId}
-              onChange={(event) => {
-                updateFilter("ipo_id", event.target.value);
-              }}
-            >
-              <option value="">All IPOs</option>
-              {lists.ipos.map((ipo) => (
-                <option key={ipo.id} value={ipo.id}>
-                  {ipo.symbol}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="font-semibold">
-            Demat account
-            <select
-              className={fieldClass}
-              value={accountId}
-              onChange={(event) => {
-                updateFilter("demat_account_id", event.target.value);
-              }}
-            >
-              <option value="">All accounts</option>
-              {lists.accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.holder_name} — {account.masked_demat_identifier}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="font-semibold">
-            Broker
-            <input
-              className={fieldClass}
-              value={broker}
-              onChange={(event) => {
-                updateFilter("broker", event.target.value);
-              }}
-            />
-          </label>
-          <label className="font-semibold">
-            Archive status
-            <select
-              className={fieldClass}
-              value={includeArchived}
-              onChange={(event) => {
-                updateFilter("include_archived", event.target.value);
-              }}
-            >
-              <option value="false">Active records</option>
-              <option value="true">Archived records</option>
-            </select>
-          </label>
-          <label className="font-semibold">
-            Application number or external reference
-            <input
-              className={fieldClass}
-              value={search}
-              onChange={(event) => {
-                updateFilter("search", event.target.value);
-              }}
-            />
-          </label>
-          <label className="font-semibold">
-            Category
-            <select
-              className={fieldClass}
-              value={categoryId}
-              onChange={(event) => {
-                updateFilter("category_id", event.target.value);
-              }}
-            >
-              <option value="">All categories</option>
-              {(categoriesQuery.data ?? []).map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.category}
-                </option>
-              ))}
-            </select>
-          </label>
-          <StatusSelect
-            label="Application status"
-            value={applicationStatus}
-            statuses={statuses}
-            onChange={(value) => {
-              updateFilter("application_status", value);
-            }}
-          />
-          <label className="font-semibold">
-            Submitted from
-            <input
-              className={fieldClass}
-              type="date"
-              value={from}
-              onChange={(event) => {
-                updateFilter("submission_from", event.target.value);
-              }}
-            />
-          </label>
-          <label className="font-semibold">
-            Submitted to
-            <input
-              className={fieldClass}
-              type="date"
-              value={to}
-              onChange={(event) => {
-                updateFilter("submission_to", event.target.value);
-              }}
-            />
-          </label>
+      <ApplicationSearchToolbar
+        search={searchInput}
+        activeFilterCount={activeFilterCount}
+        onSearchChange={setSearchInput}
+        onClearSearch={() => {
+          setSearchInput("");
+          updateListParams({ ipo_search: null });
+        }}
+        onOpenFilters={() => {
+          setDraftFilters(appliedFilters);
+          setFiltersOpen(true);
+        }}
+        onClearFilters={() => applyFilters(defaultApplicationFilters)}
+      />
+      <ActiveFilterChips
+        filters={filterChips}
+        onRemove={(key) => {
+          const next = { ...appliedFilters };
+          if (key.startsWith("ipo:")) next.ipoIds = next.ipoIds.filter((id) => key !== `ipo:${id}`);
+          else if (key === "submissionDate") {
+            next.submissionFrom = "";
+            next.submissionTo = "";
+          } else if (key in next) {
+            (next as Record<string, string | string[]>)[key] =
+              key === "archiveStatus" ? "active" : "";
+          }
+          applyFilters(next);
+        }}
+        onClear={() => applyFilters(defaultApplicationFilters)}
+      />
+      <ApplicationFilterDrawer
+        open={filtersOpen}
+        filters={draftFilters}
+        activeCount={filterCount(draftFilters)}
+        ipoOptions={ipoOptions}
+        accountOptions={accountOptions}
+        brokerOptions={brokerOptions}
+        categoryOptions={categoryOptions}
+        statusOptions={statuses.map((status) => ({ value: status, label: prettyStatus(status) }))}
+        loading={{
+          ipos: lists.optionLoading.ipos,
+          accounts: lists.optionLoading.accounts,
+          brokers: lists.optionLoading.accounts,
+          categories: categoriesQuery.isLoading,
+        }}
+        onChange={(key, value) => setDraftFilters((current) => ({ ...current, [key]: value }))}
+        onClose={() => setFiltersOpen(false)}
+        onReset={() => setDraftFilters(defaultApplicationFilters)}
+        onApply={() => {
+          applyFilters(draftFilters);
+          setFiltersOpen(false);
+        }}
+      />
+      {error ? <ErrorMessage error={error} onRetry={() => void refetch()} /> : null}
+      {lists.error ? (
+        <div className="space-y-2">
+          <ErrorMessage error={lists.error} />
+          <Button variant="outline" onClick={() => void lists.refetch()}>
+            Retry filter options
+          </Button>
         </div>
-      </Card>
-      {error ? <ErrorMessage error={error} /> : null}
+      ) : null}
+      {categoriesQuery.error ? (
+        <div className="space-y-2">
+          <ErrorMessage error={categoriesQuery.error} />
+          <Button variant="outline" onClick={() => void categoriesQuery.refetch()}>
+            Retry category filters
+          </Button>
+        </div>
+      ) : null}
       <Card>
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <label className="font-semibold">
@@ -450,8 +628,6 @@ export function ApplicationListPage() {
           >
             Update {selectedIds.length} selected
           </Button>
-          {bulkStatusMessage ? <p role="status">{bulkStatusMessage}</p> : null}
-          {bulkStatusMutation.error ? <ErrorMessage error={bulkStatusMutation.error} /> : null}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left">
@@ -474,49 +650,64 @@ export function ApplicationListPage() {
                 </th>
               </tr>
             </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-b border-border">
-                  <td className="p-3 text-center">
-                    <input
-                      aria-label={`Select application ${row.id}`}
-                      className="size-5"
-                      type="checkbox"
-                      checked={selectedIds.includes(row.id)}
-                      onChange={(event) =>
-                        setSelectedIds((current) =>
-                          event.target.checked
-                            ? [...current, row.id]
-                            : current.filter((id) => id !== row.id),
-                        )
-                      }
-                    />
-                  </td>
-                  <td className="p-3">
-                    <Link
-                      className="font-semibold text-action underline"
-                      to={`/applications/${row.id}`}
-                      state={{ from: `${location.pathname}${location.search}` }}
-                    >
-                      {row.ipos?.symbol ?? "IPO"} · {row.ipo_categories?.category ?? "Category"}
-                    </Link>
-                  </td>
-                  <td className="p-3">
-                    {row.demat_accounts?.holder_name ?? "Account"}
-                    <br />
-                    <span className="text-sm text-muted">{row.demat_accounts?.broker_name}</span>
-                  </td>
-                  <td className="p-3 text-right tabular-nums whitespace-nowrap">
-                    {row.lots} lots · {row.application_amount}
-                  </td>
-                  <td className="p-3 text-center">{prettyStatus(row.application_status)}</td>
-                </tr>
-              ))}
+            <tbody aria-busy={isLoading}>
+              {isLoading ? (
+                <SkeletonTableRows rows={6} cols={5} />
+              ) : (
+                rows.map((row) => (
+                  <tr key={row.id} className="border-b border-border">
+                    <td className="p-3 text-center">
+                      <input
+                        aria-label={`Select application ${row.id}`}
+                        className="size-5"
+                        type="checkbox"
+                        checked={selectedIds.includes(row.id)}
+                        onChange={(event) =>
+                          setSelectedIds((current) =>
+                            event.target.checked
+                              ? [...current, row.id]
+                              : current.filter((id) => id !== row.id),
+                          )
+                        }
+                      />
+                    </td>
+                    <td className="p-3">
+                      <Link
+                        className="font-semibold text-action underline"
+                        to={`/applications/${row.id}`}
+                        state={{ from: `${location.pathname}${location.search}` }}
+                      >
+                        {row.ipos?.symbol ?? "IPO"} · {row.ipo_categories?.category ?? "Category"}
+                      </Link>
+                    </td>
+                    <td className="p-3">
+                      {row.demat_accounts?.holder_name ?? "Account"}
+                      <br />
+                      <span className="text-sm text-muted">{row.demat_accounts?.broker_name}</span>
+                    </td>
+                    <td className="p-3 text-right tabular-nums whitespace-nowrap">
+                      {row.lots} lots · {row.application_amount}
+                    </td>
+                    <td className="p-3 text-center">{prettyStatus(row.application_status)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
-          {isLoading ? <p className="p-4">Loading applications…</p> : null}
           {!isLoading && !rows.length ? (
-            <p className="p-4">No applications match these filters.</p>
+            <div className="p-8 text-center">
+              <p className="font-semibold text-ink">No applications found.</p>
+              <p className="mt-1 text-sm text-muted">Try changing your search or filters.</p>
+              {activeFilterCount ? (
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => applyFilters(defaultApplicationFilters)}
+                >
+                  Clear filters
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         </div>
         <Pagination
@@ -586,6 +777,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     notes: notes || null,
   };
   const applicationFingerprint = JSON.stringify(applicationPayload);
+  const { notify } = useToast();
   const currentReview =
     reviewedApplication?.fingerprint === applicationFingerprint ? reviewedApplication.data : null;
   const calculation = useMutation({
@@ -631,6 +823,12 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       navigate("/applications/list", {
         state: { successMessage: editing ? "Application updated." : "Application created." },
       }),
+    onError: (error) =>
+      notify({
+        title: editing ? "Application could not be updated" : "Application could not be created",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   const application = detail.data?.data;
   useEffect(() => {
@@ -675,189 +873,219 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
           mutation.mutate();
         }}
       >
-        {editing && detail.isLoading ? <p role="status">Loading application…</p> : null}
-        {detail.error ? <ErrorMessage error={detail.error} /> : null}
-        {lists.error ? <ErrorMessage error={lists.error} /> : null}
-        {!editing ? (
-          <FormSection title="Issue and account">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <SearchableFormSelect
-                label="IPO"
-                required
-                error={validation.errors.ipo_id}
-                value={ipoId}
-                placeholder="Choose an IPO"
-                options={lists.ipos.map((item) => ({
-                  value: item.id,
-                  label: `${item.symbol} — ${item.company_name}`,
-                }))}
-                onChange={(event) => {
-                  setIpoId(event.target.value);
-                  setCategoryId("");
-                  setPrice("");
-                }}
-              />
-              <SearchableFormSelect
-                label="Demat account"
-                required
-                error={validation.errors.demat_account_id}
-                value={accountId}
-                placeholder="Choose an active account"
-                options={lists.accounts
-                  .filter((account) => account.account_status === "active" && !account.archived_at)
-                  .map((account) => ({
-                    value: account.id,
-                    label: `${account.holder_name} — ${account.masked_demat_identifier}`,
+        {editing && detail.isLoading ? (
+          <div role="status" aria-label="Loading application" aria-busy="true">
+            <span className="sr-only">Loading application…</span>
+            <SkeletonFormFields fields={6} />
+          </div>
+        ) : null}
+        {detail.error ? (
+          <ErrorMessage error={detail.error} onRetry={() => void detail.refetch()} />
+        ) : null}
+        <div hidden={editing && (detail.isLoading || Boolean(detail.error))}>
+          {lists.error ? <ErrorMessage error={lists.error} /> : null}
+          {lists.error ? (
+            <Button className="mt-2" variant="outline" onClick={() => void lists.refetch()}>
+              Retry issue and account options
+            </Button>
+          ) : null}
+          {categoriesQuery.error ? (
+            <div className="mb-4 space-y-2">
+              <ErrorMessage error={categoriesQuery.error} />
+              <Button variant="outline" onClick={() => void categoriesQuery.refetch()}>
+                Retry categories
+              </Button>
+            </div>
+          ) : null}
+          {!editing ? (
+            <FormSection title="Issue and account">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SearchableFormSelect
+                  label="IPO"
+                  required
+                  error={validation.errors.ipo_id}
+                  value={ipoId}
+                  placeholder={lists.optionLoading.ipos ? "Loading IPOs…" : "Choose an IPO"}
+                  disabled={lists.optionLoading.ipos}
+                  options={lists.ipos.map((item) => ({
+                    value: item.id,
+                    label: `${item.symbol} — ${item.company_name}`,
                   }))}
-                onChange={(event) => setAccountId(event.target.value)}
-              />
-              <FormSelect
-                label="Application category"
-                error={validation.errors.category_id}
-                required
-                value={categoryId}
-                onChange={(event) => setCategoryId(event.target.value)}
-              >
-                <option value="">Choose a configured category</option>
-                {categories.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.category} (rules v{item.rule_version})
-                  </option>
-                ))}
-              </FormSelect>
-              <FormInput
-                label="Lots"
-                error={validation.errors.lots}
-                required
-                type="number"
-                min="1"
-                step="1"
-                value={lots}
-                onChange={(event) => setLots(event.target.value)}
-              />
-              <FormSelect
-                label="Price type"
-                error={validation.errors.price_type}
-                value={priceType}
-                onChange={(event) => {
-                  setPriceType(event.target.value as "BID" | "CUT_OFF");
-                  setPrice(event.target.value === "CUT_OFF" ? (ipo?.cut_off_price ?? "") : "");
-                }}
-              >
-                <option value="CUT_OFF">Cut-off</option>
-                <option value="BID">Bid price</option>
-              </FormSelect>
-              <FormInput
-                label="Price"
-                error={validation.errors.price}
-                required
-                inputMode="decimal"
-                value={price || (priceType === "CUT_OFF" ? (ipo?.cut_off_price ?? "") : "")}
-                onChange={(event) => setPrice(event.target.value)}
-              />
-              {activeCategory?.category === "SHAREHOLDER" ? (
-                <FormInput
-                  label="Shareholder shares on configured record date"
-                  error={validation.errors.shareholder_shares}
-                  type="number"
-                  min="0"
-                  value={shareholderShares}
-                  onChange={(event) => setShareholderShares(event.target.value)}
+                  onChange={(event) => {
+                    setIpoId(event.target.value);
+                    setCategoryId("");
+                    setPrice("");
+                  }}
                 />
-              ) : null}
-              {activeCategory?.eligibility_conditions.map((condition) => (
-                <label
-                  key={condition.id}
-                  className="flex min-h-touch items-center gap-3 rounded-lg border border-border p-3 sm:col-span-2"
+                <SearchableFormSelect
+                  label="Demat account"
+                  required
+                  error={validation.errors.demat_account_id}
+                  value={accountId}
+                  placeholder={
+                    lists.optionLoading.accounts ? "Loading accounts…" : "Choose an active account"
+                  }
+                  disabled={lists.optionLoading.accounts}
+                  options={lists.accounts
+                    .filter(
+                      (account) => account.account_status === "active" && !account.archived_at,
+                    )
+                    .map((account) => ({
+                      value: account.id,
+                      label: `${account.holder_name} — ${account.masked_demat_identifier}`,
+                    }))}
+                  onChange={(event) => setAccountId(event.target.value)}
+                />
+                <FormSelect
+                  label="Application category"
+                  error={validation.errors.category_id}
+                  required
+                  value={categoryId}
+                  disabled={categoriesQuery.isLoading || Boolean(categoriesQuery.error)}
+                  onChange={(event) => setCategoryId(event.target.value)}
                 >
-                  <input
-                    className="size-5"
-                    type="checkbox"
-                    checked={eligibilityAnswers[condition.id] === true}
-                    onChange={(event) =>
-                      setEligibilityAnswers((current) => ({
-                        ...current,
-                        [condition.id]: event.target.checked,
-                      }))
-                    }
+                  <option value="">
+                    {categoriesQuery.isLoading
+                      ? "Loading categories…"
+                      : categoriesQuery.error
+                        ? "Categories unavailable"
+                        : "Choose a configured category"}
+                  </option>
+                  {categories.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.category} (rules v{item.rule_version})
+                    </option>
+                  ))}
+                </FormSelect>
+                <FormInput
+                  label="Lots"
+                  error={validation.errors.lots}
+                  required
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={lots}
+                  onChange={(event) => setLots(event.target.value)}
+                />
+                <FormSelect
+                  label="Price type"
+                  error={validation.errors.price_type}
+                  value={priceType}
+                  onChange={(event) => {
+                    setPriceType(event.target.value as "BID" | "CUT_OFF");
+                    setPrice(event.target.value === "CUT_OFF" ? (ipo?.cut_off_price ?? "") : "");
+                  }}
+                >
+                  <option value="CUT_OFF">Cut-off</option>
+                  <option value="BID">Bid price</option>
+                </FormSelect>
+                <FormInput
+                  label="Price"
+                  error={validation.errors.price}
+                  required
+                  inputMode="decimal"
+                  value={price || (priceType === "CUT_OFF" ? (ipo?.cut_off_price ?? "") : "")}
+                  onChange={(event) => setPrice(event.target.value)}
+                />
+                {activeCategory?.category === "SHAREHOLDER" ? (
+                  <FormInput
+                    label="Shareholder shares on configured record date"
+                    error={validation.errors.shareholder_shares}
+                    type="number"
+                    min="0"
+                    value={shareholderShares}
+                    onChange={(event) => setShareholderShares(event.target.value)}
                   />
-                  <span>{condition.description}</span>
-                </label>
+                ) : null}
+                {activeCategory?.eligibility_conditions.map((condition) => (
+                  <label
+                    key={condition.id}
+                    className="flex min-h-touch items-center gap-3 rounded-lg border border-border p-3 sm:col-span-2"
+                  >
+                    <input
+                      className="size-5"
+                      type="checkbox"
+                      checked={eligibilityAnswers[condition.id] === true}
+                      onChange={(event) =>
+                        setEligibilityAnswers((current) => ({
+                          ...current,
+                          [condition.id]: event.target.checked,
+                        }))
+                      }
+                    />
+                    <span>{condition.description}</span>
+                  </label>
+                ))}
+              </div>
+            </FormSection>
+          ) : (
+            <p className="text-muted">
+              Calculation inputs and rule version are preserved and cannot be changed here.
+            </p>
+          )}
+          <Button
+            className="mt-4"
+            variant="outline"
+            disabled={!ipoId || !accountId || !categoryId || !price || calculation.isPending}
+            onClick={() => calculation.mutate()}
+          >
+            Review calculation and duplicates
+          </Button>
+          {currentReview ? (
+            <p role="status" className="mt-3 rounded-lg bg-canvas p-4 text-lg font-semibold">
+              Calculation: {currentReview.total_shares} shares · {currentReview.application_amount}
+              {currentReview.warnings.map((warning) => (
+                <span className="mt-2 block text-base font-normal text-danger" key={warning}>
+                  Potential duplicate: {warning}
+                </span>
               ))}
+            </p>
+          ) : null}
+          {calculation.error ? <ErrorMessage error={calculation.error} /> : null}
+          {activeCategory ? (
+            <p className="mt-3 text-sm text-muted">
+              Rule version {activeCategory.rule_version}. This account/category combination will be
+              checked against the configured issue rules.
+            </p>
+          ) : null}
+          <FormSection title="Record details">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormInput
+                label="Application number"
+                error={validation.errors.application_number}
+                value={applicationNumber}
+                onChange={(event) => setApplicationNumber(event.target.value)}
+              />
+              <FormInput
+                label="External reference"
+                error={validation.errors.external_reference}
+                value={externalReference}
+                onChange={(event) => setExternalReference(event.target.value)}
+              />
+              <FormInput
+                label="Submission date"
+                error={validation.errors.submission_date}
+                type="date"
+                value={submissionDate}
+                onChange={(event) => setSubmissionDate(event.target.value)}
+              />
+              <StatusSelect
+                label="Application status"
+                value={applicationStatus}
+                statuses={statuses}
+                onChange={setApplicationStatus}
+              />
+              <FormTextarea
+                label="Notes"
+                error={validation.errors.notes}
+                fieldClassName="sm:col-span-2"
+                rows={3}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+              />
             </div>
           </FormSection>
-        ) : (
-          <p className="text-muted">
-            Calculation inputs and rule version are preserved and cannot be changed here.
-          </p>
-        )}
-        <Button
-          className="mt-4"
-          variant="outline"
-          disabled={!ipoId || !accountId || !categoryId || !price || calculation.isPending}
-          onClick={() => calculation.mutate()}
-        >
-          Review calculation and duplicates
-        </Button>
-        {currentReview ? (
-          <p role="status" className="mt-3 rounded-lg bg-canvas p-4 text-lg font-semibold">
-            Calculation: {currentReview.total_shares} shares · {currentReview.application_amount}
-            {currentReview.warnings.map((warning) => (
-              <span className="mt-2 block text-base font-normal text-danger" key={warning}>
-                Potential duplicate: {warning}
-              </span>
-            ))}
-          </p>
-        ) : null}
-        {calculation.error ? <ErrorMessage error={calculation.error} /> : null}
-        {activeCategory ? (
-          <p className="mt-3 text-sm text-muted">
-            Rule version {activeCategory.rule_version}. This account/category combination will be
-            checked against the configured issue rules.
-          </p>
-        ) : null}
-        <FormSection title="Record details">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormInput
-              label="Application number"
-              error={validation.errors.application_number}
-              value={applicationNumber}
-              onChange={(event) => setApplicationNumber(event.target.value)}
-            />
-            <FormInput
-              label="External reference"
-              error={validation.errors.external_reference}
-              value={externalReference}
-              onChange={(event) => setExternalReference(event.target.value)}
-            />
-            <FormInput
-              label="Submission date"
-              error={validation.errors.submission_date}
-              type="date"
-              value={submissionDate}
-              onChange={(event) => setSubmissionDate(event.target.value)}
-            />
-            <StatusSelect
-              label="Application status"
-              value={applicationStatus}
-              statuses={statuses}
-              onChange={setApplicationStatus}
-            />
-            <FormTextarea
-              label="Notes"
-              error={validation.errors.notes}
-              fieldClassName="sm:col-span-2"
-              rows={3}
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-            />
-          </div>
-        </FormSection>
-        {mutation.error ? (
-          <p role="alert" className="mt-4 text-danger">
-            {errorMessage(mutation.error)}
-          </p>
-        ) : null}
+        </div>
       </form>
     </RouteFormDrawer>
   );
@@ -868,6 +1096,7 @@ export function ApplicationDetailsPage() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { notify } = useToast();
   const detail = useQuery({
     queryKey: ["applications", applicationId],
     enabled: Boolean(session && applicationId),
@@ -878,18 +1107,29 @@ export function ApplicationDetailsPage() {
       apiRequest(`/api/applications/${applicationId}`, session!, { method: "DELETE" }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
+      notify({ title: "Application archived", tone: "success" });
       navigate("/applications/list");
     },
+    onError: (error) =>
+      notify({
+        title: "Application could not be archived",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   const item = detail.data?.data;
-  if (detail.isLoading) return <p>Loading application…</p>;
-  if (detail.error) return <ErrorMessage error={detail.error} />;
+  if (detail.isLoading) return <SkeletonDetailsPage rows={10} />;
+  if (detail.error)
+    return <ErrorMessage error={detail.error} onRetry={() => void detail.refetch()} />;
   if (!item) return <p>Application not found.</p>;
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <BackLink fallback="/applications/list" allowedPath={/^\/applications(\/list)?$/}>
+          <BackLink
+            fallback="/applications/list"
+            allowedPath={/^\/(applications(\/list)?|dashboard)?$/}
+          >
             Back to applications
           </BackLink>
           <h1 className="text-3xl font-bold text-navy">Application details</h1>
@@ -935,7 +1175,6 @@ export function ApplicationDetailsPage() {
             {JSON.stringify(item.calculation_snapshot, null, 2)}
           </pre>
         </details>
-        {archive.error ? <ErrorMessage error={archive.error} /> : null}
         <ConfirmButton
           className="mt-5"
           variant="outline"
@@ -954,6 +1193,7 @@ export function ApplicationDetailsPage() {
 
 export function BulkApplicationPage() {
   const { session } = useAuth();
+  const { notify } = useToast();
   const [ipoId, setIpoId] = useState("");
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState("");
@@ -961,7 +1201,6 @@ export function BulkApplicationPage() {
   const [price, setPrice] = useState("");
   const [priceType, setPriceType] = useState<"BID" | "CUT_OFF">("CUT_OFF");
   const [preview, setPreview] = useState<ValidationRow[] | null>(null);
-  const [message, setMessage] = useState("");
   const [holdings, setHoldings] = useState<Record<string, string>>({});
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
   const lists = useOwnedLists();
@@ -990,7 +1229,6 @@ export function BulkApplicationPage() {
       }),
     onSuccess: (result) => {
       setPreview(result.data.rows);
-      setMessage("");
     },
   });
   const createMutation = useMutation({
@@ -1000,9 +1238,15 @@ export function BulkApplicationPage() {
         body: JSON.stringify({ applications: inputs }),
       }),
     onSuccess: () => {
-      setMessage("Applications created.");
+      notify({ title: "Applications created", tone: "success" });
       setPreview(null);
     },
+    onError: (error) =>
+      notify({
+        title: "Applications could not be created",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   const eligibleAccounts = lists.accounts.filter(
     (account) => account.account_status === "active" && !account.archived_at,
@@ -1201,14 +1445,7 @@ export function BulkApplicationPage() {
             </p>
           </div>
         ) : null}
-        {message ? (
-          <p role="status" className="mt-4 text-success">
-            {message}
-          </p>
-        ) : null}
-        {previewMutation.error || createMutation.error ? (
-          <ErrorMessage error={previewMutation.error ?? createMutation.error} />
-        ) : null}
+        {previewMutation.error ? <ErrorMessage error={previewMutation.error} /> : null}
         <div className="mt-5 flex flex-wrap gap-3">
           <Button
             disabled={
@@ -1231,6 +1468,7 @@ export function BulkApplicationPage() {
 
 export function ApplicationImportPage() {
   const { session } = useAuth();
+  const { notify } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
   const [sample, setSample] = useState<
@@ -1238,7 +1476,6 @@ export function ApplicationImportPage() {
   >([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<ImportPreviewResponse["data"] | null>(null);
-  const [message, setMessage] = useState("");
   const fields = [
     ["ipo", "IPO symbol or ID"],
     ["demat_account", "Demat account reference"],
@@ -1268,8 +1505,13 @@ export function ApplicationImportPage() {
       setPreview(data);
       if (data.headers) setHeaders(data.headers);
       if (data.sample_rows) setSample(data.sample_rows);
-      setMessage("");
     },
+    onError: (error) =>
+      notify({
+        title: "Application import preview failed",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   const confirmMutation = useMutation({
     mutationFn: () =>
@@ -1277,11 +1519,18 @@ export function ApplicationImportPage() {
         method: "POST",
         body: JSON.stringify({ import_id: preview?.import?.id }),
       }),
-    onSuccess: () => {
-      setMessage(
-        "Import confirmed. Imported applications remain drafts unless you explicitly mapped a status.",
-      );
-    },
+    onSuccess: () =>
+      notify({
+        title: "Application import confirmed",
+        description: "Imported applications remain drafts unless you explicitly mapped a status.",
+        tone: "success",
+      }),
+    onError: (error) =>
+      notify({
+        title: "Application import could not be confirmed",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -1411,14 +1660,6 @@ export function ApplicationImportPage() {
             </Button>
           </section>
         ) : null}
-        {previewMutation.error || confirmMutation.error ? (
-          <ErrorMessage error={previewMutation.error ?? confirmMutation.error} />
-        ) : null}
-        {message ? (
-          <p role="status" className="mt-4 text-success">
-            {message}
-          </p>
-        ) : null}
         <Link
           className="mt-5 inline-flex min-h-touch items-center text-action underline"
           to="/applications/import-history"
@@ -1433,9 +1674,9 @@ export function ApplicationImportPage() {
 export function ApplicationImportHistoryPage() {
   const { session } = useAuth();
   const { importId } = useParams();
-  const { data, error, isLoading } = useQuery({
+  const { data, error, isLoading, refetch } = useQuery({
     queryKey: ["application-imports", importId ?? "history"],
-    enabled: Boolean(session),
+    enabled: Boolean(session && !importId),
     queryFn: () => apiRequest<ImportHistoryResponse>(`/api/imports/history`, session!),
   });
   return (
@@ -1453,13 +1694,16 @@ export function ApplicationImportHistoryPage() {
           Import applications
         </Link>
       </header>
-      {error ? <ErrorMessage error={error} /> : null}
+      {error ? <ErrorMessage error={error} onRetry={() => void refetch()} /> : null}
       {importId ? (
         <ImportReport importId={importId} />
       ) : (
         <Card>
           {isLoading ? (
-            <p>Loading import history…</p>
+            <div role="status" aria-label="Loading application import history" aria-busy="true">
+              <span className="sr-only">Loading import history…</span>
+              <SkeletonTable rows={5} cols={5} />
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[620px] text-left">
@@ -1493,7 +1737,9 @@ export function ApplicationImportHistoryPage() {
                   ))}
                 </tbody>
               </table>
-              {!data?.data.imports.length ? <p className="p-3">No imports yet.</p> : null}
+              {data && data.data.imports.length === 0 ? (
+                <p className="p-3">No imports yet.</p>
+              ) : null}
             </div>
           )}
         </Card>
@@ -1504,6 +1750,7 @@ export function ApplicationImportHistoryPage() {
 
 function ImportReport({ importId }: { importId: string }) {
   const { session } = useAuth();
+  const { notify } = useToast();
   const queryClient = useQueryClient();
   const report = useQuery({
     queryKey: ["application-import-report", importId],
@@ -1526,15 +1773,18 @@ function ImportReport({ importId }: { importId: string }) {
     mutationFn: () => apiRequest(`/api/imports/${importId}/reverse`, session!, { method: "POST" }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["application-import-report", importId] });
+      notify({ title: "Application import reversed", tone: "success" });
     },
+    onError: (error) =>
+      notify({
+        title: "Application import could not be reversed",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
-  if (report.isLoading)
-    return (
-      <Card>
-        <p>Loading report…</p>
-      </Card>
-    );
-  if (report.error) return <ErrorMessage error={report.error} />;
+  if (report.isLoading) return <SkeletonDetailsPage rows={6} />;
+  if (report.error)
+    return <ErrorMessage error={report.error} onRetry={() => void report.refetch()} />;
   const item = report.data?.data;
   if (!item) return null;
   return (
@@ -1577,7 +1827,6 @@ function ImportReport({ importId }: { importId: string }) {
           Reverse import
         </ConfirmButton>
       ) : null}
-      {reverse.error ? <ErrorMessage error={reverse.error} /> : null}
     </Card>
   );
 }
@@ -1625,10 +1874,15 @@ function errorMessage(error: unknown) {
     : "The request failed.";
 }
 
-function ErrorMessage({ error }: { error: unknown }) {
+function ErrorMessage({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   return (
-    <p role="alert" className="rounded-lg border border-danger/30 bg-white p-3 text-danger">
-      {errorMessage(error)}
-    </p>
+    <div role="alert" className="rounded-lg border border-danger/30 bg-white p-3 text-danger">
+      <p>{errorMessage(error)}</p>
+      {onRetry ? (
+        <Button variant="outline" className="mt-2 border-danger/30 text-danger" onClick={onRetry}>
+          Retry
+        </Button>
+      ) : null}
+    </div>
   );
 }

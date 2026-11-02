@@ -15,6 +15,12 @@ describe("backDestination", () => {
     ).toBe("/ipos?source=personal&search=Example&status=OPEN&page=3");
   });
 
+  it("returns to the signed-in dashboard when the detail link came from home", () => {
+    expect(backDestination({ from: "/?category=RETAIL" }, fallback, /^\/(ipos|dashboard)?$/)).toBe(
+      "/?category=RETAIL",
+    );
+  });
+
   it.each([
     null,
     {},

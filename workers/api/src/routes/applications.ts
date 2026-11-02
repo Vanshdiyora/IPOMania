@@ -158,7 +158,7 @@ applicationsRoutes.get("/", async (context) => {
   let query = supabase
     .from("applications")
     .select(
-      `${applicationColumns}, ipos(company_name, symbol), demat_accounts(holder_name, broker_name), ${applicationCategoryEmbed}`,
+      `${applicationColumns}, ${filters.ipo_search ? "ipos!inner" : "ipos"}(company_name, symbol), ${filters.broker ? "demat_accounts!inner" : "demat_accounts"}(holder_name, broker_name), ${applicationCategoryEmbed}`,
       { count: "exact" },
     )
     .eq("user_id", userId)
@@ -167,6 +167,7 @@ applicationsRoutes.get("/", async (context) => {
   if (filters.include_archived === "false") query = query.is("archived_at", null);
   if (filters.include_archived === "true") query = query.not("archived_at", "is", null);
   if (filters.ipo_id) query = query.eq("ipo_id", filters.ipo_id);
+  if (filters.ipo_ids?.length) query = query.in("ipo_id", filters.ipo_ids);
   if (filters.demat_account_id) query = query.eq("demat_account_id", filters.demat_account_id);
   if (filters.category_id) query = query.eq("category_id", filters.category_id);
   if (filters.application_status)
@@ -180,6 +181,12 @@ applicationsRoutes.get("/", async (context) => {
   if (filters.search) {
     const search = escapeOrFilter(filters.search);
     query = query.or(`application_number.ilike.%${search}%,external_reference.ilike.%${search}%`);
+  }
+  if (filters.ipo_search) {
+    const search = escapeOrFilter(filters.ipo_search);
+    query = query.or(`company_name.ilike.%${search}%,symbol.ilike.%${search}%`, {
+      foreignTable: "ipos",
+    });
   }
   const { data, error, count } = await query.range(
     (filters.page - 1) * filters.page_size,
@@ -207,7 +214,7 @@ applicationsRoutes.get("/export", async (context) => {
   let query = supabase
     .from("applications")
     .select(
-      `${applicationColumns}, ipos(symbol, company_name), demat_accounts(masked_demat_identifier, broker_name), ${applicationCategoryEmbed}`,
+      `${applicationColumns}, ${filters.ipo_search ? "ipos!inner" : "ipos"}(symbol, company_name), ${filters.broker ? "demat_accounts!inner" : "demat_accounts"}(masked_demat_identifier, broker_name), ${applicationCategoryEmbed}`,
       { count: "exact" },
     )
     .eq("user_id", context.get("authenticatedUser").id)
@@ -215,6 +222,7 @@ applicationsRoutes.get("/export", async (context) => {
   if (filters.include_archived === "false") query = query.is("archived_at", null);
   if (filters.include_archived === "true") query = query.not("archived_at", "is", null);
   if (filters.ipo_id) query = query.eq("ipo_id", filters.ipo_id);
+  if (filters.ipo_ids?.length) query = query.in("ipo_id", filters.ipo_ids);
   if (filters.demat_account_id) query = query.eq("demat_account_id", filters.demat_account_id);
   if (filters.category_id) query = query.eq("category_id", filters.category_id);
   if (filters.application_status)
@@ -228,6 +236,12 @@ applicationsRoutes.get("/export", async (context) => {
   if (filters.search) {
     const search = escapeOrFilter(filters.search);
     query = query.or(`application_number.ilike.%${search}%,external_reference.ilike.%${search}%`);
+  }
+  if (filters.ipo_search) {
+    const search = escapeOrFilter(filters.ipo_search);
+    query = query.or(`company_name.ilike.%${search}%,symbol.ilike.%${search}%`, {
+      foreignTable: "ipos",
+    });
   }
   const { data: firstPage, count, error: countError } = await query.range(0, 999);
   if (countError) throw countError;

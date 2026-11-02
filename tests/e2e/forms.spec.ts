@@ -210,6 +210,7 @@ test("account form preserves typed values, validates, saves, and loads existing 
   });
   await page.getByRole("button", { name: "Save account", exact: true }).click();
   await expect(page).toHaveURL(/\/accounts\/list$/);
+  await expect(page.getByText("Account created.")).toBeVisible();
   await page.goto(`/accounts/${recordId}/edit`);
   await expect(page.getByLabel("Account holder name")).toHaveValue(account.holder_name);
   await expect(page.getByLabel("Depository", { exact: true })).toHaveValue("CDSL");
@@ -392,6 +393,8 @@ for (const width of [390, 1440]) {
       }
       if (path.endsWith("settings"))
         await expect(page.getByText("Interval: 3 hours")).toBeVisible();
+      if (path.endsWith("/sync"))
+        await expect(page.getByRole("button", { name: "Fetch Latest IPO Data" })).toBeEnabled();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       );
@@ -412,7 +415,8 @@ for (const width of [390, 1440]) {
     expect(runs).toBe(0);
     await page.getByRole("button", { name: "Fetch Latest IPO Data" }).click();
     await page.getByRole("button", { name: "Start synchronization", exact: true }).click();
-    await expect(page.getByText("Completed: 2 inserted, 1 updated.")).toBeVisible();
+    await expect(page.getByText("IPO synchronization complete")).toBeVisible();
+    await expect(page.getByText("2 inserted, 1 updated.")).toBeVisible();
     expect(runs).toBe(1);
     expect(errors).toEqual([]);
   });
@@ -469,6 +473,88 @@ test("admin catalog view returns to the filtered management list", async ({ page
   await page.getByRole("link", { name: "Back to IPOs" }).click();
   await expect(page).toHaveURL(/\/admin\/ipos\?search=Catalog&status=upcoming$/);
   await expect(page.getByRole("searchbox", { name: "Search IPO catalog" })).toHaveValue("Catalog");
+});
+
+test("disabled synchronization actions retain readable contrast", async ({ page }) => {
+  await prepare(page, true);
+  await page.route("**/api/admin/ipos/sync/status", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          providerConfigured: false,
+          syncIntervalHours: 3,
+          remainingManualRuns: 0,
+          runsUsedToday: 0,
+          running: false,
+          nextAllowedAt: null,
+        },
+      },
+    }),
+  );
+  await page.goto("/admin/sync");
+  await expect(page.getByRole("button", { name: "Fetch Latest IPO Data" })).toBeDisabled();
+  expect(await auditAccessibility(page)).toEqual([]);
+});
+
+test("application search and IPO filter update the actual list request", async ({ page }) => {
+  await prepare(page);
+  await page.route("**/api/applications?*", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          applications: [],
+          pagination: { page: 1, page_size: 50, total: 0, total_pages: 1 },
+        },
+      },
+    }),
+  );
+  await page.goto("/applications/list");
+  const searchRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname === "/api/applications" && url.searchParams.get("ipo_search") === "Form";
+  });
+  await page.getByRole("textbox", { name: "Search IPO or company name" }).fill("Form");
+  await searchRequest;
+
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await page.getByRole("button", { name: "Select IPOs" }).click();
+  const optionSearch = page.getByPlaceholder("Search IPOs...");
+  await expect(optionSearch).toBeFocused();
+  await optionSearch.press("Tab");
+  await expect(page.getByRole("option", { name: /Form test company/ })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Filters" })).toBeVisible();
+  await page.getByRole("button", { name: "Select IPOs" }).click();
+  await page.getByRole("option", { name: /Form test company/ }).click();
+  const filteredRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname === "/api/applications" && url.searchParams.get("ipo_ids") === recordId;
+  });
+  await page.getByRole("button", { name: /Apply filters/ }).click();
+  await filteredRequest;
+  await expect(page).toHaveURL(new RegExp(`ipo_ids=${recordId}`));
+});
+
+test("application filter options remain visible in the mobile drawer", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await prepare(page);
+  await page.route("**/api/applications?*", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          applications: [],
+          pagination: { page: 1, page_size: 50, total: 0, total_pages: 1 },
+        },
+      },
+    }),
+  );
+  await page.goto("/applications/list");
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await page.getByRole("button", { name: "All statuses", exact: true }).click();
+  const box = await page.getByRole("listbox", { name: "Status" }).boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(800);
 });
 
 test("category switching protects unsaved rule changes", async ({ page }) => {

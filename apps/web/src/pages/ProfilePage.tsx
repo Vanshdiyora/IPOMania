@@ -3,13 +3,15 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { profileUpdateSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
-import { AlertTriangle, CheckCircle2, ShieldAlert, Trash2 } from "lucide-react";
+import { AlertTriangle, ShieldAlert, Trash2 } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/Card";
 import { FormField, Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
+import { useToast } from "../components/ui/ToastContext";
 import { ApiRequestError, apiRequest } from "../lib/api";
+import { SkeletonFormFields } from "../components/ui/Skeleton";
 
 type Profile = {
   id: string;
@@ -22,9 +24,11 @@ type ProfileValues = z.infer<typeof profileUpdateSchema>;
 
 export function ProfilePage() {
   const { session, user, markSessionExpired, signOut } = useAuth();
+  const { notify } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [status, setStatus] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [deleting, setDeleting] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
   const {
@@ -35,8 +39,13 @@ export function ProfilePage() {
   } = useForm<ProfileValues>({ resolver: zodResolver(profileUpdateSchema) });
 
   useEffect(() => {
-    if (!session) return;
+    if (!session) {
+      setProfileLoading(false);
+      return;
+    }
     let active = true;
+    setProfileLoading(true);
+    setErrorMessage("");
     void apiRequest<ProfileResponse>("/api/me/profile", session)
       .then(({ data }) => {
         if (!active) return;
@@ -50,28 +59,33 @@ export function ProfilePage() {
         } else {
           setErrorMessage("We could not load your profile. Please try again.");
         }
+      })
+      .finally(() => {
+        if (active) setProfileLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [session, reset, markSessionExpired]);
+  }, [session, reset, markSessionExpired, loadAttempt]);
 
   async function save(values: ProfileValues) {
     if (!session) return;
-    setStatus("");
-    setErrorMessage("");
     try {
       const { data } = await apiRequest<ProfileResponse>("/api/me/profile", session, {
         method: "PATCH",
         body: JSON.stringify(values),
       });
       setProfile(data);
-      setStatus("Profile updated successfully.");
+      notify({ title: "Profile updated", tone: "success" });
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 401) {
         markSessionExpired();
       } else {
-        setErrorMessage("We could not save your profile. Please try again.");
+        notify({
+          title: "Profile could not be saved",
+          description: "Please try again.",
+          tone: "error",
+        });
       }
     }
   }
@@ -79,12 +93,16 @@ export function ProfilePage() {
   async function deleteAccount() {
     if (!session) return;
     setDeleting(true);
-    setErrorMessage("");
     try {
       await apiRequest("/api/auth/account", session, { method: "DELETE" });
+      notify({ title: "Account deleted", tone: "success" });
       await signOut("local");
     } catch {
-      setErrorMessage("We could not delete your account. Please try again or contact support.");
+      notify({
+        title: "Account could not be deleted",
+        description: "Please try again or contact support.",
+        tone: "error",
+      });
     } finally {
       setDeleting(false);
     }
@@ -129,31 +147,28 @@ export function ProfilePage() {
             )}
           </div>
 
-          <form className="space-y-4" onSubmit={handleSubmit(save)} noValidate>
-            <FormField label="Full Name" htmlFor="full_name" error={errors.full_name?.message}>
-              <Input
-                id="full_name"
-                autoComplete="name"
-                placeholder="e.g. Rahul Sharma"
-                aria-invalid={Boolean(errors.full_name)}
-                {...register("full_name")}
-              />
-            </FormField>
+          {profileLoading ? (
+            <div role="status" aria-label="Loading profile" aria-busy="true">
+              <span className="sr-only">Loading profile…</span>
+              <SkeletonFormFields fields={1} />
+            </div>
+          ) : (
+            <form className="space-y-4" onSubmit={handleSubmit(save)} noValidate>
+              <FormField label="Full Name" htmlFor="full_name" error={errors.full_name?.message}>
+                <Input
+                  id="full_name"
+                  autoComplete="name"
+                  placeholder="e.g. Rahul Sharma"
+                  aria-invalid={Boolean(errors.full_name)}
+                  {...register("full_name")}
+                />
+              </FormField>
 
-            {status && (
-              <div
-                className="flex items-center gap-2 rounded-xl border border-action-emerald/30 bg-action-emerald/5 p-3.5 text-sm font-medium text-action-emerald"
-                role="status"
-              >
-                <CheckCircle2 size={16} />
-                <span>{status}</span>
-              </div>
-            )}
-
-            <Button type="submit" disabled={isSubmitting} className="shadow-xs">
-              {isSubmitting ? "Saving changes…" : "Save changes"}
-            </Button>
-          </form>
+              <Button type="submit" loading={isSubmitting} className="shadow-xs">
+                {isSubmitting ? "Saving changes…" : "Save changes"}
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
 
@@ -201,12 +216,17 @@ export function ProfilePage() {
       </Card>
 
       {errorMessage && (
-        <div
-          className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm font-medium text-danger"
-          role="alert"
-        >
-          <AlertTriangle size={16} />
-          <span>{errorMessage}</span>
+        <div className="space-y-3">
+          <div
+            className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm font-medium text-danger"
+            role="alert"
+          >
+            <AlertTriangle size={16} />
+            <span>{errorMessage}</span>
+          </div>
+          <Button variant="outline" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
+            Retry profile
+          </Button>
         </div>
       )}
     </div>

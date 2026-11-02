@@ -1,6 +1,7 @@
-import { useEffect, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircle2, CircleAlert, Info, X } from "lucide-react";
+import { ToastContext, type ToastInput } from "./ToastContext";
 
 export type ToastTone = "success" | "error" | "info";
 
@@ -12,6 +13,33 @@ export type ToastProps = {
   duration?: number;
   onDismiss: (id: string) => void;
 };
+
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [toasts, setToasts] = useState<ToastProps[]>([]);
+  const nextId = useRef(0);
+  const dismiss = useCallback((id: string) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }, []);
+  const notify = useCallback(
+    (toast: ToastInput) => {
+      const id = `toast-${++nextId.current}`;
+      setToasts((current) => [...current, { ...toast, id, onDismiss: dismiss }].slice(-4));
+    },
+    [dismiss],
+  );
+  const value = useMemo(() => ({ notify }), [notify]);
+
+  return (
+    <ToastContext.Provider value={value}>
+      {children}
+      <ToastViewport>
+        {toasts.map((toast) => (
+          <Toast key={toast.id} {...toast} />
+        ))}
+      </ToastViewport>
+    </ToastContext.Provider>
+  );
+}
 
 export function Toast({
   id,
@@ -30,20 +58,20 @@ export function Toast({
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
-      className="pointer-events-auto flex w-full max-w-sm gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-lg"
+      className="pointer-events-auto flex w-full max-w-sm gap-3 rounded-xl border border-border bg-surface p-4 shadow-dropdown"
     >
       <Icon
-        className={`mt-0.5 h-5 w-5 shrink-0 ${tone === "success" ? "text-green-700" : tone === "error" ? "text-red-700" : "text-blue-700"}`}
+        className={`mt-0.5 h-5 w-5 shrink-0 ${tone === "success" ? "text-success" : tone === "error" ? "text-danger" : "text-info"}`}
         aria-hidden="true"
       />
       <div className="min-w-0 flex-1">
-        <p className="font-semibold text-slate-950">{title}</p>
-        {description && <div className="mt-1 text-sm text-slate-600">{description}</div>}
+        <p className="font-semibold text-ink">{title}</p>
+        {description && <div className="mt-1 text-sm text-muted">{description}</div>}
       </div>
       <button
         type="button"
         onClick={() => onDismiss(id)}
-        className="h-8 w-8 shrink-0 rounded-md text-slate-500 hover:bg-slate-100"
+        className="min-h-touch min-w-touch shrink-0 rounded-lg text-muted hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus"
         aria-label="Dismiss notification"
       >
         <X className="mx-auto h-4 w-4" />

@@ -22,13 +22,20 @@ import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormCon
 import { FormSection } from "../../components/ui/FormSection";
 import { ConfirmationDialog } from "../../components/ui/ConfirmationDialog";
 import { RouteFormDrawer } from "../../components/ui/FormDrawer";
+import { useToast } from "../../components/ui/ToastContext";
 import { Card } from "../../components/ui/Card";
 import { BackLink } from "../../components/ui/BackLink";
 import { StatusBadge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { EmptyState } from "../../components/ui/States";
-import { SkeletonCard } from "../../components/ui/Skeleton";
+import {
+  SkeletonCard,
+  SkeletonFormPage,
+  SkeletonIpoDetails,
+  SkeletonPage,
+  Skeleton,
+} from "../../components/ui/Skeleton";
 import { ActiveFilterChips } from "../../components/filters/ActiveFilterChips";
 import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
 import { ApiRequestError, apiRequest } from "../../lib/api";
@@ -121,7 +128,7 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
     ...(search ? { search } : {}),
     ...(status ? { status } : {}),
   });
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
       "ipos",
       personal ? "personal" : "catalog",
@@ -293,13 +300,15 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
           </div>
         </FilterSection>
       </FilterDrawer>
-      {error ? <ErrorNotice error={error} /> : null}
+      {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       {isLoading ? (
-        <div role="status" aria-label="Loading IPO records" className="grid gap-4">
-          <span className="sr-only">Loading IPO records…</span>
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
+        <SkeletonPage label="Loading IPO records">
+          <div className="grid gap-4">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        </SkeletonPage>
       ) : null}
       {!isLoading && !error && ipos.length === 0 ? (
         <Card>
@@ -362,20 +371,20 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
 export function IpoCatalogDetailsPage() {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["ipo-catalog", ipoId],
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!),
   });
-  if (isLoading) return <p role="status">Loading IPO details…</p>;
-  if (error) return <ErrorNotice error={error} />;
+  if (isLoading) return <SkeletonIpoDetails />;
+  if (error) return <ErrorNotice error={error} onRetry={() => void refetch()} />;
   const ipo = data?.data;
   if (!ipo) return <p role="alert">IPO record not found.</p>;
 
   return (
     <div className="space-y-6">
       <header>
-        <BackLink fallback="/ipos" allowedPath={/^\/(ipos|ipo-calendar|admin\/ipos)$/} />
+        <BackLink fallback="/ipos" allowedPath={/^\/(ipos|ipo-calendar|admin\/ipos|dashboard)?$/} />
         <h1 className="mt-3 text-3xl font-bold text-navy">{ipo.company_name}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-3 text-muted">
           <span>
@@ -394,6 +403,7 @@ export function IpoDetailsPage() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { notify } = useToast();
   const ipoQuery = useQuery({
     queryKey: ["ipo", ipoId],
     enabled: Boolean(session && ipoId),
@@ -409,13 +419,21 @@ export function IpoDetailsPage() {
       apiRequest<IpoResponse>(`/api/ipos/${ipoId}/archive`, session!, { method: "POST" }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["ipos"] });
+      notify({ title: "IPO archived", tone: "success" });
       navigate("/ipos?source=personal");
     },
+    onError: (error) =>
+      notify({
+        title: "IPO could not be archived",
+        description: error instanceof Error ? error.message : "Please try again.",
+        tone: "error",
+      }),
   });
   const ipo = ipoQuery.data?.data;
 
-  if (ipoQuery.isLoading) return <p role="status">Loading IPO details…</p>;
-  if (ipoQuery.error) return <ErrorNotice error={ipoQuery.error} />;
+  if (ipoQuery.isLoading) return <SkeletonIpoDetails />;
+  if (ipoQuery.error)
+    return <ErrorNotice error={ipoQuery.error} onRetry={() => void ipoQuery.refetch()} />;
   if (!ipo) return <p role="alert">IPO record not found.</p>;
 
   const latestCategories = latestByCategory(categoriesQuery.data?.data.configurations ?? []);
@@ -423,7 +441,10 @@ export function IpoDetailsPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <BackLink fallback="/ipos?source=personal" allowedPath={/^\/(ipos|ipo-calendar)$/} />
+          <BackLink
+            fallback="/ipos?source=personal"
+            allowedPath={/^\/(ipos|ipo-calendar|dashboard)?$/}
+          />
           <p className="text-sm font-semibold uppercase tracking-wide text-muted">{ipo.symbol}</p>
           <h1 className="mt-1 text-3xl font-bold text-navy">{ipo.company_name}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-muted">
@@ -459,7 +480,6 @@ export function IpoDetailsPage() {
           ) : null}
         </div>
       </header>
-      {archive.error ? <ErrorNotice error={archive.error} /> : null}
       <IssueSummary ipo={ipo} personal />
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -473,20 +493,40 @@ export function IpoDetailsPage() {
             Manage rules
           </Link>
         </div>
-        {categoriesQuery.error ? <ErrorNotice error={categoriesQuery.error} /> : null}
-        <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-          {categories.map((category) => {
-            const current = latestCategories.get(category);
-            return (
-              <li key={category} className="rounded-lg border border-border p-3">
-                <span className="font-semibold text-ink">{category}</span>
-                <span className="ml-2 text-sm text-muted">
-                  {current ? `Rule version ${current.rule_version}` : "Rules not configured"}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+        {categoriesQuery.error ? (
+          <div className="mt-4 space-y-3">
+            <ErrorNotice
+              error={categoriesQuery.error}
+              onRetry={() => void categoriesQuery.refetch()}
+            />
+          </div>
+        ) : categoriesQuery.isLoading ? (
+          <div role="status" aria-label="Loading category rules" aria-busy="true">
+            <span className="sr-only">Loading category rules…</span>
+            <ul aria-hidden="true" className="mt-4 grid gap-2 sm:grid-cols-2">
+              {categories.map((category) => (
+                <li key={category} className="rounded-lg border border-border p-3">
+                  <Skeleton className="h-4 w-1/3" />
+                  <Skeleton className="mt-2 h-4 w-2/3" />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+            {categories.map((category) => {
+              const current = latestCategories.get(category);
+              return (
+                <li key={category} className="rounded-lg border border-border p-3">
+                  <span className="font-semibold text-ink">{category}</span>
+                  <span className="ml-2 text-sm text-muted">
+                    {current ? `Rule version ${current.rule_version}` : "Rules not configured"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </Card>
     </div>
   );
@@ -496,7 +536,7 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
   const navigate = useNavigate();
-  const [errorMessage, setErrorMessage] = useState("");
+  const { notify } = useToast();
   const [verificationTime, setVerificationTime] = useState("");
   const loadedRecordId = useRef<string | null>(null);
   const queryClient = useQueryClient();
@@ -521,7 +561,6 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
 
   const submit = form.handleSubmit(async (values) => {
     if (!session) return;
-    setErrorMessage("");
     const payload = {
       ...values,
       source_reference: values.source_reference || null,
@@ -538,12 +577,17 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
         state: { successMessage: editing ? "IPO updated." : "IPO created." },
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "The IPO could not be saved.");
+      notify({
+        title: editing ? "IPO could not be updated" : "IPO could not be created",
+        description: error instanceof Error ? error.message : "Please try again.",
+        tone: "error",
+      });
     }
   });
 
-  if (editing && existing.isLoading) return <p role="status">Loading IPO record…</p>;
-  if (editing && existing.error) return <ErrorNotice error={existing.error} />;
+  if (editing && existing.isLoading) return <SkeletonFormPage />;
+  if (editing && existing.error)
+    return <ErrorNotice error={existing.error} onRetry={() => void existing.refetch()} />;
 
   return (
     <RouteFormDrawer
@@ -561,11 +605,6 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
             : "")
       }
     >
-      {errorMessage ? (
-        <p role="alert" className="mb-4 text-danger">
-          {errorMessage}
-        </p>
-      ) : null}
       <form id="personal-ipo-form" className="space-y-5" onSubmit={submit} noValidate>
         <FormSection title="Company details">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -638,6 +677,7 @@ export function IpoCategoryConfigurationPage() {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  const { notify } = useToast();
   const [pendingCategory, setPendingCategory] = useState<IpoCategoryCode | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [categoryDirty, setCategoryDirty] = useState(false);
@@ -666,12 +706,22 @@ export function IpoCategoryConfigurationPage() {
     onSuccess: async () => {
       setCategoryDirty(false);
       setCategoryError(false);
-      setMessage("A new rule version was saved. Earlier versions remain unchanged.");
+      setMessage("");
+      notify({
+        title: "Category rule saved",
+        description: "A new immutable rule version was created.",
+        tone: "success",
+      });
       await queryClient.invalidateQueries({ queryKey: ["ipo-categories", ipoId] });
     },
     onError: (error) => {
-      setCategoryError(true);
-      setMessage(error instanceof Error ? error.message : "Rules were not saved.");
+      setCategoryError(false);
+      setMessage("");
+      notify({
+        title: "Category rules could not be saved",
+        description: error instanceof Error ? error.message : "Please try again.",
+        tone: "error",
+      });
     },
   });
   const configurations = rulesQuery.data?.data.configurations ?? [];
@@ -721,8 +771,16 @@ export function IpoCategoryConfigurationPage() {
     createRule.mutate(parsed.data);
   };
 
-  if (ipoQuery.isLoading) return <p role="status">Loading IPO…</p>;
-  if (ipoQuery.error) return <ErrorNotice error={ipoQuery.error} />;
+  if (ipoQuery.isLoading || rulesQuery.isLoading) return <SkeletonFormPage />;
+  if (ipoQuery.error)
+    return <ErrorNotice error={ipoQuery.error} onRetry={() => void ipoQuery.refetch()} />;
+  if (rulesQuery.error) {
+    return (
+      <div className="space-y-3">
+        <ErrorNotice error={rulesQuery.error} onRetry={() => void rulesQuery.refetch()} />
+      </div>
+    );
+  }
   if (!ipoQuery.data) return <p role="alert">IPO record not found.</p>;
   const ipo = ipoQuery.data.data;
 
@@ -1006,7 +1064,6 @@ export function IpoCategoryConfigurationPage() {
           </Button>
         </form>
       </Card>
-      {rulesQuery.error ? <ErrorNotice error={rulesQuery.error} /> : null}
       <ConfirmationDialog
         open={pendingCategory !== null}
         title="Discard category changes?"
@@ -1148,6 +1205,15 @@ export function QuotaCalculatorPage() {
           {requestError}
         </p>
       ) : null}
+      {iposQuery.error ? (
+        <ErrorNotice error={iposQuery.error} onRetry={() => void iposQuery.refetch()} />
+      ) : null}
+      {accountsQuery.error ? (
+        <ErrorNotice error={accountsQuery.error} onRetry={() => void accountsQuery.refetch()} />
+      ) : null}
+      {categoriesQuery.error ? (
+        <ErrorNotice error={categoriesQuery.error} onRetry={() => void categoriesQuery.refetch()} />
+      ) : null}
       <Card>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-sm font-semibold text-ink">
@@ -1155,9 +1221,16 @@ export function QuotaCalculatorPage() {
             <select
               className={inputClass}
               value={ipoId}
+              disabled={iposQuery.isLoading || Boolean(iposQuery.error)}
               onChange={(event) => setIpoId(event.target.value)}
             >
-              <option value="">Choose an IPO</option>
+              <option value="">
+                {iposQuery.isLoading
+                  ? "Loading IPOs…"
+                  : iposQuery.error
+                    ? "IPO list unavailable"
+                    : "Choose an IPO"}
+              </option>
               {ipoOptions.map((ipo) => (
                 <option key={ipo.id} value={ipo.id}>
                   {ipo.company_name} ({ipo.symbol})
@@ -1170,9 +1243,16 @@ export function QuotaCalculatorPage() {
             <select
               className={inputClass}
               value={dematAccountId}
+              disabled={accountsQuery.isLoading || Boolean(accountsQuery.error)}
               onChange={(event) => setDematAccountId(event.target.value)}
             >
-              <option value="">Choose an account</option>
+              <option value="">
+                {accountsQuery.isLoading
+                  ? "Loading accounts…"
+                  : accountsQuery.error
+                    ? "Account list unavailable"
+                    : "Choose an account"}
+              </option>
               {accountOptions.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.holder_name} · {account.broker_name} · {account.masked_demat_identifier}
@@ -1185,6 +1265,7 @@ export function QuotaCalculatorPage() {
             <select
               className={inputClass}
               value={category}
+              disabled={!ipoId || categoriesQuery.isLoading || Boolean(categoriesQuery.error)}
               onChange={(event) => setCategory(event.target.value as IpoCategoryCode)}
             >
               {categories.map((value) => (
@@ -1617,13 +1698,18 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ErrorNotice({ error }: { error: unknown }) {
+function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const message =
     error instanceof ApiRequestError ? error.message : "The request could not be completed.";
   return (
-    <p role="alert" className="rounded-lg bg-[#FDECEC] p-4 text-danger">
-      {message}
-    </p>
+    <div role="alert" className="rounded-lg bg-[#FDECEC] p-4 text-danger">
+      <p>{message}</p>
+      {onRetry ? (
+        <Button variant="outline" className="mt-2 border-danger/30 text-danger" onClick={onRetry}>
+          Retry
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

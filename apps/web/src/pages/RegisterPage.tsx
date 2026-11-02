@@ -1,5 +1,4 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { registerSchema } from "@ipo-mania/validation";
@@ -7,13 +6,13 @@ import type { z } from "@ipo-mania/validation";
 import { AuthPage } from "../auth/AuthPage";
 import { Button } from "../components/ui/Button";
 import { Input, FormField } from "../components/ui/Input";
+import { useToast } from "../components/ui/ToastContext";
 import { getSupabaseClient } from "../lib/supabase";
 
 type RegisterValues = z.infer<typeof registerSchema>;
 
 export function RegisterPage() {
-  const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const { notify } = useToast();
   const {
     register,
     handleSubmit,
@@ -24,8 +23,6 @@ export function RegisterPage() {
   });
 
   async function submit(values: RegisterValues) {
-    setErrorMessage("");
-    setMessage("");
     try {
       const { error } = await getSupabaseClient().auth.signUp({
         email: values.email,
@@ -35,9 +32,17 @@ export function RegisterPage() {
         },
       });
       if (error) throw error;
-      setMessage("Account created successfully. Check your email to confirm, then sign in.");
+      notify({
+        title: "Account created",
+        description: "Check your email to confirm, then sign in.",
+        tone: "success",
+      });
     } catch {
-      setErrorMessage("We could not create your account. Check the details and try again.");
+      notify({
+        title: "Account could not be created",
+        description: "Check the details and try again.",
+        tone: "error",
+      });
     }
   }
 
@@ -55,23 +60,6 @@ export function RegisterPage() {
       }
     >
       <form className="space-y-5" onSubmit={handleSubmit(submit)} noValidate>
-        {errorMessage && (
-          <div
-            role="alert"
-            className="rounded-lg border border-danger-border bg-danger-bg p-3 text-sm text-danger"
-          >
-            {errorMessage}
-          </div>
-        )}
-        {message && (
-          <div
-            role="status"
-            className="rounded-lg border border-success-border bg-success-bg p-3 text-sm text-success"
-          >
-            {message}
-          </div>
-        )}
-
         <FormField label="Full name" htmlFor="fullName" error={errors.fullName?.message}>
           <Input
             id="fullName"
@@ -123,7 +111,7 @@ export function RegisterPage() {
           />
         </FormField>
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
+        <Button type="submit" className="w-full" loading={isSubmitting}>
           {isSubmitting ? "Creating account…" : "Create account"}
         </Button>
       </form>
