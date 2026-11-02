@@ -41,9 +41,7 @@ export function AuthPage({
 
         {/* Logo */}
         <Link to="/" className="relative flex items-center gap-3 w-fit">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-action text-white font-bold">
-            IM
-          </div>
+          <img src="/logo.png" alt="" className="h-9 w-9 rounded-lg object-contain" />
           <span className="text-lg font-bold text-white">IPO Mania</span>
         </Link>
 
@@ -86,9 +84,7 @@ export function AuthPage({
       <div className="flex flex-1 flex-col items-center justify-center p-6 sm:p-10">
         {/* Mobile logo */}
         <Link to="/" className="mb-8 flex items-center gap-2.5 lg:hidden">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-action text-white font-bold text-sm">
-            IM
-          </div>
+          <img src="/logo.png" alt="" className="h-8 w-8 rounded-lg object-contain" />
           <span className="text-base font-bold text-ink">IPO Mania</span>
         </Link>
 

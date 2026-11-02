@@ -125,6 +125,7 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
   const params = new URLSearchParams({
     page: String(page),
     page_size: "25",
+    ...(calendar ? { sort: "opening_asc" } : {}),
     ...(search ? { search } : {}),
     ...(status ? { status } : {}),
   });
@@ -324,23 +325,54 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
       ) : null}
       <div className="grid gap-4">
         {ipos.map((ipo) => (
-          <Card key={ipo.id} className="flex flex-wrap items-center justify-between gap-4">
-            <div className="min-w-0">
+          <Card
+            key={ipo.id}
+            className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+          >
+            <div className="min-w-0 flex-1">
               <Link
-                className="text-xl font-bold text-action underline"
+                className="text-xl font-bold text-action no-underline underline-offset-4 hover:underline visited:text-action"
                 to={`/ipos/${personal ? "" : "catalog/"}${ipo.id}`}
                 state={{ from: `${location.pathname}${location.search}` }}
               >
                 {ipo.company_name}
               </Link>
-              <p className="mt-1 text-sm text-muted">
-                {ipo.symbol ?? "Symbol not set"} · {ipo.exchange ?? "Exchange not set"} · Opens{" "}
-                {formatDate(ipo.opening_date)}
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                Price {ipo.issue_price_min ?? "Not set"}–{ipo.issue_price_max ?? "Not set"} · Lot
-                size {ipo.lot_size ?? "Not set"}
-              </p>
+              <div className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Issue details
+                  </p>
+                  <p className="mt-1 font-semibold text-ink">
+                    {ipo.symbol || "Symbol not set"} · {ipo.exchange || "Exchange not set"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Price band
+                  </p>
+                  <p className="mt-1 font-semibold text-ink">
+                    {formatPriceBand(ipo.issue_price_min, ipo.issue_price_max)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Lot size
+                  </p>
+                  <p className="mt-1 font-semibold text-ink">
+                    {ipo.lot_size
+                      ? `${ipo.lot_size.toLocaleString("en-IN")} shares`
+                      : "Not published"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Bidding dates
+                  </p>
+                  <p className="mt-1 font-semibold text-ink">
+                    {formatDate(ipo.opening_date)} – {formatDate(ipo.closing_date)}
+                  </p>
+                </div>
+              </div>
               <p className="mt-1 text-xs text-muted">
                 {!personal
                   ? `Admin-managed · ${ipo.data_source === "IPO_GURU" ? "IPO Guru" : ipo.data_source === "MANUAL" ? "Manual entry" : ipo.data_source}`
@@ -489,7 +521,10 @@ export function IpoDetailsPage() {
               Each new configuration creates an immutable version for later calculation records.
             </p>
           </div>
-          <Link className="text-action underline" to={`/ipos/${ipo.id}/categories`}>
+          <Link
+            className="text-action no-underline underline-offset-4 hover:underline visited:text-action"
+            to={`/ipos/${ipo.id}/categories`}
+          >
             Manage rules
           </Link>
         </div>
@@ -1188,7 +1223,7 @@ export function QuotaCalculatorPage() {
   }, [priceOptions, priceType]);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="w-full space-y-6">
       <header>
         <h1 className="text-3xl font-bold text-navy">Quota calculator</h1>
         <p className="mt-2 text-muted">
@@ -1687,6 +1722,13 @@ function formatRupees(value: string) {
     currency: "INR",
     maximumFractionDigits: 2,
   }).format(number);
+}
+
+function formatPriceBand(minimum: string | null, maximum: string | null) {
+  if (!minimum && !maximum) return "Not published";
+  if (!maximum || minimum === maximum) return formatRupees(minimum || maximum || "");
+  if (!minimum) return formatRupees(maximum);
+  return `${formatRupees(minimum)} – ${formatRupees(maximum)}`;
 }
 
 function Detail({ label, value }: { label: string; value: string }) {

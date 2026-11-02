@@ -1,6 +1,6 @@
-import type { RefObject } from "react";
+import { useEffect, type RefObject } from "react";
 import { Menu } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../auth/useAuth";
 import { cn } from "../../lib/utils";
 
@@ -14,6 +14,11 @@ export function Header({
   onMenuToggle: () => void;
 }) {
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  const pageTitle = getPageTitle(pathname);
+  useEffect(() => {
+    document.title = `${pageTitle} | IPO Mania`;
+  }, [pageTitle]);
 
   return (
     <header
@@ -46,8 +51,8 @@ export function Header({
       </button>
 
       {/* Page title / breadcrumb area */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-ink truncate hidden sm:block">IPO Mania</p>
+      <div className="flex flex-1 min-w-0 items-center gap-2">
+        <p className="truncate text-sm font-semibold text-ink sm:text-base">{pageTitle}</p>
       </div>
 
       {/* Right actions */}
@@ -80,4 +85,38 @@ export function Header({
       </div>
     </header>
   );
+}
+
+function getPageTitle(pathname: string) {
+  if (pathname === "/" || pathname === "/dashboard") return "Dashboard";
+  if (pathname === "/accounts") return "Demat Accounts";
+  if (pathname === "/accounts/list") return "Account list";
+  if (pathname.startsWith("/accounts/import-history")) return "Account import history";
+  if (pathname === "/accounts/import") return "Import accounts";
+  if (/^\/accounts\/[^/]+\/edit$/.test(pathname)) return "Edit account";
+  if (/^\/accounts\/[^/]+$/.test(pathname)) return "Account details";
+  if (pathname === "/accounts/new") return "Add account";
+  if (pathname === "/applications") return "Applications";
+  if (pathname === "/applications/list") return "Application list";
+  if (pathname === "/applications/bulk") return "Bulk applications";
+  if (pathname === "/applications/import") return "Import applications";
+  if (pathname.startsWith("/applications/import-history")) return "Application import history";
+  if (/^\/applications\/[^/]+\/edit$/.test(pathname)) return "Edit application";
+  if (/^\/applications\/[^/]+$/.test(pathname)) return "Application details";
+  if (pathname === "/applications/new") return "Add application";
+  if (pathname === "/ipos") return "IPOs";
+  if (pathname === "/ipo-calendar") return "IPO calendar";
+  if (pathname === "/quota-calculator") return "Quota calculator";
+  if (/^\/ipos\/[^/]+\/categories$/.test(pathname)) return "IPO categories";
+  if (/^\/ipos\/[^/]+\/edit$/.test(pathname)) return "Edit IPO";
+  if (/^\/ipos\/catalog/.test(pathname)) return "IPO catalog";
+  if (/^\/ipos\/[^/]+$/.test(pathname)) return "IPO details";
+  if (pathname === "/ipos/new") return "Add IPO";
+  if (pathname === "/admin") return "Admin overview";
+  if (pathname === "/admin/ipos") return "IPO catalog";
+  if (pathname === "/admin/sync") return "IPO synchronization";
+  if (pathname === "/admin/ipo-sync-history") return "Synchronization history";
+  if (pathname === "/admin/settings") return "Admin settings";
+  if (pathname === "/profile") return "Profile";
+  return "IPO Mania";
 }

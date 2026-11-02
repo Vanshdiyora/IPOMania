@@ -32,7 +32,7 @@ export function ActiveFilterChips({
       <button
         type="button"
         onClick={onClear}
-        className="min-h-touch px-2 text-sm font-semibold text-action underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+        className="min-h-touch px-2 text-sm font-semibold text-action no-underline underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy visited:text-action"
       >
         Clear all
       </button>

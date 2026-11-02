@@ -16,7 +16,7 @@ vi.mock("../../apps/web/src/auth/useAuth", () => ({
   }),
 }));
 
-function renderSidebar(path: string, group: string) {
+function renderSidebar(path: string) {
   render(
     <ToastProvider>
       <MemoryRouter initialEntries={[path]}>
@@ -24,18 +24,18 @@ function renderSidebar(path: string, group: string) {
       </MemoryRouter>
     </ToastProvider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: group }));
   return within(screen.getByRole("navigation", { name: "Main navigation" }));
 }
 
 describe("sidebar active links", () => {
   it.each([
-    ["/accounts", "Demat Accounts", "Account dashboard", "Account list"],
-    ["/accounts/list", "Demat Accounts", "Account list", "Account dashboard"],
-    ["/applications", "Applications", "App dashboard", "Application table"],
-    ["/applications/list", "Applications", "Application table", "App dashboard"],
-  ])("marks only the current page for %s", (path, group, active, inactive) => {
-    const navigation = renderSidebar(path, group);
+    ["/accounts", "Demat Accounts", "Applications"],
+    ["/accounts/list", "Demat Accounts", "Applications"],
+    ["/applications", "Applications", "Demat Accounts"],
+    ["/applications/list", "Applications", "Demat Accounts"],
+    ["/ipo-calendar", "IPOs", "Applications"],
+  ])("marks the current section for %s", (path, active, inactive) => {
+    const navigation = renderSidebar(path);
 
     expect(navigation.getByRole("link", { name: active })).toHaveAttribute("aria-current", "page");
     expect(navigation.getByRole("link", { name: inactive })).not.toHaveAttribute("aria-current");
@@ -43,7 +43,7 @@ describe("sidebar active links", () => {
   });
 
   it("announces successful sign out in a toast", async () => {
-    renderSidebar("/accounts", "Demat Accounts");
+    renderSidebar("/accounts");
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(await screen.findByText("Signed out")).toBeInTheDocument();
   });

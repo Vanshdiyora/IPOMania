@@ -95,7 +95,7 @@ const catalog = {
 
 afterEach(() => vi.unstubAllGlobals());
 
-function installMock(restResponse = JSON.stringify(analytics)) {
+function installMock(restResponse = JSON.stringify(analytics), catalogUnavailable = false) {
   const requests: Request[] = [];
   vi.stubGlobal(
     "fetch",
@@ -107,6 +107,20 @@ function installMock(restResponse = JSON.stringify(analytics)) {
         });
       }
       requests.push(request.clone());
+      if (
+        catalogUnavailable &&
+        new URL(request.url).pathname.endsWith("/rpc/get_dashboard_catalog_analytics")
+      ) {
+        return new Response(
+          JSON.stringify({
+            code: "PGRST202",
+            message: "Could not find the function get_dashboard_catalog_analytics",
+            details: null,
+            hint: null,
+          }),
+          { status: 404, headers: { "Content-Type": "application/json" } },
+        );
+      }
       return new Response(
         new URL(request.url).pathname.endsWith("/rpc/get_dashboard_catalog_analytics")
           ? JSON.stringify(catalog)
@@ -184,6 +198,21 @@ describe("dashboard analytics API", () => {
       data: { totals: { applications: 0 }, allotment_performance: { success_rate_percent: null } },
     });
     expect(emptyRequests).toHaveLength(2);
+  });
+
+  it("keeps dashboard analytics available when the catalog RPC is not deployed", async () => {
+    const requests = installMock(JSON.stringify(analytics), true);
+    const response = await createApp().request(
+      "/api/analytics",
+      { headers: authHeaders() },
+      bindings,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { ...analytics, catalog: { total: 0, issues: [], upcoming: [] } },
+    });
+    expect(requests).toHaveLength(2);
   });
 
   it("exports exact decimal strings and formula-safe CSV", async () => {

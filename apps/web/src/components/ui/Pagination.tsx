@@ -13,6 +13,10 @@ export function Pagination({
   onPageChange: (page: number) => void;
   label?: string;
 }) {
+  const visiblePages = Array.from({ length: Math.min(5, Math.max(1, totalPages)) }, (_, index) => {
+    const start = Math.min(Math.max(page - 2, 1), Math.max(1, totalPages - 4));
+    return start + index;
+  });
   return (
     <nav aria-label={label} className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-muted">
@@ -23,6 +27,16 @@ export function Pagination({
         <Button variant="outline" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
           Previous
         </Button>
+        {visiblePages.map((visiblePage) => (
+          <Button
+            key={visiblePage}
+            variant={visiblePage === page ? "default" : "outline"}
+            aria-current={visiblePage === page ? "page" : undefined}
+            onClick={() => onPageChange(visiblePage)}
+          >
+            {visiblePage}
+          </Button>
+        ))}
         <Button
           variant="outline"
           disabled={page >= totalPages}

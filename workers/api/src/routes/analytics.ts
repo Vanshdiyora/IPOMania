@@ -128,17 +128,46 @@ async function loadAnalytics(
   if (!data || typeof data !== "object") {
     throw new Error("The dashboard analytics query returned an invalid response.");
   }
-  const { data: catalog, error: catalogError } = await supabase.rpc(
-    "get_dashboard_catalog_analytics",
-    { p_catalog_ipo_id: query.catalog_ipo_id ?? null, p_limit: query.limit },
-  );
-  if (catalogError) throw catalogError;
+  const catalogResponse = await supabase.rpc("get_dashboard_catalog_analytics", {
+    p_catalog_ipo_id: query.catalog_ipo_id ?? null,
+    p_limit: query.limit,
+  });
+  let catalog = catalogResponse.data;
+  const catalogError = catalogResponse.error;
+  if (catalogError && !isMissingCatalogAnalyticsRpc(catalogError)) throw catalogError;
+  if (catalogError && isMissingCatalogAnalyticsRpc(catalogError)) {
+    catalog = emptyCatalogAnalytics();
+  }
   if (!catalog || typeof catalog !== "object") {
     throw new Error("The IPO catalog analytics query returned an invalid response.");
   }
   return {
     ...(data as Omit<DashboardAnalytics, "catalog">),
     catalog: catalog as DashboardAnalytics["catalog"],
+  };
+}
+
+function isMissingCatalogAnalyticsRpc(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const rpcError = error as { code?: unknown; message?: unknown };
+  return (
+    rpcError.code === "PGRST202" ||
+    (typeof rpcError.message === "string" &&
+      rpcError.message.includes("get_dashboard_catalog_analytics"))
+  );
+}
+
+function emptyCatalogAnalytics(): DashboardAnalytics["catalog"] {
+  return {
+    total: 0,
+    by_status: [
+      { status: "upcoming", count: 0 },
+      { status: "open", count: 0 },
+      { status: "closed", count: 0 },
+      { status: "listed", count: 0 },
+    ],
+    issues: [],
+    upcoming: [],
   };
 }
 

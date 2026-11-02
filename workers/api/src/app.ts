@@ -26,7 +26,12 @@ export function createApp() {
         const allowedOrigins = new Set([
           ...(context.env?.RUNTIME_ENV === "production"
             ? []
-            : ["http://127.0.0.1:4175", "http://localhost:4175"]),
+            : [
+                "http://127.0.0.1:4175",
+                "http://localhost:4175",
+                "http://127.0.0.1:4179",
+                "http://localhost:4179",
+              ]),
           ...(configuredOrigin ? [configuredOrigin] : []),
         ]);
         return origin && allowedOrigins.has(origin) ? origin : undefined;

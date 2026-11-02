@@ -1,6 +1,5 @@
 import {
   BriefcaseBusiness,
-  ChevronDown,
   ClipboardList,
   LayoutDashboard,
   LogOut,
@@ -8,7 +7,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { NavLink, Link } from "react-router-dom";
+import { NavLink, Link, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useAuth } from "../../auth/useAuth";
 import { cn } from "../../lib/utils";
@@ -20,24 +19,52 @@ function NavItem({
   icon,
   label,
   end = false,
+  activePrefixes,
   onClick,
 }: {
   to: string;
   icon: React.ReactNode;
   label: string;
   end?: boolean;
+  activePrefixes?: string[];
   onClick?: () => void;
 }) {
+  const { pathname } = useLocation();
+  const sectionActive = activePrefixes?.some((prefix) => pathname.startsWith(prefix)) ?? false;
+
+  if (activePrefixes) {
+    return (
+      <Link
+        to={to}
+        onClick={onClick}
+        aria-current={sectionActive ? "page" : undefined}
+        className={cn(
+          "flex min-h-touch items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
+          "transition-colors duration-150",
+          sectionActive
+            ? "bg-action-light text-action font-semibold"
+            : "text-muted hover:bg-canvas hover:text-ink",
+        )}
+      >
+        <span className="shrink-0" aria-hidden="true">
+          {icon}
+        </span>
+        <span className="truncate">{label}</span>
+      </Link>
+    );
+  }
+
   return (
     <NavLink
       to={to}
       end={end}
       onClick={onClick}
+      aria-current={sectionActive ? "page" : undefined}
       className={({ isActive }) =>
         cn(
           "flex min-h-touch items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
           "transition-colors duration-150",
-          isActive
+          isActive || sectionActive
             ? "bg-action-light text-action font-semibold"
             : "text-muted hover:bg-canvas hover:text-ink",
         )
@@ -47,85 +74,6 @@ function NavItem({
         {icon}
       </span>
       <span className="truncate">{label}</span>
-    </NavLink>
-  );
-}
-
-// ─── NavGroup with collapsible children ───────────────────────────────────────
-function NavGroup({
-  icon,
-  label,
-  basePath,
-  children,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  basePath: string;
-  children: React.ReactNode;
-}) {
-  // Auto-expand if on a matching route
-  const isActive = typeof window !== "undefined" && window.location.pathname.startsWith(basePath);
-  const [open, setOpen] = useState(isActive);
-
-  return (
-    <div>
-      <button
-        type="button"
-        className={cn(
-          "flex w-full min-h-touch items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
-          "transition-colors duration-150",
-          isActive ? "text-action font-semibold" : "text-muted hover:bg-canvas hover:text-ink",
-        )}
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span className="shrink-0" aria-hidden="true">
-          {icon}
-        </span>
-        <span className="flex-1 truncate text-left">{label}</span>
-        <ChevronDown
-          size={14}
-          className={cn("shrink-0 transition-transform duration-200", open ? "rotate-180" : "")}
-          aria-hidden="true"
-        />
-      </button>
-      {open && (
-        <div className="ml-5 mt-0.5 space-y-0.5 border-l border-border pl-3 animate-fade-in">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Sub-NavItem ──────────────────────────────────────────────────────────────
-function SubNavItem({
-  to,
-  label,
-  end = false,
-  onClick,
-}: {
-  to: string;
-  label: string;
-  end?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <NavLink
-      to={to}
-      end={end}
-      onClick={onClick}
-      className={({ isActive }) =>
-        cn(
-          "flex min-h-9 items-center rounded-md px-2 py-1.5 text-sm",
-          "transition-colors duration-150",
-          isActive
-            ? "font-semibold text-action bg-action-light"
-            : "font-medium text-muted hover:bg-canvas hover:text-ink",
-        )
-      }
-    >
-      {label}
     </NavLink>
   );
 }
@@ -188,9 +136,7 @@ export function Sidebar({
       {/* Logo */}
       <div className="mb-4 flex shrink-0 items-center justify-between px-2">
         <Link to="/" className="flex items-center gap-2.5 min-h-touch">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-action text-white font-bold text-sm">
-            IM
-          </div>
+          <img src="/logo.png" alt="" className="h-8 w-8 rounded-lg object-contain" />
           <span className="text-base font-bold tracking-tight text-ink">IPO Mania</span>
         </Link>
         <button
@@ -221,45 +167,27 @@ export function Sidebar({
 
         {user ? (
           <>
-            {/* Demat Accounts Group */}
-            <NavGroup
+            <NavItem
+              to="/accounts"
+              activePrefixes={["/accounts"]}
               icon={<BriefcaseBusiness size={18} />}
               label="Demat Accounts"
-              basePath="/accounts"
-            >
-              <SubNavItem to="/accounts" end label="Account dashboard" onClick={onNavigate} />
-              <SubNavItem to="/accounts/list" label="Account list" onClick={onNavigate} />
-              <SubNavItem to="/accounts/import" label="Bulk import" onClick={onNavigate} />
-              <SubNavItem
-                to="/accounts/import-history"
-                label="Import history"
-                onClick={onNavigate}
-              />
-            </NavGroup>
-
-            {/* Applications Group */}
-            <NavGroup
+              onClick={onNavigate}
+            />
+            <NavItem
+              to="/applications"
+              activePrefixes={["/applications"]}
               icon={<ClipboardList size={18} />}
               label="Applications"
-              basePath="/applications"
-            >
-              <SubNavItem to="/applications" end label="App dashboard" onClick={onNavigate} />
-              <SubNavItem to="/applications/list" label="Application table" onClick={onNavigate} />
-              <SubNavItem to="/applications/bulk" label="Bulk entry" onClick={onNavigate} />
-              <SubNavItem to="/applications/import" label="Import wizard" onClick={onNavigate} />
-              <SubNavItem
-                to="/applications/import-history"
-                label="Import history"
-                onClick={onNavigate}
-              />
-            </NavGroup>
-
-            {/* IPOs Group */}
-            <NavGroup icon={<TrendingUp size={18} />} label="IPOs" basePath="/ipos">
-              <SubNavItem to="/ipos" label="IPO list" onClick={onNavigate} />
-              <SubNavItem to="/ipo-calendar" label="IPO calendar" onClick={onNavigate} />
-              <SubNavItem to="/quota-calculator" label="Quota calculator" onClick={onNavigate} />
-            </NavGroup>
+              onClick={onNavigate}
+            />
+            <NavItem
+              to="/ipos"
+              activePrefixes={["/ipos", "/ipo-calendar", "/quota-calculator"]}
+              icon={<TrendingUp size={18} />}
+              label="IPOs"
+              onClick={onNavigate}
+            />
 
             {/* Divider */}
             <div className="my-2 h-px bg-border" />

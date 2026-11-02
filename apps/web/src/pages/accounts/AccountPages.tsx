@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { BriefcaseBusiness, CircleCheck } from "lucide-react";
 import type { z } from "@ipo-mania/validation";
 import { dematAccountSchema } from "@ipo-mania/validation";
 import type { AccountImportPreviewRow, DematAccount } from "@ipo-mania/shared";
@@ -18,6 +19,9 @@ import { FormSection } from "../../components/ui/FormSection";
 import { useToast } from "../../components/ui/ToastContext";
 import { Card } from "../../components/ui/Card";
 import { BackLink } from "../../components/ui/BackLink";
+import { DataTable } from "../../components/ui/DataTable";
+import { ListToolbar } from "../../components/filters/ListToolbar";
+import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
 import { ApiRequestError, apiRequest } from "../../lib/api";
 import {
   SkeletonCard,
@@ -125,7 +129,7 @@ const accountColumns: ColumnDef<DematAccount>[] = [
 function AccountDetailLink({
   account,
   children,
-  className = "font-semibold text-action underline",
+  className = "font-semibold text-action no-underline underline-offset-4 hover:underline visited:text-action",
 }: {
   account: DematAccount;
   children: React.ReactNode;
@@ -160,14 +164,14 @@ export function AccountDashboardPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-navy">Demat accounts</h1>
-          <p className="mt-2 text-lg text-muted">
+          <h1 className="text-2xl font-bold text-navy">Demat accounts</h1>
+          <p className="mt-1 text-sm text-muted">
             Manage the accounts associated with your profile.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
           <Link
-            className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-5 py-2 text-base font-semibold text-white hover:bg-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
+            className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
             to="/accounts/new"
           >
             Add account
@@ -200,16 +204,55 @@ export function AccountDashboardPage() {
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-bold text-ink">Account management</h2>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+              Quick access
+            </p>
+            <h2 className="mt-1 text-base font-bold text-ink">Account management</h2>
           </div>
-          <div className="flex flex-wrap gap-4 text-base font-semibold">
-            <Link className="text-action underline" to="/accounts/list">
+          <div className="flex flex-wrap gap-4 text-sm font-semibold">
+            <Link
+              className="text-action no-underline underline-offset-4 hover:underline visited:text-action"
+              to="/accounts/list"
+            >
               View account list
             </Link>
-            <Link className="text-action underline" to="/accounts/import-history">
+            <Link
+              className="text-action no-underline underline-offset-4 hover:underline visited:text-action"
+              to="/accounts/import-history"
+            >
               Import history
             </Link>
           </div>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <Link
+            to="/accounts/list"
+            className="flex items-center gap-3 rounded-lg border border-border bg-canvas px-4 py-3 text-sm font-semibold text-ink transition-colors hover:border-action hover:bg-action-light"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-action">
+              <BriefcaseBusiness size={18} aria-hidden="true" />
+            </span>
+            <span>
+              <span className="block">Manage accounts</span>
+              <span className="mt-0.5 block text-xs font-normal text-muted">
+                Review, edit, and archive holdings
+              </span>
+            </span>
+          </Link>
+          <Link
+            to="/accounts/import"
+            className="flex items-center gap-3 rounded-lg border border-border bg-canvas px-4 py-3 text-sm font-semibold text-ink transition-colors hover:border-action hover:bg-action-light"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-action">
+              <CircleCheck size={18} aria-hidden="true" />
+            </span>
+            <span>
+              <span className="block">Import accounts</span>
+              <span className="mt-0.5 block text-xs font-normal text-muted">
+                Add multiple accounts from a file
+              </span>
+            </span>
+          </Link>
         </div>
       </Card>
     </div>
@@ -219,6 +262,7 @@ export function AccountDashboardPage() {
 export function AccountListPage() {
   const { session, markSessionExpired } = useAuth();
   const [listParams, setListParams] = useSearchParams();
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const pageValue = Number(listParams.get("page"));
   const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
   const holderName = listParams.get("holder_name") ?? "";
@@ -228,6 +272,14 @@ export function AccountListPage() {
   const archived = listParams.get("archived") ?? "false";
   const createdFrom = listParams.get("created_from") ?? "";
   const createdTo = listParams.get("created_to") ?? "";
+  const [draftFilters, setDraftFilters] = useState(() => ({
+    broker,
+    depository,
+    status,
+    archived,
+    createdFrom,
+    createdTo,
+  }));
   const updateFilter = (key: string, value: string) => {
     setListParams(
       (previous) => {
@@ -292,117 +344,174 @@ export function AccountListPage() {
     setListParams({}, { replace: true });
   }
 
+  const filterCount = [
+    broker,
+    depository,
+    status,
+    archived !== "false",
+    createdFrom,
+    createdTo,
+  ].filter(Boolean).length;
+
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <header className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(560px,auto)] lg:items-end">
         <div>
-          <h1 className="text-3xl font-bold text-navy">Account list</h1>
+          <h1 className="text-2xl font-bold text-navy">Account list</h1>
           <p className="mt-2 text-base text-muted">
             {data
               ? `${data.data.pagination.total} matching accounts`
               : "Search and filter your accounts."}
           </p>
         </div>
-        <Link className={secondaryLinkClass} to="/accounts/new">
-          Add an account
-        </Link>
-      </header>
-      <Card>
-        <h2 className="text-xl font-bold text-ink">Search and filter</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <FilterInput
-            label="Holder name"
-            value={holderName}
-            onChange={(value) => {
-              updateFilter("holder_name", value);
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <ListToolbar
+            className="min-w-0 flex-1 sm:flex-nowrap"
+            search={holderName}
+            searchPlaceholder="Search holder name..."
+            searchLabel="Search holder name"
+            activeFilterCount={filterCount}
+            onSearchChange={(value) => updateFilter("holder_name", value)}
+            onOpenFilters={() => {
+              setDraftFilters({ broker, depository, status, archived, createdFrom, createdTo });
+              setFiltersOpen(true);
             }}
+            onClearFilters={resetFilters}
           />
-          <FilterInput
-            label="Broker"
-            value={broker}
-            onChange={(value) => {
-              updateFilter("broker", value);
-            }}
-          />
-          <label className="block text-base font-semibold text-ink">
-            Depository
-            <select
-              className={inputClass}
-              value={depository}
-              onChange={(event) => {
-                updateFilter("depository", event.target.value);
-              }}
-            >
-              <option value="">All depositories</option>
-              <option value="NSDL">NSDL</option>
-              <option value="CDSL">CDSL</option>
-            </select>
-          </label>
-          <label className="block text-base font-semibold text-ink">
-            Account status
-            <select
-              className={inputClass}
-              value={status}
-              onChange={(event) => {
-                updateFilter("status", event.target.value);
-              }}
-            >
-              <option value="">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="closed">Closed</option>
-            </select>
-          </label>
-          <label className="block text-base font-semibold text-ink">
-            Archive
-            <select
-              className={inputClass}
-              value={archived}
-              onChange={(event) => {
-                updateFilter("archived", event.target.value);
-              }}
-            >
-              <option value="false">Not archived</option>
-              <option value="true">Archived</option>
-              <option value="all">All accounts</option>
-            </select>
-          </label>
-          <label className="block text-base font-semibold text-ink">
-            Created from
-            <input
-              className={inputClass}
-              type="date"
-              value={createdFrom}
-              onChange={(event) => {
-                updateFilter("created_from", event.target.value);
-              }}
-            />
-          </label>
-          <label className="block text-base font-semibold text-ink">
-            Created through
-            <input
-              className={inputClass}
-              type="date"
-              value={createdTo}
-              onChange={(event) => {
-                updateFilter("created_to", event.target.value);
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            className="min-h-touch self-end text-left font-semibold text-action underline"
-            onClick={resetFilters}
-          >
-            Clear filters
-          </button>
+          <Link className={`${secondaryLinkClass} shrink-0`} to="/accounts/new">
+            Add an account
+          </Link>
         </div>
-      </Card>
+      </header>
+      <FilterDrawer
+        open={filtersOpen}
+        title="Account filters"
+        activeCount={filterCount}
+        onClose={() => setFiltersOpen(false)}
+        onReset={() => {
+          setDraftFilters({
+            broker: "",
+            depository: "",
+            status: "",
+            archived: "false",
+            createdFrom: "",
+            createdTo: "",
+          });
+        }}
+        onApply={() => {
+          setListParams(
+            (previous) => {
+              const next = new URLSearchParams(previous);
+              ["broker", "depository", "status", "created_from", "created_to"].forEach((key) => {
+                next.delete(key);
+              });
+              if (draftFilters.broker) next.set("broker", draftFilters.broker);
+              if (draftFilters.depository) next.set("depository", draftFilters.depository);
+              if (draftFilters.status) next.set("status", draftFilters.status);
+              if (draftFilters.createdFrom) next.set("created_from", draftFilters.createdFrom);
+              if (draftFilters.createdTo) next.set("created_to", draftFilters.createdTo);
+              if (draftFilters.archived !== "false") next.set("archived", draftFilters.archived);
+              else next.delete("archived");
+              next.delete("page");
+              return next;
+            },
+            { replace: true },
+          );
+          setFiltersOpen(false);
+        }}
+      >
+        <FilterSection title="Account">
+          <div className="grid gap-4">
+            <FilterInput
+              label="Broker"
+              value={draftFilters.broker}
+              onChange={(broker) => setDraftFilters((current) => ({ ...current, broker }))}
+            />
+            <label className="block text-sm font-semibold text-ink">
+              Depository
+              <select
+                className={inputClass}
+                value={draftFilters.depository}
+                onChange={(event) =>
+                  setDraftFilters((current) => ({ ...current, depository: event.target.value }))
+                }
+              >
+                <option value="">All depositories</option>
+                <option value="NSDL">NSDL</option>
+                <option value="CDSL">CDSL</option>
+              </select>
+            </label>
+            <label className="block text-sm font-semibold text-ink">
+              Account status
+              <select
+                className={inputClass}
+                value={draftFilters.status}
+                onChange={(event) =>
+                  setDraftFilters((current) => ({ ...current, status: event.target.value }))
+                }
+              >
+                <option value="">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="closed">Closed</option>
+              </select>
+            </label>
+            <label className="block text-sm font-semibold text-ink">
+              Archive
+              <select
+                className={inputClass}
+                value={draftFilters.archived}
+                onChange={(event) =>
+                  setDraftFilters((current) => ({ ...current, archived: event.target.value }))
+                }
+              >
+                <option value="false">Not archived</option>
+                <option value="true">Archived</option>
+                <option value="all">All accounts</option>
+              </select>
+            </label>
+            <label className="block text-sm font-semibold text-ink">
+              Created from
+              <input
+                className={inputClass}
+                type="date"
+                value={draftFilters.createdFrom}
+                onChange={(event) =>
+                  setDraftFilters((current) => ({ ...current, createdFrom: event.target.value }))
+                }
+              />
+            </label>
+            <label className="block text-sm font-semibold text-ink">
+              Created through
+              <input
+                className={inputClass}
+                type="date"
+                value={draftFilters.createdTo}
+                onChange={(event) =>
+                  setDraftFilters((current) => ({ ...current, createdTo: event.target.value }))
+                }
+              />
+            </label>
+          </div>
+        </FilterSection>
+      </FilterDrawer>
       {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       <Card className="p-3 sm:p-5">
         <div className="hidden overflow-hidden md:block" aria-busy={isLoading}>
           <div ref={scrollRef} className="max-h-[36rem] overflow-auto">
-            <table className="w-full min-w-[850px] table-fixed border-collapse text-left text-base">
+            <DataTable minWidth="850px" className="table-fixed text-base">
+              <colgroup>
+                {[
+                  ["holder_name", "20%"],
+                  ["broker_name", "17%"],
+                  ["depository_type", "16%"],
+                  ["masked_demat_identifier", "17%"],
+                  ["account_status", "15%"],
+                  ["created_at", "15%"],
+                ].map(([id, width]) => (
+                  <col key={id} style={{ width }} />
+                ))}
+              </colgroup>
               <thead className="sticky top-0 z-10 bg-canvas text-ink">
                 {table.getHeaderGroups().map((group) => (
                   <tr key={group.id}>
@@ -436,6 +545,8 @@ export function AccountListPage() {
                         style={{
                           height: `${virtualRow.size}px`,
                           transform: `translateY(${virtualRow.start}px)`,
+                          display: "table",
+                          tableLayout: "fixed",
                         }}
                       >
                         {row.getVisibleCells().map((cell) => (
@@ -451,7 +562,7 @@ export function AccountListPage() {
                   })
                 )}
               </tbody>
-            </table>
+            </DataTable>
           </div>
         </div>
         <div className="space-y-3 md:hidden" aria-busy={isLoading}>
@@ -466,7 +577,7 @@ export function AccountListPage() {
               <article key={account.id} className="rounded-lg border border-border p-4 text-base">
                 <AccountDetailLink
                   account={account}
-                  className="text-lg font-bold text-action underline"
+                  className="text-lg font-bold text-action no-underline underline-offset-4 hover:underline visited:text-action"
                 >
                   {account.holder_name}
                 </AccountDetailLink>
@@ -716,13 +827,13 @@ export function AccountDetailsPage() {
   if (isLoading) return <SkeletonDetailsPage rows={8} />;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="w-full space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <BackLink fallback="/accounts/list" allowedPath={/^\/accounts(\/list)?$/}>
             Back to accounts
           </BackLink>
-          <h1 className="text-3xl font-bold text-navy">Account details</h1>
+          <h1 className="text-2xl font-bold text-navy">Account details</h1>
           <p className="mt-2 text-base text-muted">
             Only masked account identifiers are displayed.
           </p>
@@ -876,7 +987,7 @@ export function AccountImportPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-bold text-navy">Bulk account import</h1>
+        <h1 className="text-2xl font-bold text-navy">Bulk account import</h1>
         <p className="mt-2 max-w-3xl text-base leading-7 text-muted">
           Upload one CSV or XLSX sheet (up to 5 MB and 500 rows), map its columns, review every row,
           then confirm. Invalid and duplicate rows remain visible in the report and are not
@@ -941,7 +1052,7 @@ export function AccountImportPage() {
             ))}
           </div>
           <div className="mt-5 overflow-auto">
-            <table className="min-w-full text-left text-sm">
+            <DataTable minWidth="720px">
               <thead>
                 <tr>
                   {headers.map((header) => (
@@ -962,7 +1073,7 @@ export function AccountImportPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </DataTable>
           </div>
           <Button
             className="mt-5"
@@ -984,7 +1095,7 @@ export function AccountImportPage() {
             {preview.summary?.invalid ?? 0} invalid
           </p>
           <div className="mt-4 overflow-auto">
-            <table className="min-w-full text-left text-base">
+            <DataTable minWidth="720px">
               <thead>
                 <tr className="border-b border-border">
                   <th className="p-3">Row</th>
@@ -1011,7 +1122,7 @@ export function AccountImportPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </DataTable>
           </div>
           {preview.summary?.ready ? (
             <p className="mt-4 text-base text-muted">
@@ -1101,7 +1212,7 @@ export function ImportHistoryPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-navy">
+          <h1 className="text-2xl font-bold text-navy">
             {importId ? "Import report" : "Import history"}
           </h1>
           <p className="mt-2 text-base text-muted">
@@ -1150,7 +1261,7 @@ export function ImportHistoryPage() {
             ) : null}
           </div>
           <div className="mt-5 overflow-auto">
-            <table className="min-w-full text-left text-base">
+            <DataTable minWidth="720px">
               <thead>
                 <tr className="border-b border-border">
                   <th className="p-3">Row</th>
@@ -1169,13 +1280,13 @@ export function ImportHistoryPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </DataTable>
           </div>
         </Card>
       ) : null}
       {!importId ? (
         <Card className="overflow-auto p-3 sm:p-5">
-          <table className="min-w-full text-left text-base">
+          <DataTable minWidth="720px">
             <thead>
               <tr className="border-b border-border">
                 <th className="p-3">File</th>
@@ -1190,7 +1301,7 @@ export function ImportHistoryPage() {
                 <tr key={item.id} className="border-b border-border">
                   <td className="p-3">
                     <Link
-                      className="text-action underline"
+                      className="text-action no-underline underline-offset-4 hover:underline visited:text-action"
                       to={`/accounts/import-history/${item.id}`}
                     >
                       {item.file_name}
@@ -1203,7 +1314,7 @@ export function ImportHistoryPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </DataTable>
           {!imports.length ? (
             <p className="py-8 text-center text-base text-muted">No imports yet.</p>
           ) : null}
@@ -1223,9 +1334,10 @@ function SummaryCard({
   loading: boolean;
 }) {
   return (
-    <Card>
-      <p className="text-base font-semibold text-muted">{label}</p>
-      <p className="mt-3 text-4xl font-bold text-navy" aria-live="polite">
+    <Card className="relative overflow-hidden">
+      <span className="absolute inset-y-0 left-0 w-1 bg-action" aria-hidden="true" />
+      <p className="text-sm font-semibold text-muted">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-navy" aria-live="polite">
         {loading ? "…" : (value ?? "—")}
       </p>
     </Card>
@@ -1299,7 +1411,7 @@ function csvEscape(value: string) {
 const inputClass =
   "mt-2 min-h-touch w-full rounded-lg border border-border bg-white px-3 text-base text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
 const secondaryLinkClass =
-  "inline-flex min-h-touch items-center justify-center rounded-lg border border-border bg-white px-5 py-2 text-base font-semibold text-ink hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
+  "inline-flex min-h-touch items-center justify-center rounded-lg border border-border bg-white px-4 py-2 text-sm font-semibold text-ink hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
 
 const importFields = [
   { key: "holder_name", label: "Holder name", required: true },

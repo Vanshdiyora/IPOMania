@@ -20,6 +20,9 @@ type SearchableSelectProps = {
   emptyLabel?: string;
   disabled?: boolean;
   loading?: boolean;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 };
 
 export function SearchableSelect({
@@ -33,6 +36,9 @@ export function SearchableSelect({
   emptyLabel = "No matching options.",
   disabled = false,
   loading = false,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -40,6 +46,7 @@ export function SearchableSelect({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const optionsListRef = useRef<HTMLDivElement>(null);
   const listId = useId();
   const selected = Array.isArray(value) ? value : value ? [value] : [];
   const selectedOptions = options.filter((option) => selected.includes(option.value));
@@ -240,14 +247,14 @@ export function SearchableSelect({
                 <div className="mt-2 flex justify-between gap-3 text-sm font-semibold">
                   <button
                     type="button"
-                    className="text-action underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+                    className="text-action no-underline underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy visited:text-action"
                     onClick={() => onChange(options.map((option) => option.value))}
                   >
                     Select all
                   </button>
                   <button
                     type="button"
-                    className="text-action underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+                    className="text-action no-underline underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy visited:text-action"
                     onClick={() => onChange([])}
                   >
                     Clear selection
@@ -256,14 +263,24 @@ export function SearchableSelect({
               ) : selected.length ? (
                 <button
                   type="button"
-                  className="mt-2 text-sm font-semibold text-action underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+                  className="mt-2 text-sm font-semibold text-action no-underline underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy visited:text-action"
                   onClick={() => onChange(multiple ? [] : "")}
                 >
                   Clear selection
                 </button>
               ) : null}
             </div>
-            <div className="max-h-64 overflow-y-auto p-1.5">
+            <div
+              ref={optionsListRef}
+              className="max-h-64 overflow-y-auto p-1.5"
+              onScroll={(event) => {
+                if (!hasMore || loadingMore || !onLoadMore) return;
+                const element = event.currentTarget;
+                if (element.scrollHeight - element.scrollTop - element.clientHeight < 80) {
+                  onLoadMore();
+                }
+              }}
+            >
               {filtered.length ? (
                 filtered.map((option, index) => {
                   const isSelected = selected.includes(option.value);
@@ -323,6 +340,12 @@ export function SearchableSelect({
               ) : (
                 <p className="px-3 py-5 text-center text-sm text-muted">{emptyLabel}</p>
               )}
+              {loadingMore ? (
+                <p className="flex min-h-10 items-center justify-center gap-2 text-sm text-muted">
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                  Loading more options…
+                </p>
+              ) : null}
             </div>
           </div>,
           document.body,

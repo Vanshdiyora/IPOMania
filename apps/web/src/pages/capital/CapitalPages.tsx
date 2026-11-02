@@ -25,6 +25,7 @@ import {
   capitalLedgerEntrySchema,
 } from "@ipo-mania/validation";
 import { Card } from "../../components/ui/Card";
+import { DataTable } from "../../components/ui/DataTable";
 import { ApiRequestError, apiRequest } from "../../lib/api";
 import { EmptyState } from "../../components/ui/States";
 import {
@@ -77,7 +78,8 @@ const blankFilters: Filters = {
 };
 const inputClass =
   "mt-1 min-h-touch w-full rounded-lg border border-border bg-white px-3 py-2 text-base text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
-const linkClass = "font-semibold text-action underline";
+const linkClass =
+  "font-semibold text-action no-underline underline-offset-4 hover:underline visited:text-action";
 const categories = ["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"];
 const mandateStatuses = ["PENDING", "APPROVED", "REJECTED", "REVOKED", "EXPIRED", "RELEASED"];
 const allotmentStatuses = ["ALLOTTED", "NOT_ALLOTTED", "PARTIAL_ALLOTMENT"];
@@ -147,7 +149,7 @@ export function MandateDetailsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="w-full space-y-6">
       <PageHeader
         title="Mandate details"
         description="Manually maintain the mandate status and reference. Approval does not record a completed debit."
@@ -321,7 +323,7 @@ export function AllotmentDetailsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="w-full space-y-6">
       <PageHeader
         title="Allotment details"
         description="Maintain allotment, price, and expected refund data against the original application."
@@ -853,7 +855,7 @@ export function FinancialTransactionHistoryPage() {
           <p className="mt-3 text-muted">No transactions match these filters.</p>
         ) : (
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <DataTable minWidth="760px">
               <thead>
                 <tr className="border-b border-border text-muted">
                   <th className="p-3">Effective</th>
@@ -879,7 +881,7 @@ export function FinancialTransactionHistoryPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </DataTable>
           </div>
         )}
       </Card>
@@ -937,7 +939,7 @@ export function RefundTrackerPage() {
       ) : null}
       <Card>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <DataTable minWidth="720px">
             <thead>
               <tr className="border-b border-border text-muted">
                 <th className="p-3">IPO / account</th>
@@ -977,7 +979,7 @@ export function RefundTrackerPage() {
                 ))
               )}
             </tbody>
-          </table>
+          </DataTable>
           {!allotmentQuery.isLoading && !allotmentQuery.error && rows.length === 0 ? (
             <p className="p-3 text-muted">No refunds match these filters.</p>
           ) : null}
@@ -1038,7 +1040,7 @@ function MandateList({ showAll }: { showAll: boolean }) {
               >
                 <div>
                   <Link
-                    className="text-lg font-semibold text-action underline"
+                    className="text-lg font-semibold text-action no-underline underline-offset-4 hover:underline visited:text-action"
                     to={`/mandates/${mandate.id}`}
                   >
                     {applicationTitle(relatedApplication(mandate.application))}
@@ -1127,7 +1129,7 @@ function AllotmentList({ showAll }: { showAll: boolean }) {
               >
                 <div>
                   <Link
-                    className="text-lg font-semibold text-action underline"
+                    className="text-lg font-semibold text-action no-underline underline-offset-4 hover:underline visited:text-action"
                     to={`/allotments/${allotment.id}`}
                   >
                     {applicationTitle(relatedApplication(allotment.application))}

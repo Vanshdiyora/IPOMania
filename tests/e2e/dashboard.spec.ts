@@ -267,12 +267,14 @@ test("dashboard exposes analytics, filters and downloadable reports", async ({ p
   const download = await downloadWait;
   expect(download.suggestedFilename()).toBe("analytics.csv");
 
+  await page.getByRole("button", { name: /^Filters/ }).click();
   await page.getByLabel("Category filter").selectOption("RETAIL");
   await expect(page.getByLabel("Category filter")).toHaveValue("RETAIL");
   await page.getByLabel("Shared IPO filter").selectOption("99999999-9999-4999-8999-999999999999");
   await expect(page.getByLabel("Shared IPO filter")).toHaveValue(
     "99999999-9999-4999-8999-999999999999",
   );
+  await page.getByRole("button", { name: "Apply filters (2)" }).click();
 });
 
 test("financial pages are unavailable in the web app", async ({ page }) => {
@@ -300,12 +302,15 @@ test("dashboard remains usable across responsive viewports with accessible filte
   ]) {
     await page.setViewportSize(viewport);
     await expect(page.getByRole("heading", { name: "Dashboard & analytics" })).toBeVisible();
-    await expect(page.getByLabel("From date")).toBeVisible();
-    await expect(page.getByLabel("To date")).toBeVisible();
+    await page.getByRole("button", { name: /^Filters/ }).click();
+    await expect(page.getByRole("dialog", { name: "Filters" })).toBeVisible();
+    await expect(page.getByLabel("Submitted from")).toBeVisible();
+    await expect(page.getByLabel("Submitted to")).toBeVisible();
     await expect(page.getByLabel("My IPO filter")).toBeVisible();
     await expect(page.getByLabel("Shared IPO filter")).toBeVisible();
     await expect(page.getByLabel("Category filter")).toBeVisible();
     await expect(page.getByLabel("Demat account filter")).toBeVisible();
+    await page.getByRole("button", { name: "Close drawer" }).last().click();
     const widths = await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
       document: document.documentElement.scrollWidth,

@@ -55,7 +55,10 @@ iposRoutes.get("/catalog", async (context) => {
     .from("ipo_catalog")
     .select(catalogColumns, { count: "exact" })
     .is("archived_at", null)
-    .order("bidding_start_date", { ascending: true, nullsFirst: false })
+    .order(
+      query.sort === "opening_asc" ? "bidding_start_date" : "created_at",
+      query.sort === "opening_asc" ? { ascending: true, nullsFirst: false } : { ascending: false },
+    )
     .order("company_name", { ascending: true })
     .order("id", { ascending: true });
   if (query.status) request = request.eq("ipo_status", query.status.toLowerCase());
@@ -109,7 +112,10 @@ iposRoutes.get("/", async (context) => {
     .from("ipos")
     .select(ipoColumns, { count: "exact" })
     .eq("user_id", userId)
-    .order("opening_date", { ascending: true })
+    .order(
+      query.sort === "opening_asc" ? "opening_date" : "created_at",
+      query.sort === "opening_asc" ? { ascending: true, nullsFirst: false } : { ascending: false },
+    )
     .order("id", { ascending: true });
 
   if (query.include_archived === "false") request = request.is("archived_at", null);

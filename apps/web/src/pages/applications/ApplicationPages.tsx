@@ -1,5 +1,5 @@
 import { toIsoDateTime } from "../../lib/formValues";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
@@ -13,6 +13,7 @@ import { ConfirmButton } from "../../components/ui/ConfirmButton";
 import { Button } from "../../components/ui/Button";
 import { RouteFormDrawer } from "../../components/ui/FormDrawer";
 import { SearchableFormSelect } from "../../components/ui/SearchableFormSelect";
+import { SearchableSelect } from "../../components/filters/SearchableSelect";
 import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
 import { FormSection } from "../../components/ui/FormSection";
 import { useFormValidation } from "../../components/ui/useFormValidation";
@@ -20,6 +21,7 @@ import { applicationCreateSchema, applicationUpdateSchema } from "@ipo-mania/val
 import { Card } from "../../components/ui/Card";
 import { BackLink } from "../../components/ui/BackLink";
 import { Pagination } from "../../components/ui/Pagination";
+import { DataTable } from "../../components/ui/DataTable";
 import { useToast } from "../../components/ui/ToastContext";
 import {
   ActiveFilterChips,
@@ -173,24 +175,15 @@ function filterCount(filters: ApplicationFilters) {
 
 function useOwnedLists() {
   const { session } = useAuth();
-  const ipos = useQuery({
+  const ipos = useInfiniteQuery({
     queryKey: ["ipos", "application-options"],
     enabled: Boolean(session),
-    queryFn: async () => {
-      const first = await apiRequest<IpoListResponse>("/api/ipos?page_size=100", session!);
-      const totalPages = first.data.pagination?.total_pages ?? 1;
-      if (totalPages <= 1) return first;
-      const pages = await Promise.all(
-        Array.from({ length: totalPages - 1 }, (_, index) =>
-          apiRequest<IpoListResponse>(`/api/ipos?page=${index + 2}&page_size=100`, session!),
-        ),
-      );
-      return {
-        data: {
-          ...first.data,
-          ipos: [first.data.ipos, ...pages.map((page) => page.data.ipos)].flat(),
-        },
-      };
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      apiRequest<IpoListResponse>(`/api/ipos/catalog?page=${pageParam}&page_size=25`, session!),
+    getNextPageParam: (lastPage) => {
+      const { page, total_pages: totalPages } = lastPage.data.pagination ?? {};
+      return page && totalPages && page < totalPages ? page + 1 : undefined;
     },
   });
   const accounts = useQuery({
@@ -214,7 +207,7 @@ function useOwnedLists() {
     },
   });
   return {
-    ipos: ipos.data?.data.ipos ?? [],
+    ipos: ipos.data?.pages.flatMap((page) => page.data.ipos) ?? [],
     accounts: accounts.data?.data.accounts ?? [],
     loading: ipos.isLoading || accounts.isLoading,
     optionLoading: {
@@ -223,6 +216,7 @@ function useOwnedLists() {
     },
     error: ipos.error ?? accounts.error,
     refetch: () => Promise.all([ipos.refetch(), accounts.refetch()]),
+    iposInfinite: ipos,
   };
 }
 
@@ -288,7 +282,7 @@ export function ApplicationDashboardPage() {
           Keep application progress up to date as your records change.
         </p>
         <Link
-          className="mt-4 inline-flex min-h-touch items-center text-action underline"
+          className="mt-4 inline-flex min-h-touch items-center text-action no-underline underline-offset-4 hover:underline visited:text-action"
           to="/applications/list"
         >
           View application table
@@ -630,7 +624,7 @@ export function ApplicationListPage() {
           </Button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left">
+          <DataTable minWidth="760px">
             <thead>
               <tr className="border-b border-border text-sm text-muted">
                 <th scope="col" className="p-3 text-center">
@@ -673,7 +667,7 @@ export function ApplicationListPage() {
                     </td>
                     <td className="p-3">
                       <Link
-                        className="font-semibold text-action underline"
+                        className="font-semibold text-action no-underline underline-offset-4 hover:underline visited:text-action"
                         to={`/applications/${row.id}`}
                         state={{ from: `${location.pathname}${location.search}` }}
                       >
@@ -693,7 +687,7 @@ export function ApplicationListPage() {
                 ))
               )}
             </tbody>
-          </table>
+          </DataTable>
           {!isLoading && !rows.length ? (
             <div className="p-8 text-center">
               <p className="font-semibold text-ink">No applications found.</p>
@@ -900,23 +894,33 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
           {!editing ? (
             <FormSection title="Issue and account">
               <div className="grid gap-4 sm:grid-cols-2">
-                <SearchableFormSelect
-                  label="IPO"
-                  required
-                  error={validation.errors.ipo_id}
-                  value={ipoId}
-                  placeholder={lists.optionLoading.ipos ? "Loading IPOs…" : "Choose an IPO"}
-                  disabled={lists.optionLoading.ipos}
-                  options={lists.ipos.map((item) => ({
-                    value: item.id,
-                    label: `${item.symbol} — ${item.company_name}`,
-                  }))}
-                  onChange={(event) => {
-                    setIpoId(event.target.value);
-                    setCategoryId("");
-                    setPrice("");
-                  }}
-                />
+                <div className="min-w-0">
+                  <SearchableSelect
+                    label="IPO"
+                    placeholder="Choose an IPO"
+                    value={ipoId}
+                    loading={lists.optionLoading.ipos}
+                    disabled={lists.optionLoading.ipos}
+                    options={lists.ipos.map((item) => ({
+                      value: item.id,
+                      label: `${item.symbol} — ${item.company_name}`,
+                    }))}
+                    hasMore={Boolean(lists.iposInfinite.hasNextPage)}
+                    loadingMore={lists.iposInfinite.isFetchingNextPage}
+                    onLoadMore={() => void lists.iposInfinite.fetchNextPage()}
+                    onChange={(value) => {
+                      const nextValue = Array.isArray(value) ? (value[0] ?? "") : value;
+                      setIpoId(nextValue);
+                      setCategoryId("");
+                      setPrice("");
+                    }}
+                  />
+                  {validation.errors.ipo_id ? (
+                    <p role="alert" className="mt-1 text-sm font-medium text-red-700">
+                      {validation.errors.ipo_id}
+                    </p>
+                  ) : null}
+                </div>
                 <SearchableFormSelect
                   label="Demat account"
                   required
@@ -1123,7 +1127,7 @@ export function ApplicationDetailsPage() {
     return <ErrorMessage error={detail.error} onRetry={() => void detail.refetch()} />;
   if (!item) return <p>Application not found.</p>;
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="w-full space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <BackLink
@@ -1258,7 +1262,7 @@ export function BulkApplicationPage() {
     setPreview(null);
   }
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="w-full space-y-6">
       <header>
         <h1 className="text-3xl font-bold text-navy">Bulk application entry</h1>
         <p className="mt-2 text-base text-muted">
@@ -1533,7 +1537,7 @@ export function ApplicationImportPage() {
       }),
   });
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="w-full space-y-6">
       <header>
         <h1 className="text-3xl font-bold text-navy">Application import wizard</h1>
         <p className="mt-2 text-base text-muted">
@@ -1661,7 +1665,7 @@ export function ApplicationImportPage() {
           </section>
         ) : null}
         <Link
-          className="mt-5 inline-flex min-h-touch items-center text-action underline"
+          className="mt-5 inline-flex min-h-touch items-center text-action no-underline underline-offset-4 hover:underline visited:text-action"
           to="/applications/import-history"
         >
           View import history
@@ -1706,7 +1710,7 @@ export function ApplicationImportHistoryPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[620px] text-left">
+              <DataTable minWidth="620px">
                 <thead>
                   <tr>
                     <th className="p-3">File</th>
@@ -1727,7 +1731,7 @@ export function ApplicationImportHistoryPage() {
                       <td className="p-3">{new Date(item.created_at).toLocaleDateString()}</td>
                       <td className="p-3">
                         <Link
-                          className="text-action underline"
+                          className="text-action no-underline underline-offset-4 hover:underline visited:text-action"
                           to={`/applications/import-history/${item.id}`}
                         >
                           Open report
@@ -1736,7 +1740,7 @@ export function ApplicationImportHistoryPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </DataTable>
               {data && data.data.imports.length === 0 ? (
                 <p className="p-3">No imports yet.</p>
               ) : null}

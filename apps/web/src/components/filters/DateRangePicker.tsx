@@ -19,7 +19,7 @@ export function DateRangePicker({
         {hasValue ? (
           <button
             type="button"
-            className="text-xs font-semibold text-action underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+            className="text-xs font-semibold text-action no-underline underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy visited:text-action"
             onClick={() => {
               onFromChange("");
               onToChange("");

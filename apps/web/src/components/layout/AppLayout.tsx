@@ -100,14 +100,17 @@ export function AppLayout() {
         />
         <main
           id="main-content"
-          className="mx-auto w-full max-w-7xl min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8 animate-fade-in"
+          className="w-full min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8 animate-fade-in"
         >
           <div aria-hidden={drawerRoute || undefined}>
             {drawerRoute
               ? (backgroundRef.current ?? (
                   <section className="rounded-xl border border-border bg-white p-6">
                     <h1 className="text-2xl font-bold">Manage your records</h1>
-                    <Link className="text-action underline" to="/dashboard">
+                    <Link
+                      className="text-action no-underline underline-offset-4 hover:underline visited:text-action"
+                      to="/dashboard"
+                    >
                       Back to dashboard
                     </Link>
                   </section>

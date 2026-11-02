@@ -31,11 +31,14 @@ import { FormDrawer } from "../../components/ui/FormDrawer";
 import { FormInput, FormSelect } from "../../components/ui/FormControls";
 import { Pagination } from "../../components/ui/Pagination";
 import { PageHeader, StatCard } from "../../components/ui/PageHeader";
+import { DataTable } from "../../components/ui/DataTable";
 import { StatusBadge } from "../../components/ui/Badge";
 import { ErrorNotice, EmptyState } from "../../components/ui/States";
 import { useToast } from "../../components/ui/ToastContext";
 import { SkeletonCard, SkeletonFormPage, SkeletonTable } from "../../components/ui/Skeleton";
 import { LoadingState } from "../../components/LoadingState";
+import { ListToolbar } from "../../components/filters/ListToolbar";
+import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
 
 const nav = [
   ["Overview", "/admin", BarChart3],
@@ -87,9 +90,7 @@ export function AdminLayout() {
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className="flex h-16 items-center px-5 text-lg font-bold text-white">
-        <span className="mr-2 grid h-8 w-8 place-items-center rounded-lg bg-white text-navy">
-          I
-        </span>
+        <img src="/logo.png" alt="" className="mr-2 h-8 w-8 rounded-lg object-contain" />
         IPO Mania
       </div>
       <nav aria-label="Administration" className="flex-1 space-y-1 px-3 py-5">
@@ -167,7 +168,7 @@ export function AdminLayout() {
             <h1 className="text-lg font-bold">{title}</h1>
           </div>
         </header>
-        <main className="mx-auto max-w-[1600px] p-4 md:p-6 lg:p-8">
+        <main className="w-full p-4 md:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>
@@ -367,6 +368,8 @@ export function AdminIposPage() {
   const { notify } = useToast();
   const location = useLocation();
   const [listParams, setListParams] = useSearchParams();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [draftStatus, setDraftStatus] = useState("");
   const search = listParams.get("search") ?? "";
   const statusFilter = listParams.get("status") ?? "";
   const pageValue = Number(listParams.get("page"));
@@ -548,34 +551,45 @@ export function AdminIposPage() {
         description={`${filtered.length} records`}
         actions={<Button onClick={openCreate}>Add IPO</Button>}
       />
-      <SearchInput
-        aria-label="Search IPO catalog"
-        value={search}
-        onClear={() => {
-          updateFilter("search", "");
+      <ListToolbar
+        search={search}
+        searchPlaceholder="Search company or symbol..."
+        searchLabel="Search IPO catalog"
+        activeFilterCount={statusFilter ? 1 : 0}
+        onSearchChange={(value) => updateFilter("search", value)}
+        onOpenFilters={() => {
+          setDraftStatus(statusFilter);
+          setFiltersOpen(true);
         }}
-        onChange={(event) => {
-          updateFilter("search", event.target.value);
-        }}
-        placeholder="Search company or symbol"
+        onClearFilters={() => updateFilter("status", "")}
       />
-
-      <Select
-        aria-label="Filter catalog status"
-        value={statusFilter}
-        onChange={(event) => {
-          updateFilter("status", event.target.value);
+      <FilterDrawer
+        open={filtersOpen}
+        title="IPO catalog filters"
+        activeCount={draftStatus ? 1 : 0}
+        onClose={() => setFiltersOpen(false)}
+        onReset={() => setDraftStatus("")}
+        onApply={() => {
+          updateFilter("status", draftStatus);
+          setFiltersOpen(false);
         }}
-        className="sm:max-w-xs"
       >
-        <option value="">All statuses</option>
-        {["upcoming", "open", "closed", "listed"].map((status) => (
-          <option key={status} value={status}>
-            {status[0]?.toUpperCase()}
-            {status.slice(1)}
-          </option>
-        ))}
-      </Select>
+        <FilterSection title="IPO status">
+          <Select
+            aria-label="Filter catalog status"
+            value={draftStatus}
+            onChange={(event) => setDraftStatus(event.target.value)}
+          >
+            <option value="">All statuses</option>
+            {["upcoming", "open", "closed", "listed"].map((status) => (
+              <option key={status} value={status}>
+                {status[0]?.toUpperCase()}
+                {status.slice(1)}
+              </option>
+            ))}
+          </Select>
+        </FilterSection>
+      </FilterDrawer>
       {loadError && (
         <div role="alert" className="rounded-lg border border-danger p-4 text-danger">
           {loadError}
@@ -646,7 +660,7 @@ export function AdminIposPage() {
                 <div className="p-8 text-center text-sm text-slate-500">No IPOs found.</div>
               )}
             </div>
-            <table className="hidden min-w-[820px] w-full text-left text-sm md:table">
+            <DataTable minWidth="820px" className="hidden text-left text-sm md:table">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
                   <th scope="col" className="px-4 py-3 text-left">
@@ -721,7 +735,7 @@ export function AdminIposPage() {
                   </tr>
                 )}
               </tbody>
-            </table>
+            </DataTable>
           </>
         )}
       </div>
@@ -987,7 +1001,7 @@ export function AdminHistoryPage() {
             ))}
           </div>
           <div className="hidden overflow-x-auto rounded-xl border bg-white md:block">
-            <table className="w-full text-sm">
+            <DataTable minWidth="720px">
               <thead className="bg-slate-50">
                 <tr>
                   {["Started", "Trigger", "Provider", "Status"].map((label) => (
@@ -1023,7 +1037,7 @@ export function AdminHistoryPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </DataTable>
           </div>
           <Pagination
             label="History pagination"

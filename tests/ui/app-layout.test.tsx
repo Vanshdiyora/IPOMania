@@ -63,5 +63,6 @@ describe("AppLayout", () => {
     expect(screen.getByRole("heading", { name: "Dashboard content" })).toBeInTheDocument();
     expect(screen.getByRole("banner")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Main navigation" })).toBeInTheDocument();
+    expect(screen.getByRole("main")).not.toHaveClass("max-w-7xl", "mx-auto");
   });
 });

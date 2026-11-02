@@ -270,6 +270,7 @@ export const ipoCatalogListQuerySchema = z
     page_size: z.coerce.number().int().min(1).max(100).default(25),
     search: z.string().trim().max(160).optional(),
     status: ipoStatusSchema.extract(["UPCOMING", "OPEN", "CLOSED", "LISTED"]).optional(),
+    sort: z.enum(["latest", "opening_asc"]).default("latest"),
   })
   .strict();
 
@@ -283,6 +284,7 @@ export const ipoListQuerySchema = z
     opening_from: z.iso.date().optional(),
     opening_to: z.iso.date().optional(),
     include_archived: z.enum(["true", "false"]).default("false"),
+    sort: z.enum(["latest", "opening_asc"]).default("latest"),
   })
   .strict()
   .refine(

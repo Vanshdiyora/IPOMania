@@ -17,18 +17,19 @@ const config: Config = {
       },
       colors: {
         // ── Core brand ──────────────────────────────────────────────────────
-        navy: "#101828",
-        "navy-secondary": "#1D2D44",
-        "navy-light": "#253650",
+        navy: "#172554",
+        "navy-secondary": "#312E81",
+        "navy-light": "#4338CA",
 
         // ── Primary interactive ──────────────────────────────────────────────
-        action: "#1D4ED8",
-        "action-hover": "#1D4ED8",
-        "action-light": "#EFF6FF",
-        "action-border": "#BFDBFE",
+        action: "#4F46E5",
+        "action-hover": "#4338CA",
+        "action-light": "#EEF2FF",
+        "action-border": "#C7D2FE",
+        "action-emerald": "#0D9488",
 
         // ── Backgrounds ──────────────────────────────────────────────────────
-        canvas: "#F8FAFC",
+        canvas: "#F5F7FB",
         surface: "#FFFFFF",
         "surface-elevated": "#FFFFFF",
         "surface-subtle": "#F1F5F9",
@@ -40,9 +41,9 @@ const config: Config = {
         subtle: "#94A3B8",
 
         // ── Borders ──────────────────────────────────────────────────────────
-        border: "#E2E8F0",
-        "border-strong": "#CBD5E1",
-        "border-focus": "#2563EB",
+        border: "#E6E9F2",
+        "border-strong": "#C7CCDA",
+        "border-focus": "#6366F1",
 
         // ── Semantic ─────────────────────────────────────────────────────────
         success: "#15803D",
@@ -65,12 +66,12 @@ const config: Config = {
         "listed-border": "#DDD6FE",
 
         // ── Chart palette ────────────────────────────────────────────────────
-        "chart-1": "#2563EB",
-        "chart-2": "#16A34A",
-        "chart-3": "#D97706",
-        "chart-4": "#DC2626",
-        "chart-5": "#7C3AED",
-        "chart-6": "#0284C7",
+        "chart-1": "#4F46E5",
+        "chart-2": "#0D9488",
+        "chart-3": "#F59E0B",
+        "chart-4": "#F43F5E",
+        "chart-5": "#8B5CF6",
+        "chart-6": "#06B6D4",
       },
 
       // ── Spacing ─────────────────────────────────────────────────────────────

@@ -25,11 +25,11 @@ describe("temporarily hidden financial screens", () => {
       </ToastProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "Applications" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "IPOs" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Mandates" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Allotments" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Capital" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Applications" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "IPOs" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Mandates" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Allotments" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Capital" })).not.toBeInTheDocument();
   });
 
   it("does not register the hidden URLs", () => {
