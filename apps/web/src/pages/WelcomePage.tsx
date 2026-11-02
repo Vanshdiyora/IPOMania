@@ -6,11 +6,9 @@ import {
   Calculator,
   ChevronRight,
   ClipboardList,
-  CreditCard,
   FileSpreadsheet,
   Lock,
   ShieldCheck,
-  TrendingUp,
   Users,
 } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
@@ -41,7 +39,7 @@ export function WelcomePage() {
           {/* Subheading */}
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted sm:text-xl">
             A purpose-built investment workspace for multi-account retail &amp; HNI investors. Track
-            bids, monitor UPI mandate blocks, compute category quotas, and reconcile allotments.
+            applications, manage demat accounts, and compute issue-specific category quotas.
           </p>
 
           {/* CTAs */}
@@ -119,18 +117,7 @@ export function WelcomePage() {
             </div>
 
             {/* Mock Dashboard metrics preview */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-6">
-              <div className="rounded-xl border border-border/70 bg-canvas/60 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted">Capital Blocked</span>
-                  <CreditCard size={15} className="text-action" />
-                </div>
-                <p className="mt-2 text-xl font-bold tabular text-navy sm:text-2xl">₹1,47,800</p>
-                <span className="mt-1 inline-block text-[11px] font-medium text-action-emerald">
-                  Across 3 active IPOs
-                </span>
-              </div>
-
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
               <div className="rounded-xl border border-border/70 bg-canvas/60 p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-muted">Active Applications</span>
@@ -150,17 +137,6 @@ export function WelcomePage() {
                 <p className="mt-2 text-xl font-bold tabular text-navy sm:text-2xl">6 Accounts</p>
                 <span className="mt-1 inline-block text-[11px] font-medium text-muted">
                   Zerodha, Groww, Angel
-                </span>
-              </div>
-
-              <div className="rounded-xl border border-border/70 bg-canvas/60 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted">Historical Allotments</span>
-                  <TrendingUp size={15} className="text-action" />
-                </div>
-                <p className="mt-2 text-xl font-bold tabular text-navy sm:text-2xl">24.5%</p>
-                <span className="mt-1 inline-block text-[11px] font-medium text-action-emerald">
-                  Allotment rate (L12M)
                 </span>
               </div>
             </div>
@@ -184,9 +160,6 @@ export function WelcomePage() {
                   </div>
                   <div className="flex items-center gap-4">
                     <Badge variant="primary">sNII • ₹2,09,300</Badge>
-                    <Badge variant="warning" dot>
-                      Blocked
-                    </Badge>
                   </div>
                 </div>
 
@@ -202,9 +175,6 @@ export function WelcomePage() {
                   </div>
                   <div className="flex items-center gap-4">
                     <Badge variant="outline">Retail • ₹14,950</Badge>
-                    <Badge variant="success" dot>
-                      Allotted
-                    </Badge>
                   </div>
                 </div>
               </div>
@@ -256,18 +226,6 @@ export function WelcomePage() {
             {/* Card 3 */}
             <div className="rounded-xl border border-border bg-canvas/50 p-6 transition-all duration-200 hover:border-action/40 hover:shadow-md">
               <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-action/10 text-action">
-                <CreditCard size={22} />
-              </div>
-              <h3 className="mt-4 text-lg font-bold text-ink">UPI Mandate &amp; Capital Tracker</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                Monitor capital status lifecycle: Blocked funds, Bank debits upon allotment, and
-                unblocked refunds with exact transaction histories.
-              </p>
-            </div>
-
-            {/* Card 4 */}
-            <div className="rounded-xl border border-border bg-canvas/50 p-6 transition-all duration-200 hover:border-action/40 hover:shadow-md">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-action/10 text-action">
                 <ClipboardList size={22} />
               </div>
               <h3 className="mt-4 text-lg font-bold text-ink">Batch Bidding &amp; Imports</h3>
@@ -277,19 +235,19 @@ export function WelcomePage() {
               </p>
             </div>
 
-            {/* Card 5 */}
+            {/* Card 4 */}
             <div className="rounded-xl border border-border bg-canvas/50 p-6 transition-all duration-200 hover:border-action/40 hover:shadow-md">
               <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-action/10 text-action">
                 <BarChart3 size={22} />
               </div>
               <h3 className="mt-4 text-lg font-bold text-ink">Deep Portfolio Analytics</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">
-                Visualize capital utilization curves, application outcomes by issue, category-wise
-                distributions, and demat performance metrics with interactive charts.
+                Review application activity by issue, category, and demat account with interactive
+                charts.
               </p>
             </div>
 
-            {/* Card 6 */}
+            {/* Card 5 */}
             <div className="rounded-xl border border-border bg-canvas/50 p-6 transition-all duration-200 hover:border-action/40 hover:shadow-md">
               <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-action/10 text-action">
                 <ShieldCheck size={22} />
@@ -310,7 +268,7 @@ export function WelcomePage() {
           <div className="text-center">
             <h2 className="text-xs font-bold uppercase tracking-wider text-action">How It Works</h2>
             <p className="mt-2 text-3xl font-extrabold text-navy sm:text-4xl">
-              From announcement to allotment in 4 steps
+              Organize your IPO records in 4 steps
             </p>
           </div>
 
@@ -341,9 +299,9 @@ export function WelcomePage() {
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-xs font-bold text-white">
                 3
               </span>
-              <h3 className="mt-4 font-bold text-ink">Track UPI Mandates</h3>
+              <h3 className="mt-4 font-bold text-ink">Record Applications</h3>
               <p className="mt-2 text-xs leading-relaxed text-muted">
-                Record applications in IPO Mania to keep tabs on blocked funds across banks.
+                Keep a record of applications for each issue and demat account.
               </p>
             </div>
 
@@ -351,9 +309,9 @@ export function WelcomePage() {
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-xs font-bold text-white">
                 4
               </span>
-              <h3 className="mt-4 font-bold text-ink">Reconcile Allotments</h3>
+              <h3 className="mt-4 font-bold text-ink">Review Activity</h3>
               <p className="mt-2 text-xs leading-relaxed text-muted">
-                Log allotment results, verify unblocked amounts, and analyze historical hit rates.
+                Review your application history and account activity in one place.
               </p>
             </div>
           </div>

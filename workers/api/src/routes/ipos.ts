@@ -2,10 +2,12 @@ import { Hono, type Context } from "hono";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { IpoCategoryConfiguration, IpoRecord } from "@ipo-mania/shared";
 import {
+  ipoCatalogListQuerySchema,
   ipoCategoryConfigurationSchema,
   ipoListQuerySchema,
   ipoSchema,
   ipoUpdateSchema,
+  z,
 } from "@ipo-mania/validation";
 import type { EnvironmentBindings } from "../env";
 import { authenticate } from "../middleware/authenticate";
@@ -21,40 +23,79 @@ const ipoColumns =
   "id, company_name, symbol, ipo_type, exchange, issue_price_min, issue_price_max, cut_off_price, lot_size, issue_size, opening_date, closing_date, allotment_date, listing_date, status, data_source, source_reference, last_verified_at, created_at, updated_at, archived_at";
 const categoryColumns =
   "id, ipo_id, category, rule_version, lot_limit_status, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, reserved_shares, reserved_percentage, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment, source_reference, rule_source, last_verified_at, created_at";
+const catalogColumns =
+  "id,provider_id,company_name,symbol,issue_type,exchange,price_band_min,price_band_max,issue_price,lot_size,issue_size,bidding_start_date,bidding_end_date,allotment_date,listing_date,ipo_status,data_source,last_synced_at,created_at,updated_at,archived_at";
+
+function catalogRecord(row: Record<string, unknown>) {
+  const decimal = (value: unknown) => (value == null ? null : String(value));
+  return {
+    ...row,
+    ipo_type: row.issue_type === "SME" ? "SME" : "MAINBOARD",
+    issue_price_min: decimal(row.price_band_min ?? row.issue_price),
+    issue_price_max: decimal(row.price_band_max ?? row.issue_price),
+    cut_off_price: decimal(row.issue_price),
+    issue_size: decimal(row.issue_size),
+    opening_date: row.bidding_start_date,
+    closing_date: row.bidding_end_date,
+    status: String(row.ipo_status).toUpperCase(),
+    source_reference: row.provider_id ?? null,
+    last_verified_at: row.last_synced_at,
+  };
+}
 
 export const iposRoutes = new Hono<IpoContext>();
 iposRoutes.use("*", authenticate);
 
 iposRoutes.get("/catalog", async (context) => {
-  const { data, error } = await context
+  const parsed = ipoCatalogListQuerySchema.safeParse(context.req.query());
+  if (!parsed.success) return validationError(context);
+  const query = parsed.data;
+  let request = context
     .get("rlsSupabase")
     .from("ipo_catalog")
-    .select(
-      "id,provider_id,company_name,symbol,issue_type,exchange,price_band_min,price_band_max,issue_price,lot_size,issue_size,bidding_start_date,bidding_end_date,allotment_date,listing_date,ipo_status,data_source,last_synced_at,created_at,updated_at,archived_at",
-    )
+    .select(catalogColumns, { count: "exact" })
     .is("archived_at", null)
     .order("bidding_start_date", { ascending: true, nullsFirst: false })
     .order("company_name", { ascending: true })
-    .limit(500);
+    .order("id", { ascending: true });
+  if (query.status) request = request.eq("ipo_status", query.status.toLowerCase());
+  if (query.search) {
+    // Quote PostgREST values so punctuation cannot introduce extra filter expressions.
+    const term = escapeLike(query.search).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    request = request.or(`company_name.ilike."%${term}%",symbol.ilike."${term}"`);
+  }
+  const { data, error, count } = await request.range(
+    (query.page - 1) * query.page_size,
+    query.page * query.page_size - 1,
+  );
   if (error) throw error;
-  const ipos = (data ?? []).map((row) => ({
-    ...row,
-    ipo_type: row.issue_type === "SME" ? "SME" : "MAINBOARD",
-    issue_price_min: row.price_band_min ?? row.issue_price,
-    issue_price_max: row.price_band_max ?? row.issue_price,
-    cut_off_price: row.issue_price,
-    opening_date: row.bidding_start_date,
-    closing_date: row.bidding_end_date,
-    status: row.ipo_status,
-    source_reference: row.provider_id ?? null,
-    last_verified_at: row.last_synced_at,
-  }));
   return context.json({
     data: {
-      ipos,
-      pagination: { page: 1, page_size: ipos.length, total: ipos.length, total_pages: 1 },
+      ipos: (data ?? []).map(catalogRecord),
+      pagination: {
+        page: query.page,
+        page_size: query.page_size,
+        total: count ?? 0,
+        total_pages: Math.ceil((count ?? 0) / query.page_size),
+      },
     },
   });
+});
+
+iposRoutes.get("/catalog/:ipoId", async (context) => {
+  const parsed = z.uuid().safeParse(context.req.param("ipoId"));
+  if (!parsed.success) return ipoNotFound(context);
+  const ipoId = parsed.data;
+  const { data, error } = await context
+    .get("rlsSupabase")
+    .from("ipo_catalog")
+    .select(catalogColumns)
+    .eq("id", ipoId)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return ipoNotFound(context);
+  return context.json({ data: catalogRecord(data) });
 });
 
 iposRoutes.get("/", async (context) => {

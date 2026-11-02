@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ipoCatalogListQuerySchema,
   ipoCategoryConfigurationSchema,
   ipoCalculationSchema,
   ipoSchema,
@@ -47,6 +48,28 @@ const categoryRules = {
 };
 
 describe("IPO boundary validation", () => {
+  it("validates catalog pagination and only accepts catalog statuses", () => {
+    expect(ipoCatalogListQuerySchema.parse({})).toEqual({ page: 1, page_size: 25 });
+    expect(
+      ipoCatalogListQuerySchema.parse({
+        page: "2",
+        page_size: "100",
+        status: "OPEN",
+        search: " Company ",
+      }),
+    ).toEqual({ page: 2, page_size: 100, status: "OPEN", search: "Company" });
+    for (const query of [
+      { page: "0" },
+      { page_size: "101" },
+      { status: "WITHDRAWN" },
+      { search: "a".repeat(161) },
+      { include_archived: "true" },
+      { user_id: "untrusted-owner" },
+    ]) {
+      expect(ipoCatalogListQuerySchema.safeParse(query).success).toBe(false);
+    }
+  });
+
   it("accepts manual IPO values without marking them verified", () => {
     expect(ipoSchema.parse(ipo)).toMatchObject({
       data_source: "MANUAL",

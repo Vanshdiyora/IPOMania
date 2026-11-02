@@ -81,6 +81,19 @@ async function seedAuthenticatedUser(page: Page) {
       },
     }),
   );
+  await page.route("**/api/ipos/catalog?*", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          ipos: [ipo],
+          pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+        },
+      },
+    }),
+  );
+  await page.route(`**/api/ipos/catalog/${ipoId}`, (route) =>
+    route.fulfill({ json: { data: ipo } }),
+  );
   await page.route(`**/api/ipos/${ipoId}`, (route) => route.fulfill({ json: { data: ipo } }));
   await page.route(`**/api/ipos/${ipoId}/categories`, (route) =>
     route.fulfill({ json: { data: { configurations: [] } } }),
@@ -106,6 +119,9 @@ for (const viewport of viewports) {
         name: /Orchestrate IPO applications across all demat accounts/i,
       }),
     ).toBeVisible();
+    await expect(page.getByRole("banner")).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Main navigation" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Open navigation" })).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
     await testInfo.attach(`landing-${viewport.width}.png`, {
       body: await page.screenshot(),
@@ -131,7 +147,7 @@ for (const viewport of viewports) {
     await expect(
       page.getByRole("textbox", { name: "Search company or exact symbol" }),
     ).toBeVisible();
-    await expect(page.getByLabel("Status")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Filters", exact: true })).toBeVisible();
     await page.getByRole("textbox", { name: "Search company or exact symbol" }).fill("IPO Test");
     await expect(page.getByRole("link", { name: "IPO Test Company" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
@@ -153,7 +169,9 @@ for (const viewport of viewports) {
 for (const viewport of viewports.filter(({ width }) => width < 768)) {
   test(`mobile navigation is accessible at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport);
-    await page.goto("/");
+    await seedAuthenticatedUser(page);
+    await page.goto("/ipos");
+    await expect(page.getByRole("heading", { name: "IPOs", exact: true })).toBeVisible();
 
     const menuButton = page.getByRole("button", { name: "Open navigation" });
     await expect(menuButton).toBeVisible();
@@ -165,7 +183,7 @@ for (const viewport of viewports.filter(({ width }) => width < 768)) {
         name: "Dashboard",
       }),
     ).toBeVisible();
-    await expect(page.getByRole("link", { name: "Create account" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
     const drawerCloseButton = page
       .getByRole("dialog", { name: "Mobile navigation" })
       .getByRole("button", {
@@ -181,11 +199,11 @@ for (const viewport of viewports.filter(({ width }) => width < 768)) {
     await page
       .getByRole("navigation", { name: "Main navigation" })
       .getByRole("link", {
-        name: "Sign in",
+        name: "Profile",
       })
       .click();
-    await expect(page).toHaveURL(/\/login$/);
-    await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+    await expect(page).toHaveURL(/\/profile$/);
+    await expect(page.getByRole("navigation", { name: "Main navigation" })).not.toBeVisible();
     await expectNoHorizontalOverflow(page);
   });
 }

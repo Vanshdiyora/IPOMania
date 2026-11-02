@@ -24,7 +24,7 @@ it is not evidence of a debit and does not increase invested capital.
 
 ## Interfaces
 
-- Mandate dashboard and details are available at `/mandates` and `/mandates/:mandateId`.
+- Mandate pages are temporarily hidden from the web UI. The API remains available.
 - `POST /api/mandates` records a pending mandate.
 - `PATCH /api/mandates/:mandateId` applies a permitted manual update.
 - `GET /api/mandates` supports IPO, account, broker, category, date, and status filters.

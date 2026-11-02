@@ -2,7 +2,9 @@
 
 `apps/web` is a React 18 single-page app served by Vite. `src/main.tsx` installs the global error
 boundary and styles. `src/app/App.tsx` sets up TanStack Query, and `src/app/router.tsx` defines
-client-side routes. `AppLayout` composes the responsive sidebar, header, and route outlet.
+client-side routes. `AppLayout` composes the responsive sidebar, header, and route outlet. At `/`,
+signed-out visitors see the full-width public landing page without the header, sidebar, or app
+content padding; the signed-in home dashboard retains the application layout.
 
 Supabase Auth state is managed by `src/auth/AuthProvider.tsx`. Registration, login, recovery, reset,
 verification, and profile pages use React Hook Form and Zod. Protected routes wait for session
@@ -18,8 +20,12 @@ and Virtual render the desktop account list, with readable mobile account cards.
 import mapping use accessible labels and inline validation. The fixed light palette and minimum
 touch-target styles apply throughout.
 
-Protected IPO routes provide the user-owned IPO list, details, add/edit form, opening-date calendar,
-immutable category-rule configuration, and quota calculator. Category forms expose explicit
+Protected IPO list and opening-date calendar routes show the shared admin-managed catalog by
+default, with server-side search, status filters, and pagination. Catalog details are read-only and
+retain provider attribution and unset source values. The **My IPOs** view (`?source=personal`)
+preserves the user-owned list, details, add/edit form, immutable category-rule configuration, and
+quota calculator. Shared issue IDs never become personal category-rule or editing targets.
+Category forms expose explicit
 unknown/unpublished/configured states rather than applying defaults. Calculator results show
 validation reasons, source/rule version, calculation inputs, and a clear notice that self-reported
 shareholder conditions are not independently verified.

@@ -1,33 +1,10 @@
 import { Hono } from "hono";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { z } from "@ipo-mania/validation";
+import { adminIpoSchema as manualIpoSchema } from "@ipo-mania/validation";
 import type { EnvironmentBindings } from "../env";
 import { authenticate } from "../middleware/authenticate";
 import { authorizeAdmin } from "../middleware/authorize-admin";
 import { validateEnvironment } from "../env";
-
-const manualIpoSchema = z.object({
-  company_name: z.string().trim().min(1).max(160),
-  provider_id: z.string().trim().min(1).max(160).nullable().optional(),
-  slug: z.string().trim().min(1).max(160).nullable().optional(),
-  display_name: z.string().trim().max(160).nullable().optional(),
-  symbol: z.string().trim().max(24).nullable().optional(),
-  isin: z.string().trim().max(24).nullable().optional(),
-  issue_type: z.enum(["mainboard", "SME"]),
-  ipo_status: z.enum(["upcoming", "open", "closed", "listed"]),
-  exchange: z.string().trim().max(40).nullable().optional(),
-  bidding_start_date: z.string().date().nullable().optional(),
-  bidding_end_date: z.string().date().nullable().optional(),
-  allotment_date: z.string().date().nullable().optional(),
-  listing_date: z.string().date().nullable().optional(),
-  listing_price: z.coerce.number().positive().nullable().optional(),
-  issue_price: z.coerce.number().positive().nullable().optional(),
-  price_band_min: z.coerce.number().positive().nullable().optional(),
-  price_band_max: z.coerce.number().positive().nullable().optional(),
-  lot_size: z.coerce.number().int().positive().nullable().optional(),
-  issue_size: z.coerce.number().positive().nullable().optional(),
-  data_source: z.string().trim().max(80).default("MANUAL"),
-});
 
 const normalizedRows = (payload: unknown): Record<string, unknown>[] => {
   if (Array.isArray(payload))

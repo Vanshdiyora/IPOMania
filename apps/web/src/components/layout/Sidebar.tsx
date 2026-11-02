@@ -1,10 +1,7 @@
 import {
-  BarChart3,
   BriefcaseBusiness,
-  CalendarDays,
   ChevronDown,
   ClipboardList,
-  CreditCard,
   LayoutDashboard,
   LogOut,
   TrendingUp,
@@ -249,27 +246,6 @@ export function Sidebar({
               <SubNavItem to="/ipos" label="IPO list" onClick={onNavigate} />
               <SubNavItem to="/ipo-calendar" label="IPO calendar" onClick={onNavigate} />
               <SubNavItem to="/quota-calculator" label="Quota calculator" onClick={onNavigate} />
-            </NavGroup>
-
-            {/* Capital Group */}
-            <NavGroup icon={<BarChart3 size={18} />} label="Capital" basePath="/capital">
-              <SubNavItem to="/capital" label="Capital tracker" onClick={onNavigate} />
-              <SubNavItem
-                to="/capital/transactions"
-                label="Transaction history"
-                onClick={onNavigate}
-              />
-              <SubNavItem to="/capital/refunds" label="Refund tracker" onClick={onNavigate} />
-            </NavGroup>
-
-            {/* Mandates Group */}
-            <NavGroup icon={<CreditCard size={18} />} label="Mandates" basePath="/mandates">
-              <SubNavItem to="/mandates" label="Mandate dashboard" onClick={onNavigate} />
-            </NavGroup>
-
-            {/* Allotments */}
-            <NavGroup icon={<CalendarDays size={18} />} label="Allotments" basePath="/allotments">
-              <SubNavItem to="/allotments" label="Allotment dashboard" onClick={onNavigate} />
             </NavGroup>
 
             {/* Divider */}

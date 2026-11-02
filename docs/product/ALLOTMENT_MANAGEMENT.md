@@ -34,8 +34,8 @@ block is recorded as `CAPITAL_RELEASED`, not as a cash refund.
 
 ## Interfaces
 
-The dashboard, detail, and refund tracker pages are `/allotments`, `/allotments/:allotmentId`, and
-`/capital/refunds`. The API supports `GET`/`POST /api/allotments` and
-`PATCH /api/allotments/:allotmentId`, with IPO, account, broker, category, date, status, and refund
-status filters on list reads. Repeating an identical allotment create returns the existing record;
+The allotment and refund pages are temporarily hidden from the web UI. The API supports
+`GET`/`POST /api/allotments` and `PATCH /api/allotments/:allotmentId`, with IPO, account, broker,
+category, date, status, and refund status filters on list reads. Repeating an identical allotment
+create returns the existing record;
 a different result for the same application returns `409`.
