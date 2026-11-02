@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { auditAccessibility } from "./accessibility";
 
-test("renders the light application shell", async ({ page }) => {
+test("renders the full-width light landing page without app navigation", async ({ page }) => {
   await page.goto("/");
 
   await expect(
@@ -9,7 +9,12 @@ test("renders the light application shell", async ({ page }) => {
       name: /Orchestrate IPO applications across all demat accounts/i,
     }),
   ).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
+  await expect(page.getByRole("banner")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Open navigation" })).toHaveCount(0);
+  const mainBounds = await page.getByRole("main").boundingBox();
+  expect(mainBounds?.x).toBe(0);
+  expect(mainBounds?.width).toBe(page.viewportSize()?.width);
 });
 
 test("public shell passes automated WCAG 2.2 AA checks", async ({ page }) => {

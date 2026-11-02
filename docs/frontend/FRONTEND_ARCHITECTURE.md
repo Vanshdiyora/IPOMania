@@ -2,7 +2,9 @@
 
 `apps/web` is a React 18 single-page app served by Vite. `src/main.tsx` installs the global error
 boundary and styles. `src/app/App.tsx` sets up TanStack Query, and `src/app/router.tsx` defines
-client-side routes. `AppLayout` composes the responsive sidebar, header, and route outlet.
+client-side routes. `AppLayout` composes the responsive sidebar, header, and route outlet. At `/`,
+signed-out visitors see the full-width public landing page without the header, sidebar, or app
+content padding; the signed-in home dashboard retains the application layout.
 
 Supabase Auth state is managed by `src/auth/AuthProvider.tsx`. Registration, login, recovery, reset,
 verification, and profile pages use React Hook Form and Zod. Protected routes wait for session
