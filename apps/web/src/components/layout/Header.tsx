@@ -25,7 +25,7 @@ export function Header({
       className={cn(
         "sticky top-0 z-30",
         "flex min-h-16 items-center gap-3",
-        "border-b border-border bg-surface/95 backdrop-blur-sm",
+        "border-b border-indigo-100/80 bg-white/90 shadow-[0_8px_30px_-24px_rgba(49,46,129,0.45)] backdrop-blur-xl",
         "px-4 sm:px-6",
       )}
     >
@@ -52,7 +52,12 @@ export function Header({
 
       {/* Page title / breadcrumb area */}
       <div className="flex flex-1 min-w-0 items-center gap-2">
-        <p className="truncate text-sm font-semibold text-ink sm:text-base">{pageTitle}</p>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-navy sm:text-base">{pageTitle}</p>
+          <p className="hidden text-[11px] font-medium text-muted sm:block">
+            IPO management workspace
+          </p>
+        </div>
       </div>
 
       {/* Right actions */}
@@ -64,8 +69,8 @@ export function Header({
               to="/profile"
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-full",
-                "bg-action-light text-action text-xs font-bold uppercase",
-                "hover:bg-blue-100 transition-colors duration-150",
+                "h-10 w-10 bg-gradient-to-br from-action-light to-teal-50 text-action text-xs font-bold uppercase ring-1 ring-indigo-100",
+                "hover:scale-[1.03] hover:ring-indigo-200 transition-all duration-150",
                 "focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus",
               )}
               aria-label="View your profile"
@@ -90,14 +95,12 @@ export function Header({
 function getPageTitle(pathname: string) {
   if (pathname === "/" || pathname === "/dashboard") return "Dashboard";
   if (pathname === "/accounts") return "Demat Accounts";
-  if (pathname === "/accounts/list") return "Account list";
   if (pathname.startsWith("/accounts/import-history")) return "Account import history";
   if (pathname === "/accounts/import") return "Import accounts";
   if (/^\/accounts\/[^/]+\/edit$/.test(pathname)) return "Edit account";
   if (/^\/accounts\/[^/]+$/.test(pathname)) return "Account details";
   if (pathname === "/accounts/new") return "Add account";
   if (pathname === "/applications") return "Applications";
-  if (pathname === "/applications/list") return "Application list";
   if (pathname === "/applications/bulk") return "Bulk applications";
   if (pathname === "/applications/import") return "Import applications";
   if (pathname.startsWith("/applications/import-history")) return "Application import history";

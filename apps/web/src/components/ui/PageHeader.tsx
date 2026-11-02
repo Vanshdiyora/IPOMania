@@ -26,7 +26,16 @@ export function PageHeader({
   const desc = description ?? subtitle;
 
   return (
-    <header className={cn("space-y-1", className)}>
+    <header
+      className={cn(
+        "relative overflow-hidden rounded-2xl border border-indigo-100 bg-white px-5 py-5 shadow-card sm:px-6",
+        className,
+      )}
+    >
+      <div
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-action via-indigo-400 to-teal-500"
+      />
       {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs items={breadcrumbs} />}
       {eyebrow && (
         <p className="text-xs font-semibold uppercase tracking-widest text-action">{eyebrow}</p>
@@ -56,10 +65,7 @@ export function Breadcrumbs({ items, className }: { items: BreadcrumbItem[]; cla
           <li key={index} className="flex items-center gap-1">
             {index > 0 && <ChevronRight size={14} className="text-subtle" aria-hidden="true" />}
             {item.href && index < items.length - 1 ? (
-              <Link
-                to={item.href}
-                className="hover:text-ink hover:underline transition-colors duration-150"
-              >
+              <Link to={item.href} className="transition-colors duration-150 hover:text-navy">
                 {item.label}
               </Link>
             ) : (
@@ -120,7 +126,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-surface p-5 shadow-card",
+        "rounded-2xl border border-border/90 bg-gradient-to-br from-white to-indigo-50/30 p-5 shadow-card",
         "transition-all duration-200 hover:shadow-card-hover",
         className,
       )}
@@ -128,7 +134,7 @@ export function StatCard({
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-muted">{label}</p>
         {icon && (
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-action-light text-action">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-action-light to-teal-50 text-action ring-1 ring-indigo-100">
             {icon}
           </div>
         )}

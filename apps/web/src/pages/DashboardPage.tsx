@@ -17,6 +17,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { DataTable } from "../components/ui/DataTable";
+import { Select as CustomSelect } from "../components/ui/Input";
 import {
   BriefcaseBusiness,
   Building2,
@@ -291,7 +292,7 @@ export function DashboardPage() {
             />
           </FilterSection>
           <FilterSection title="My IPO">
-            <select
+            <CustomSelect
               aria-label="My IPO filter"
               className={selectClass}
               value={draftFilters.ipo_id}
@@ -300,13 +301,13 @@ export function DashboardPage() {
               <option value="">All my IPOs</option>
               {ipoOptions.map((ipo) => (
                 <option key={ipo.id} value={ipo.id}>
-                  {ipo.company_name} ({ipo.symbol})
+                  {ipo.company_name}
                 </option>
               ))}
-            </select>
+            </CustomSelect>
           </FilterSection>
           <FilterSection title="Shared IPO">
-            <select
+            <CustomSelect
               aria-label="Shared IPO filter"
               className={selectClass}
               value={draftFilters.catalog_ipo_id}
@@ -316,13 +317,12 @@ export function DashboardPage() {
               {catalogOptions.map((ipo) => (
                 <option key={ipo.id} value={ipo.id}>
                   {ipo.company_name}
-                  {ipo.symbol ? ` (${ipo.symbol})` : ""}
                 </option>
               ))}
-            </select>
+            </CustomSelect>
           </FilterSection>
           <FilterSection title="Bid category">
-            <select
+            <CustomSelect
               aria-label="Category filter"
               className={selectClass}
               value={draftFilters.category}
@@ -334,10 +334,10 @@ export function DashboardPage() {
                   {categoryLabel(category)}
                 </option>
               ))}
-            </select>
+            </CustomSelect>
           </FilterSection>
           <FilterSection title="Demat account">
-            <select
+            <CustomSelect
               aria-label="Demat account filter"
               className={selectClass}
               value={draftFilters.account_id}
@@ -349,7 +349,7 @@ export function DashboardPage() {
                   {account.holder_name} · {account.masked_demat_identifier}
                 </option>
               ))}
-            </select>
+            </CustomSelect>
           </FilterSection>
         </div>
       </FilterDrawer>
@@ -842,7 +842,7 @@ export function DashboardPage() {
               </CardDescription>
             </div>
             <Button asChild variant="outline" size="sm" className="gap-1.5 bg-surface text-xs">
-              <Link to="/applications/list">
+              <Link to="/applications">
                 <span>View all applications</span>
                 <ChevronRight size={14} />
               </Link>

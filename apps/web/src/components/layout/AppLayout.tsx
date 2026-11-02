@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useOutlet, Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
+import { Menu } from "lucide-react";
 import { useAuth } from "../../auth/useAuth";
-import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 import { useToast } from "../ui/ToastContext";
 import { LoadingState } from "../LoadingState";
+import { DrawerRouteHost } from "./DrawerRouteHost";
+import { DrawerRouteProvider } from "../ui/FormDrawer";
 
 export function AppLayout() {
   const { loading, user } = useAuth();
@@ -25,6 +27,11 @@ export function AppLayout() {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuWasOpen = useRef(false);
   const pageContentRef = useRef<HTMLDivElement>(null);
+  const [localDrawerPath, setLocalDrawerPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLocalDrawerPath(null);
+  }, [location.key]);
 
   useEffect(() => {
     if (typeof successMessage !== "string") return;
@@ -73,53 +80,70 @@ export function AppLayout() {
   }
 
   return (
-    <div className="flex min-h-screen min-w-0 bg-canvas">
-      {/* Mobile overlay */}
-      {mobileMenuOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-40 bg-navy/40 backdrop-blur-sm md:hidden"
-          aria-label="Close navigation menu"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
+    <DrawerRouteProvider
+      value={{
+        open: setLocalDrawerPath,
+        close: () => setLocalDrawerPath(null),
+        isLocal: Boolean(localDrawerPath),
+      }}
+    >
+      <div className="relative flex min-h-screen min-w-0 bg-canvas">
+        {/* Mobile overlay */}
+        {mobileMenuOpen && (
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-navy/40 backdrop-blur-sm md:hidden"
+            aria-label="Close navigation menu"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
 
-      {/* Sidebar */}
-      <Sidebar
-        mobileOpen={mobileMenuOpen}
-        onNavigate={() => setMobileMenuOpen(false)}
-        onClose={() => setMobileMenuOpen(false)}
-      />
-
-      {/* Main content */}
-      <div ref={pageContentRef} className="flex min-w-0 flex-1 flex-col md:ml-64">
-        <Header
-          mobileMenuOpen={mobileMenuOpen}
-          menuButtonRef={menuButtonRef}
-          onMenuToggle={() => setMobileMenuOpen((open) => !open)}
+        {/* Sidebar */}
+        <Sidebar
+          mobileOpen={mobileMenuOpen}
+          onNavigate={() => setMobileMenuOpen(false)}
+          onClose={() => setMobileMenuOpen(false)}
         />
-        <main
-          id="main-content"
-          className="w-full min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8 animate-fade-in"
-        >
-          <div aria-hidden={drawerRoute || undefined}>
-            {drawerRoute
-              ? (backgroundRef.current ?? (
-                  <section className="rounded-xl border border-border bg-white p-6">
-                    <h1 className="text-2xl font-bold">Manage your records</h1>
-                    <Link
-                      className="text-action no-underline underline-offset-4 hover:underline visited:text-action"
-                      to="/dashboard"
-                    >
-                      Back to dashboard
-                    </Link>
-                  </section>
-                ))
-              : outlet}
-          </div>
-          {drawerRoute && <div key={pathname}>{outlet}</div>}
-        </main>
+
+        {/* Main content */}
+        <div ref={pageContentRef} className="flex min-w-0 flex-1 flex-col md:ml-64">
+          {!mobileMenuOpen && (
+            <button
+              ref={menuButtonRef}
+              type="button"
+              className="fixed left-4 top-4 z-30 grid min-h-touch min-w-touch place-items-center rounded-lg border border-border bg-white text-muted shadow-sm md:hidden"
+              aria-label="Open navigation"
+              aria-expanded={false}
+              aria-controls="main-navigation"
+              onClick={() => setMobileMenuOpen(true)}
+            >
+              <Menu aria-hidden="true" size={20} />
+            </button>
+          )}
+          <main
+            id="main-content"
+            className="relative w-full min-w-0 flex-1 overflow-x-hidden bg-[radial-gradient(circle_at_top_right,rgba(79,70,229,0.055),transparent_32rem)] p-4 sm:p-6 lg:p-8 animate-fade-in"
+          >
+            <div aria-hidden={drawerRoute || undefined}>
+              {drawerRoute
+                ? (backgroundRef.current ?? (
+                    <section className="rounded-xl border border-border bg-white p-6">
+                      <h1 className="text-2xl font-bold">Manage your records</h1>
+                      <Link
+                        className="text-action no-underline transition-colors hover:text-navy visited:text-action"
+                        to="/dashboard"
+                      >
+                        Back to dashboard
+                      </Link>
+                    </section>
+                  ))
+                : outlet}
+            </div>
+            {drawerRoute && <div key={pathname}>{outlet}</div>}
+            <DrawerRouteHost path={localDrawerPath} />
+          </main>
+        </div>
       </div>
-    </div>
+    </DrawerRouteProvider>
   );
 }

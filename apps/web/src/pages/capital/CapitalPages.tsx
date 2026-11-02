@@ -15,6 +15,7 @@ import { useAuth } from "../../auth/useAuth";
 import { Button } from "../../components/ui/Button";
 import { FormDrawer, RouteFormDrawer } from "../../components/ui/FormDrawer";
 import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
+import { Input, Select as CustomSelect } from "../../components/ui/Input";
 import { FormSection } from "../../components/ui/FormSection";
 import { useFormValidation } from "../../components/ui/useFormValidation";
 import {
@@ -79,7 +80,7 @@ const blankFilters: Filters = {
 const inputClass =
   "mt-1 min-h-touch w-full rounded-lg border border-border bg-white px-3 py-2 text-base text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
 const linkClass =
-  "font-semibold text-action no-underline underline-offset-4 hover:underline visited:text-action";
+  "font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action";
 const categories = ["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"];
 const mandateStatuses = ["PENDING", "APPROVED", "REJECTED", "REVOKED", "EXPIRED", "RELEASED"];
 const allotmentStatuses = ["ALLOTTED", "NOT_ALLOTTED", "PARTIAL_ALLOTMENT"];
@@ -920,7 +921,7 @@ export function RefundTrackerPage() {
       />
       <label className="block max-w-sm text-sm font-semibold text-ink">
         Refund status
-        <select
+        <CustomSelect
           className={inputClass}
           value={filters.refund_status}
           onChange={(event) => {
@@ -932,7 +933,7 @@ export function RefundTrackerPage() {
           <option value="PENDING">Pending</option>
           <option value="COMPLETED">Completed</option>
           <option value="NOT_REQUIRED">Not required</option>
-        </select>
+        </CustomSelect>
       </label>
       {allotmentQuery.error ? (
         <ErrorNotice error={allotmentQuery.error} onRetry={() => void allotmentQuery.refetch()} />
@@ -1040,7 +1041,7 @@ function MandateList({ showAll }: { showAll: boolean }) {
               >
                 <div>
                   <Link
-                    className="text-lg font-semibold text-action no-underline underline-offset-4 hover:underline visited:text-action"
+                    className="text-lg font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
                     to={`/mandates/${mandate.id}`}
                   >
                     {applicationTitle(relatedApplication(mandate.application))}
@@ -1129,7 +1130,7 @@ function AllotmentList({ showAll }: { showAll: boolean }) {
               >
                 <div>
                   <Link
-                    className="text-lg font-semibold text-action no-underline underline-offset-4 hover:underline visited:text-action"
+                    className="text-lg font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
                     to={`/allotments/${allotment.id}`}
                   >
                     {applicationTitle(relatedApplication(allotment.application))}
@@ -1374,7 +1375,7 @@ function FinancialFilters({
       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <label className="text-sm font-semibold text-ink">
           IPO
-          <select
+          <CustomSelect
             className={inputClass}
             value={filters.ipo_id}
             disabled={ipos.isLoading || Boolean(ipos.error)}
@@ -1385,14 +1386,14 @@ function FinancialFilters({
             </option>
             {(ipos.data?.data.ipos ?? []).map((ipo) => (
               <option key={ipo.id} value={ipo.id}>
-                {ipo.company_name} ({ipo.symbol})
+                {ipo.company_name}
               </option>
             ))}
-          </select>
+          </CustomSelect>
         </label>
         <label className="text-sm font-semibold text-ink">
           Demat account
-          <select
+          <CustomSelect
             className={inputClass}
             value={filters.account_id}
             disabled={accounts.isLoading || Boolean(accounts.error)}
@@ -1410,7 +1411,7 @@ function FinancialFilters({
                 {account.holder_name} · {account.broker_name}
               </option>
             ))}
-          </select>
+          </CustomSelect>
         </label>
         <label className="text-sm font-semibold text-ink">
           Broker
@@ -1422,7 +1423,7 @@ function FinancialFilters({
         </label>
         <label className="text-sm font-semibold text-ink">
           Category
-          <select
+          <CustomSelect
             className={inputClass}
             value={filters.category}
             onChange={(event) => onChange({ ...filters, category: event.target.value })}
@@ -1433,11 +1434,11 @@ function FinancialFilters({
                 {category}
               </option>
             ))}
-          </select>
+          </CustomSelect>
         </label>
         <label className="text-sm font-semibold text-ink">
           From date
-          <input
+          <Input
             className={inputClass}
             type="date"
             value={filters.date_from}
@@ -1446,7 +1447,7 @@ function FinancialFilters({
         </label>
         <label className="text-sm font-semibold text-ink">
           To date
-          <input
+          <Input
             className={inputClass}
             type="date"
             value={filters.date_to}

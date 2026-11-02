@@ -61,7 +61,7 @@ export function ApplicationSearchToolbar({
           <button
             type="button"
             onClick={onClearFilters}
-            className="min-h-touch px-2 text-sm font-semibold text-action no-underline underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy visited:text-action"
+            className="min-h-touch px-2 text-sm font-semibold text-action no-underline transition-colors hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy visited:text-action"
           >
             Clear filters
           </button>

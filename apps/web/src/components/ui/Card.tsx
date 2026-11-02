@@ -20,7 +20,7 @@ export function Card({
   return (
     <section
       className={cn(
-        "rounded-xl border border-border bg-surface shadow-card",
+        "rounded-2xl border border-border/90 bg-surface shadow-card",
         !noPadding && "p-6",
         nested && "border-border bg-canvas shadow-none",
         hoverable && [

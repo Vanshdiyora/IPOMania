@@ -52,6 +52,16 @@ body {
   line-height: 1.5;
 }
 
+body {
+  background: radial-gradient(circle at 100% 0, rgba(79, 70, 229, 0.045), transparent 30rem),
+    #f5f7fb;
+}
+
+::selection {
+  color: #172554;
+  background: #c7d2fe;
+}
+
 /* ─── Typography ─────────────────────────────────────────────────────────── */
 h1,
 h2,

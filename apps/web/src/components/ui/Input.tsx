@@ -1,10 +1,25 @@
-import { forwardRef } from "react";
-import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import {
+  Children,
+  forwardRef,
+  isValidElement,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import type {
+  InputHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+} from "react";
 import { cn } from "../../lib/utils";
+import { SearchableSelect } from "../filters/SearchableSelect";
+import { DateTimeInput } from "./DateTimeInput";
 
 // ─── Base input class ─────────────────────────────────────────────────────────
 const inputBase = [
-  "min-w-0 max-w-full w-full rounded-lg border border-border bg-surface",
+  "min-w-0 max-w-full w-full rounded-xl border border-border bg-surface shadow-sm shadow-indigo-950/[0.02]",
   "px-3 py-2 text-base text-ink placeholder:text-subtle",
   "transition-colors duration-150",
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-border-focus focus-visible:border-border-focus",
@@ -24,12 +39,17 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
 };
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { className, inputSize = "md", ...props },
+  { className, inputSize = "md", type, ...props },
   ref,
 ) {
-  return (
-    <input ref={ref} className={cn(inputBase, inputSizeClass[inputSize], className)} {...props} />
-  );
+  const styledClassName = cn(inputBase, inputSizeClass[inputSize], className);
+  if (type === "date") {
+    return <DateTimeInput {...props} ref={ref} type="date" className={styledClassName} />;
+  }
+  if (type === "datetime-local") {
+    return <DateTimeInput {...props} ref={ref} type="datetime-local" className={styledClassName} />;
+  }
+  return <input ref={ref} type={type} className={styledClassName} {...props} />;
 });
 
 // ─── Select ───────────────────────────────────────────────────────────────────
@@ -38,20 +58,122 @@ type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
 };
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { className, inputSize = "md", ...props },
+  {
+    className,
+    inputSize = "md",
+    children,
+    value,
+    defaultValue,
+    onChange,
+    onBlur,
+    multiple,
+    required,
+    disabled,
+    name,
+    id,
+    "aria-label": ariaLabel,
+    "aria-invalid": ariaInvalid,
+    "aria-describedby": ariaDescribedby,
+    ...nativeProps
+  },
   ref,
 ) {
+  const nativeRef = useRef<HTMLSelectElement>(null);
+  const [uncontrolledValue, setUncontrolledValue] = useState(() => {
+    if (Array.isArray(defaultValue)) return defaultValue.map(String);
+    return String(defaultValue ?? "");
+  });
+  useImperativeHandle(ref, () => {
+    if (!nativeRef.current) throw new Error("The custom dropdown ref is not mounted.");
+    return nativeRef.current;
+  }, []);
+  const options: Array<{ value: string; label: string; disabled?: boolean }> = [];
+  Children.forEach(children, (child) => {
+    if (!isValidElement(child)) return;
+    const option = child.props as {
+      value?: string | number;
+      label?: string;
+      children?: ReactNode;
+      disabled?: boolean;
+    };
+    const optionLabel =
+      option.label ??
+      (typeof option.children === "string" ? option.children : String(option.children ?? ""));
+    options.push({
+      value: String(option.value ?? optionLabel),
+      label: optionLabel,
+      disabled: option.disabled,
+    });
+  });
+  const currentValue = Array.isArray(value)
+    ? value.map(String)
+    : value === undefined
+      ? (nativeRef.current?.value ?? uncontrolledValue)
+      : String(value ?? "");
+  const placeholder = options.find((option) => option.value === "")?.label ?? "Choose an option";
+  const selectValue = (nextValue: string | string[]) => {
+    const element = nativeRef.current;
+    if (!element) return;
+    if (Array.isArray(nextValue)) {
+      for (const option of element.options) option.selected = nextValue.includes(option.value);
+    } else {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLSelectElement.prototype,
+        "value",
+      )?.set;
+      if (!valueSetter) throw new Error("The custom dropdown could not update its selected value.");
+      valueSetter.call(element, nextValue);
+    }
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+    setUncontrolledValue(nextValue);
+  };
+  useEffect(() => {
+    if (value !== undefined || defaultValue !== undefined || !nativeRef.current) return;
+    setUncontrolledValue(nativeRef.current.value);
+  }, [defaultValue, value]);
+
   return (
-    <select
-      ref={ref}
-      className={cn(
-        inputBase,
-        inputSizeClass[inputSize],
-        "cursor-pointer appearance-none bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")] bg-[position:right_10px_center] bg-no-repeat pr-9",
-        className,
-      )}
-      {...props}
-    />
+    <>
+      <SearchableSelect
+        label={ariaLabel ?? ""}
+        placeholder={placeholder}
+        options={options.filter((option) => option.value !== "")}
+        value={currentValue}
+        multiple={multiple}
+        disabled={disabled}
+        hideLabel
+        triggerId={id}
+        triggerClassName={cn(
+          inputBase,
+          inputSizeClass[inputSize],
+          "cursor-pointer text-left",
+          className,
+        )}
+        ariaInvalid={ariaInvalid === true || ariaInvalid === "true"}
+        ariaRequired={required}
+        ariaDescribedby={ariaDescribedby}
+        onTriggerBlur={() => {
+          if (!onBlur || !nativeRef.current) return;
+          nativeRef.current.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+        }}
+        onChange={selectValue}
+      />
+      <select
+        ref={nativeRef}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+        name={name}
+        value={currentValue}
+        multiple={multiple}
+        disabled={disabled}
+        onChange={onChange}
+        onBlur={onBlur}
+        {...nativeProps}
+      >
+        {children}
+      </select>
+    </>
   );
 });
 

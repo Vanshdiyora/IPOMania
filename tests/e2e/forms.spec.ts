@@ -178,11 +178,12 @@ test("account form preserves typed values, validates, saves, and loads existing 
   await prepare(page);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/accounts/list");
+  await page.goto("/accounts");
   await page
     .getByRole("link", { name: /Add.*account/i })
     .first()
     .click();
+  await expect(page).toHaveURL(/\/accounts$/);
   const drawer = page.getByRole("dialog");
   await expect(drawer).toHaveAccessibleName("Add demat account");
   await page.getByRole("button", { name: "Save account", exact: true }).click();
@@ -209,7 +210,7 @@ test("account form preserves typed values, validates, saves, and loads existing 
     await route.fulfill({ json: { data: account } });
   });
   await page.getByRole("button", { name: "Save account", exact: true }).click();
-  await expect(page).toHaveURL(/\/accounts\/list$/);
+  await expect(page).toHaveURL(/\/accounts$/);
   await expect(page.getByText("Account created.")).toBeVisible();
   await page.goto(`/accounts/${recordId}/edit`);
   await expect(page.getByLabel("Account holder name")).toHaveValue(account.holder_name);
@@ -219,16 +220,18 @@ test("account form preserves typed values, validates, saves, and loads existing 
   expect(errors).toEqual([]);
 });
 
-test("IPO validation, back navigation and optional fields work inside the drawer", async ({
-  page,
-}) => {
+test("IPO validation and close confirmation work inside the drawer", async ({ page }) => {
   await prepare(page);
   await page.goto("/ipos?source=personal");
   await page.getByRole("link", { name: "Add IPO", exact: true }).click();
+  await expect(page).toHaveURL(/\/ipos\?source=personal$/);
   await page.getByRole("button", { name: "Add IPO", exact: true }).click();
   await expect(page.getByLabel("Company name")).toHaveAttribute("aria-invalid", "true");
   await page.getByLabel("Company name").fill("Unsaved company");
-  await page.goBack();
+  await page
+    .getByRole("dialog", { name: "Add IPO" })
+    .getByRole("button", { name: "Close drawer" })
+    .click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.getByRole("button", { name: "Keep editing" }).click();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
@@ -290,7 +293,16 @@ test("application form hides financial statuses and preserves them on edit", asy
   await expect(page.getByLabel("Mandate status")).toHaveCount(0);
   await expect(page.getByLabel("Allotment status")).toHaveCount(0);
   await page.getByRole("button", { name: "Save application" }).click();
-  await expect(page).toHaveURL(/\/applications\/list$/);
+  await expect(page).toHaveURL(/\/applications$/);
+});
+
+test("opening the add-application drawer keeps the applications tab URL", async ({ page }) => {
+  await prepare(page);
+  await page.goto("/applications");
+  await page.getByRole("link", { name: "Add application", exact: true }).first().click();
+
+  await expect(page).toHaveURL(/\/applications$/);
+  await expect(page.getByRole("dialog", { name: "Add application" })).toBeVisible();
 });
 
 test("admin typing remains focused, errors stay inline, and edits and archive actions work", async ({
@@ -508,7 +520,7 @@ test("application search and IPO filter update the actual list request", async (
       },
     }),
   );
-  await page.goto("/applications/list");
+  await page.goto("/applications");
   const searchRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());
     return url.pathname === "/api/applications" && url.searchParams.get("ipo_search") === "Form";
@@ -548,7 +560,7 @@ test("application filter options remain visible in the mobile drawer", async ({ 
       },
     }),
   );
-  await page.goto("/applications/list");
+  await page.goto("/applications");
   await page.getByRole("button", { name: "Filters", exact: true }).click();
   await page.getByRole("button", { name: "All statuses", exact: true }).click();
   const box = await page.getByRole("listbox", { name: "Status" }).boundingBox();

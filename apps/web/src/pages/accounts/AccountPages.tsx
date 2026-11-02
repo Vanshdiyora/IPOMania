@@ -6,7 +6,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { BriefcaseBusiness, CircleCheck } from "lucide-react";
 import type { z } from "@ipo-mania/validation";
 import { dematAccountSchema } from "@ipo-mania/validation";
 import type { AccountImportPreviewRow, DematAccount } from "@ipo-mania/shared";
@@ -14,7 +13,8 @@ import { useAuth } from "../../auth/useAuth";
 import { ConfirmButton } from "../../components/ui/ConfirmButton";
 import { Button } from "../../components/ui/Button";
 import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
-import { RouteFormDrawer } from "../../components/ui/FormDrawer";
+import { Input, Select as CustomSelect } from "../../components/ui/Input";
+import { DrawerRouteLink, RouteFormDrawer } from "../../components/ui/FormDrawer";
 import { FormSection } from "../../components/ui/FormSection";
 import { useToast } from "../../components/ui/ToastContext";
 import { Card } from "../../components/ui/Card";
@@ -129,7 +129,7 @@ const accountColumns: ColumnDef<DematAccount>[] = [
 function AccountDetailLink({
   account,
   children,
-  className = "font-semibold text-action no-underline underline-offset-4 hover:underline visited:text-action",
+  className = "font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action",
 }: {
   account: DematAccount;
   children: React.ReactNode;
@@ -170,12 +170,12 @@ export function AccountDashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Link
+          <DrawerRouteLink
             className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
             to="/accounts/new"
           >
             Add account
-          </Link>
+          </DrawerRouteLink>
           <Link className={secondaryLinkClass} to="/accounts/import">
             Import accounts
           </Link>
@@ -201,65 +201,12 @@ export function AccountDashboardPage() {
           </>
         )}
       </section>
-      <Card>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Quick access
-            </p>
-            <h2 className="mt-1 text-base font-bold text-ink">Account management</h2>
-          </div>
-          <div className="flex flex-wrap gap-4 text-sm font-semibold">
-            <Link
-              className="text-action no-underline underline-offset-4 hover:underline visited:text-action"
-              to="/accounts/list"
-            >
-              View account list
-            </Link>
-            <Link
-              className="text-action no-underline underline-offset-4 hover:underline visited:text-action"
-              to="/accounts/import-history"
-            >
-              Import history
-            </Link>
-          </div>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <Link
-            to="/accounts/list"
-            className="flex items-center gap-3 rounded-lg border border-border bg-canvas px-4 py-3 text-sm font-semibold text-ink transition-colors hover:border-action hover:bg-action-light"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-action">
-              <BriefcaseBusiness size={18} aria-hidden="true" />
-            </span>
-            <span>
-              <span className="block">Manage accounts</span>
-              <span className="mt-0.5 block text-xs font-normal text-muted">
-                Review, edit, and archive holdings
-              </span>
-            </span>
-          </Link>
-          <Link
-            to="/accounts/import"
-            className="flex items-center gap-3 rounded-lg border border-border bg-canvas px-4 py-3 text-sm font-semibold text-ink transition-colors hover:border-action hover:bg-action-light"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-action">
-              <CircleCheck size={18} aria-hidden="true" />
-            </span>
-            <span>
-              <span className="block">Import accounts</span>
-              <span className="mt-0.5 block text-xs font-normal text-muted">
-                Add multiple accounts from a file
-              </span>
-            </span>
-          </Link>
-        </div>
-      </Card>
+      <AccountListPage embedded />
     </div>
   );
 }
 
-export function AccountListPage() {
+export function AccountListPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { session, markSessionExpired } = useAuth();
   const [listParams, setListParams] = useSearchParams();
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -355,34 +302,50 @@ export function AccountListPage() {
 
   return (
     <div className="space-y-6">
-      <header className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(560px,auto)] lg:items-end">
-        <div>
-          <h1 className="text-2xl font-bold text-navy">Account list</h1>
-          <p className="mt-2 text-base text-muted">
-            {data
-              ? `${data.data.pagination.total} matching accounts`
-              : "Search and filter your accounts."}
-          </p>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <ListToolbar
-            className="min-w-0 flex-1 sm:flex-nowrap"
-            search={holderName}
-            searchPlaceholder="Search holder name..."
-            searchLabel="Search holder name"
-            activeFilterCount={filterCount}
-            onSearchChange={(value) => updateFilter("holder_name", value)}
-            onOpenFilters={() => {
-              setDraftFilters({ broker, depository, status, archived, createdFrom, createdTo });
-              setFiltersOpen(true);
-            }}
-            onClearFilters={resetFilters}
-          />
-          <Link className={`${secondaryLinkClass} shrink-0`} to="/accounts/new">
-            Add an account
-          </Link>
-        </div>
-      </header>
+      {!embedded && (
+        <header className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(560px,auto)] lg:items-end">
+          <div>
+            <h1 className="text-2xl font-bold text-navy">Account list</h1>
+            <p className="mt-2 text-base text-muted">
+              {data
+                ? `${data.data.pagination.total} matching accounts`
+                : "Search and filter your accounts."}
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <ListToolbar
+              className="min-w-0 flex-1 sm:flex-nowrap"
+              search={holderName}
+              searchPlaceholder="Search holder name..."
+              searchLabel="Search holder name"
+              activeFilterCount={filterCount}
+              onSearchChange={(value) => updateFilter("holder_name", value)}
+              onOpenFilters={() => {
+                setDraftFilters({ broker, depository, status, archived, createdFrom, createdTo });
+                setFiltersOpen(true);
+              }}
+              onClearFilters={resetFilters}
+            />
+            <DrawerRouteLink className={`${secondaryLinkClass} shrink-0`} to="/accounts/new">
+              Add an account
+            </DrawerRouteLink>
+          </div>
+        </header>
+      )}
+      {embedded ? (
+        <ListToolbar
+          search={holderName}
+          searchPlaceholder="Search holder name..."
+          searchLabel="Search holder name"
+          activeFilterCount={filterCount}
+          onSearchChange={(value) => updateFilter("holder_name", value)}
+          onOpenFilters={() => {
+            setDraftFilters({ broker, depository, status, archived, createdFrom, createdTo });
+            setFiltersOpen(true);
+          }}
+          onClearFilters={resetFilters}
+        />
+      ) : null}
       <FilterDrawer
         open={filtersOpen}
         title="Account filters"
@@ -429,7 +392,7 @@ export function AccountListPage() {
             />
             <label className="block text-sm font-semibold text-ink">
               Depository
-              <select
+              <CustomSelect
                 className={inputClass}
                 value={draftFilters.depository}
                 onChange={(event) =>
@@ -439,11 +402,11 @@ export function AccountListPage() {
                 <option value="">All depositories</option>
                 <option value="NSDL">NSDL</option>
                 <option value="CDSL">CDSL</option>
-              </select>
+              </CustomSelect>
             </label>
             <label className="block text-sm font-semibold text-ink">
               Account status
-              <select
+              <CustomSelect
                 className={inputClass}
                 value={draftFilters.status}
                 onChange={(event) =>
@@ -454,11 +417,11 @@ export function AccountListPage() {
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
                 <option value="closed">Closed</option>
-              </select>
+              </CustomSelect>
             </label>
             <label className="block text-sm font-semibold text-ink">
               Archive
-              <select
+              <CustomSelect
                 className={inputClass}
                 value={draftFilters.archived}
                 onChange={(event) =>
@@ -468,11 +431,11 @@ export function AccountListPage() {
                 <option value="false">Not archived</option>
                 <option value="true">Archived</option>
                 <option value="all">All accounts</option>
-              </select>
+              </CustomSelect>
             </label>
             <label className="block text-sm font-semibold text-ink">
               Created from
-              <input
+              <Input
                 className={inputClass}
                 type="date"
                 value={draftFilters.createdFrom}
@@ -483,7 +446,7 @@ export function AccountListPage() {
             </label>
             <label className="block text-sm font-semibold text-ink">
               Created through
-              <input
+              <Input
                 className={inputClass}
                 type="date"
                 value={draftFilters.createdTo}
@@ -577,7 +540,7 @@ export function AccountListPage() {
               <article key={account.id} className="rounded-lg border border-border p-4 text-base">
                 <AccountDetailLink
                   account={account}
-                  className="text-lg font-bold text-action no-underline underline-offset-4 hover:underline visited:text-action"
+                  className="text-lg font-bold text-action no-underline transition-colors hover:text-navy visited:text-action"
                 >
                   {account.holder_name}
                 </AccountDetailLink>
@@ -683,7 +646,7 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
         }),
       });
       await client.invalidateQueries({ queryKey: ["accounts"] });
-      navigate(editing ? `/accounts/${accountId}` : "/accounts/list", {
+      navigate(editing ? `/accounts/${accountId}` : "/accounts", {
         state: { successMessage: editing ? "Account updated." : "Account created." },
       });
     } catch (error) {
@@ -703,7 +666,7 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
     <RouteFormDrawer
       title={editing ? "Edit demat account" : "Add demat account"}
       description="Enter masked account details only. Do not enter a full account number or password."
-      cancelTo={editing && accountId ? `/accounts/${accountId}` : "/accounts/list"}
+      cancelTo={editing && accountId ? `/accounts/${accountId}` : "/accounts"}
       formId="account-form"
       submitLabel="Save account"
       busy={isSubmitting}
@@ -812,7 +775,7 @@ export function AccountDetailsPage() {
               : "Account deleted",
         tone: "success",
       });
-      if (method === "delete") navigate("/accounts/list");
+      if (method === "delete") navigate("/accounts");
     },
     onError: (reason) => {
       if (reason instanceof ApiRequestError && reason.status === 401) markSessionExpired();
@@ -830,7 +793,7 @@ export function AccountDetailsPage() {
     <div className="w-full space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <BackLink fallback="/accounts/list" allowedPath={/^\/accounts(\/list)?$/}>
+          <BackLink fallback="/accounts" allowedPath={/^\/accounts$/}>
             Back to accounts
           </BackLink>
           <h1 className="text-2xl font-bold text-navy">Account details</h1>
@@ -839,9 +802,9 @@ export function AccountDetailsPage() {
           </p>
         </div>
         {account && !account.archived_at ? (
-          <Link className={secondaryLinkClass} to={`/accounts/${account.id}/edit`}>
+          <DrawerRouteLink className={secondaryLinkClass} to={`/accounts/${account.id}/edit`}>
             Edit account
-          </Link>
+          </DrawerRouteLink>
         ) : null}
       </header>
       {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
@@ -1034,7 +997,7 @@ export function AccountImportPage() {
               <label key={field.key} className="block text-base font-semibold text-ink">
                 {field.label}
                 {field.required ? " (required)" : " (optional)"}
-                <select
+                <CustomSelect
                   className={inputClass}
                   value={mapping[field.key] ?? ""}
                   onChange={(event) =>
@@ -1047,7 +1010,7 @@ export function AccountImportPage() {
                       {header}
                     </option>
                   ))}
-                </select>
+                </CustomSelect>
               </label>
             ))}
           </div>
@@ -1301,7 +1264,7 @@ export function ImportHistoryPage() {
                 <tr key={item.id} className="border-b border-border">
                   <td className="p-3">
                     <Link
-                      className="text-action no-underline underline-offset-4 hover:underline visited:text-action"
+                      className="text-action no-underline transition-colors hover:text-navy visited:text-action"
                       to={`/accounts/import-history/${item.id}`}
                     >
                       {item.file_name}

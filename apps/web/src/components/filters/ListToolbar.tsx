@@ -63,7 +63,7 @@ export function ListToolbar({
           <button
             type="button"
             onClick={onClearFilters}
-            className="min-h-touch px-2 text-sm font-semibold text-action no-underline underline-offset-4 hover:underline visited:text-action"
+            className="min-h-touch px-2 text-sm font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
           >
             Clear
           </button>

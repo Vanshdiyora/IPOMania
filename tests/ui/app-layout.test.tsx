@@ -48,20 +48,20 @@ describe("AppLayout", () => {
     expect(screen.queryByRole("button", { name: "Open navigation" })).not.toBeInTheDocument();
   });
 
-  it("keeps the header and sidebar for the authenticated home route", () => {
+  it("keeps only the sidebar for the authenticated home route", () => {
     useAuthMock.mockReturnValue({ user: { email: "investor@example.test" } });
     renderLayout();
 
-    expect(screen.getByRole("banner")).toBeInTheDocument();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Main navigation" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View your profile" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
   });
 
   it("preserves the application layout on other routes", () => {
     renderLayout("/dashboard");
 
     expect(screen.getByRole("heading", { name: "Dashboard content" })).toBeInTheDocument();
-    expect(screen.getByRole("banner")).toBeInTheDocument();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Main navigation" })).toBeInTheDocument();
     expect(screen.getByRole("main")).not.toHaveClass("max-w-7xl", "mx-auto");
   });

@@ -86,11 +86,10 @@ export function AdminLayout() {
   const [open, setOpen] = useState(false);
   const mobilePanelRef = useRef<HTMLDivElement>(null);
   useModalLayer(open, mobilePanelRef, () => setOpen(false), "[data-navigation-close]");
-  const title = nav.find(([, path]) => path === location.pathname)?.[0] ?? "IPO Administration";
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className="flex h-16 items-center px-5 text-lg font-bold text-white">
-        <img src="/logo.png" alt="" className="mr-2 h-8 w-8 rounded-lg object-contain" />
+        <img src="/logo.png" alt="" className="mr-2 h-9 w-9 rounded-xl object-contain" />
         IPO Mania
       </div>
       <nav aria-label="Administration" className="flex-1 space-y-1 px-3 py-5">
@@ -153,9 +152,9 @@ export function AdminLayout() {
           document.body,
         )}
       <div className="min-w-0 flex-1 lg:ml-64">
-        <header className="sticky top-0 z-30 flex h-16 items-center border-b border-border bg-surface px-4 lg:px-8">
+        {!open && (
           <button
-            className="mr-3 grid min-h-touch min-w-touch place-items-center rounded-lg lg:hidden"
+            className="fixed left-4 top-4 z-30 grid min-h-touch min-w-touch place-items-center rounded-lg border border-border bg-white text-muted shadow-sm lg:hidden"
             aria-label="Open navigation"
             aria-expanded={open}
             aria-haspopup="dialog"
@@ -163,11 +162,7 @@ export function AdminLayout() {
           >
             <Menu />
           </button>
-          <div>
-            <p className="text-xs text-muted">Admin / {title}</p>
-            <h1 className="text-lg font-bold">{title}</h1>
-          </div>
-        </header>
+        )}
         <main className="w-full p-4 md:p-6 lg:p-8">
           <Outlet />
         </main>

@@ -1,8 +1,60 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useBlocker, useNavigate } from "react-router-dom";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
+import { Link, useBlocker, useNavigate, type LinkProps } from "react-router-dom";
 import { Button } from "./Button";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { SideDrawer } from "./SideDrawer";
+
+type DrawerRouteContextValue = {
+  open: (path: string) => void;
+  close: () => void;
+  isLocal: boolean;
+};
+
+const DrawerRouteContext = createContext<DrawerRouteContextValue | null>(null);
+
+export function DrawerRouteProvider({
+  value,
+  children,
+}: {
+  value: DrawerRouteContextValue;
+  children: ReactNode;
+}) {
+  return <DrawerRouteContext.Provider value={value}>{children}</DrawerRouteContext.Provider>;
+}
+
+export function DrawerRouteLink({ to, onClick, ...props }: Omit<LinkProps, "to"> & { to: string }) {
+  const drawerRoute = useContext(DrawerRouteContext);
+
+  function handleClick(event: MouseEvent<HTMLAnchorElement>) {
+    onClick?.(event);
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      props.target
+    ) {
+      return;
+    }
+
+    if (drawerRoute) {
+      event.preventDefault();
+      drawerRoute.open(to);
+    }
+  }
+
+  return <Link {...props} to={to} onClick={handleClick} />;
+}
 
 type FormDrawerProps = {
   title: string;
@@ -91,7 +143,9 @@ export function RouteFormDrawer({
   children: ReactNode;
 }) {
   const navigate = useNavigate();
+  const drawerRoute = useContext(DrawerRouteContext);
   const [closing, setClosing] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const closeTimer = useRef<number>();
   useEffect(() => () => window.clearTimeout(closeTimer.current), []);
   const leave = (action: () => void) => {
@@ -100,6 +154,12 @@ export function RouteFormDrawer({
     closeTimer.current = window.setTimeout(action, 180);
   };
   const requestClose = () => {
+    if (drawerRoute?.isLocal) {
+      if (busy) return;
+      if (dirty) setDiscardOpen(true);
+      else leave(drawerRoute.close);
+      return;
+    }
     if (dirty) navigate(cancelTo);
     else leave(() => navigate(cancelTo));
   };
@@ -130,14 +190,26 @@ export function RouteFormDrawer({
         {children}
       </SideDrawer>
       <ConfirmationDialog
-        open={blocker.state === "blocked" && !closing}
+        open={
+          (blocker.state === "blocked" || Boolean(drawerRoute?.isLocal && discardOpen)) && !closing
+        }
         title="Discard unsaved changes?"
         description="Your changes will be lost if you leave this form."
         confirmLabel="Discard changes"
         cancelLabel="Keep editing"
         danger
-        onCancel={() => blocker.reset?.()}
-        onConfirm={() => leave(() => blocker.proceed?.())}
+        onCancel={() => {
+          setDiscardOpen(false);
+          blocker.reset?.();
+        }}
+        onConfirm={() => {
+          if (drawerRoute?.isLocal) {
+            setDiscardOpen(false);
+            leave(drawerRoute.close);
+          } else {
+            leave(() => blocker.proceed?.());
+          }
+        }}
       />
     </>
   );

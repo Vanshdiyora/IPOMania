@@ -12,7 +12,9 @@ export function DataTable({
 }) {
   return (
     <div
-      className={cn("w-full overflow-x-auto rounded-xl border border-border bg-white")}
+      className={cn(
+        "w-full overflow-x-auto rounded-2xl border border-border/90 bg-surface shadow-card",
+      )}
       tabIndex={0}
       role="region"
       aria-label="Scrollable data table"
