@@ -25,7 +25,7 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest run tests/ui",
     "test:security:db": "supabase test db",
-    "test:integration:accounts": "vitest run tests/integration/demat-account-capacity.test.ts",
+    "test:integration:accounts": "vitest run tests/integration/demat-account-concurrency.test.ts",
     "test:integration:applications": "vitest run tests/integration/application-concurrency.test.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

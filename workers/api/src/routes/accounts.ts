@@ -116,7 +116,6 @@ accountsRoutes.get("/", async (context) => {
         total: totalResult.count ?? 0,
         active,
         archived,
-        remainingCapacity: 500 - active,
       },
     },
   });
@@ -667,17 +666,6 @@ function databaseError(context: AccountRouteContext, error: { code?: string; mes
     return context.json(
       { error: { code: "IMPORT_NOT_FOUND", message: "The import was not found." } },
       404,
-    );
-  }
-  if (error.code === "23514" && error.message.includes("ACTIVE_ACCOUNT_LIMIT")) {
-    return context.json(
-      {
-        error: {
-          code: "ACCOUNT_LIMIT_REACHED",
-          message: "You can have up to 500 active accounts.",
-        },
-      },
-      409,
     );
   }
   if (error.code === "23505") {

@@ -117,6 +117,29 @@ describe("demat account API", () => {
     expect(query.get("user_id")).not.toContain(otherUserId);
   });
 
+  it("reports account totals without a remaining capacity", async () => {
+    installSupabaseMock(async (request) => {
+      const count =
+        new URL(request.url).searchParams.get("archived_at") === "not.is.null" ? 0 : 501;
+      return request.method === "HEAD"
+        ? new Response(null, { headers: { "Content-Range": `*/${count}` } })
+        : new Response("[]", {
+            headers: { "Content-Type": "application/json", "Content-Range": `*/${count}` },
+          });
+    });
+
+    const response = await createApp().request(
+      "/api/accounts",
+      { headers: bearerHeaders() },
+      bindings,
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { data: { summary: Record<string, number> } };
+    expect(body.data.summary).toEqual({ total: 501, active: 501, archived: 0 });
+    expect(body.data.summary).not.toHaveProperty("remainingCapacity");
+  });
+
   it("applies server-side search and pagination filters", async () => {
     const requests = installSupabaseMock(async (request) => {
       if (request.method === "HEAD") {

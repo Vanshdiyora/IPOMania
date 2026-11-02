@@ -1,7 +1,7 @@
 import { toIsoDateTime } from "../../lib/formValues";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
   DematAccount,
   IpoApplication,
@@ -18,6 +18,8 @@ import { FormSection } from "../../components/ui/FormSection";
 import { useFormValidation } from "../../components/ui/useFormValidation";
 import { applicationCreateSchema, applicationUpdateSchema } from "@ipo-mania/validation";
 import { Card } from "../../components/ui/Card";
+import { BackLink } from "../../components/ui/BackLink";
+import { Pagination } from "../../components/ui/Pagination";
 import { ApiRequestError, apiRequest } from "../../lib/api";
 
 type ApplicationListResponse = {
@@ -183,16 +185,36 @@ export function ApplicationDashboardPage() {
 
 export function ApplicationListPage() {
   const { session } = useAuth();
-  const [page, setPage] = useState(1);
-  const [ipoId, setIpoId] = useState("");
-  const [accountId, setAccountId] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [applicationStatus, setApplicationStatus] = useState("");
-  const [broker, setBroker] = useState("");
-  const [search, setSearch] = useState("");
-  const [includeArchived, setIncludeArchived] = useState("false");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const location = useLocation();
+  const [listParams, setListParams] = useSearchParams();
+  const pageValue = Number(listParams.get("page"));
+  const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const ipoId = listParams.get("ipo_id") ?? "";
+  const accountId = listParams.get("demat_account_id") ?? "";
+  const categoryId = listParams.get("category_id") ?? "";
+  const applicationStatus = listParams.get("application_status") ?? "";
+  const broker = listParams.get("broker") ?? "";
+  const search = listParams.get("search") ?? "";
+  const includeArchived = listParams.get("include_archived") ?? "false";
+  const from = listParams.get("submission_from") ?? "";
+  const to = listParams.get("submission_to") ?? "";
+  const updateFilter = (key: string, value: string) => {
+    setListParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (value && !(key === "include_archived" && value === "false")) next.set(key, value);
+      else next.delete(key);
+      next.delete("page");
+      return next;
+    }, { replace: true });
+  };
+  const changePage = (nextPage: number) => {
+    setListParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (nextPage > 1) next.set("page", String(nextPage));
+      else next.delete("page");
+      return next;
+    });
+  };
   const lists = useOwnedLists();
   const categoriesQuery = useQuery({
     queryKey: ["application-category-options", lists.ipos.map((item) => item.id).join(",")],
@@ -290,8 +312,7 @@ export function ApplicationListPage() {
               className={fieldClass}
               value={ipoId}
               onChange={(event) => {
-                setIpoId(event.target.value);
-                setPage(1);
+                updateFilter("ipo_id", event.target.value);
               }}
             >
               <option value="">All IPOs</option>
@@ -308,8 +329,7 @@ export function ApplicationListPage() {
               className={fieldClass}
               value={accountId}
               onChange={(event) => {
-                setAccountId(event.target.value);
-                setPage(1);
+                updateFilter("demat_account_id", event.target.value);
               }}
             >
               <option value="">All accounts</option>
@@ -326,8 +346,7 @@ export function ApplicationListPage() {
               className={fieldClass}
               value={broker}
               onChange={(event) => {
-                setBroker(event.target.value);
-                setPage(1);
+                updateFilter("broker", event.target.value);
               }}
             />
           </label>
@@ -337,8 +356,7 @@ export function ApplicationListPage() {
               className={fieldClass}
               value={includeArchived}
               onChange={(event) => {
-                setIncludeArchived(event.target.value);
-                setPage(1);
+                updateFilter("include_archived", event.target.value);
               }}
             >
               <option value="false">Active records</option>
@@ -351,8 +369,7 @@ export function ApplicationListPage() {
               className={fieldClass}
               value={search}
               onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
+                updateFilter("search", event.target.value);
               }}
             />
           </label>
@@ -362,8 +379,7 @@ export function ApplicationListPage() {
               className={fieldClass}
               value={categoryId}
               onChange={(event) => {
-                setCategoryId(event.target.value);
-                setPage(1);
+                updateFilter("category_id", event.target.value);
               }}
             >
               <option value="">All categories</option>
@@ -379,8 +395,7 @@ export function ApplicationListPage() {
             value={applicationStatus}
             statuses={statuses}
             onChange={(value) => {
-              setApplicationStatus(value);
-              setPage(1);
+              updateFilter("application_status", value);
             }}
           />
           <label className="font-semibold">
@@ -390,8 +405,7 @@ export function ApplicationListPage() {
               type="date"
               value={from}
               onChange={(event) => {
-                setFrom(event.target.value);
-                setPage(1);
+                updateFilter("submission_from", event.target.value);
               }}
             />
           </label>
@@ -402,8 +416,7 @@ export function ApplicationListPage() {
               type="date"
               value={to}
               onChange={(event) => {
-                setTo(event.target.value);
-                setPage(1);
+                updateFilter("submission_to", event.target.value);
               }}
             />
           </label>
@@ -441,17 +454,17 @@ export function ApplicationListPage() {
           <table className="w-full min-w-[760px] text-left">
             <thead>
               <tr className="border-b border-border text-sm text-muted">
-                <th className="p-3">Select</th>
-                <th className="p-3">IPO / category</th>
-                <th className="p-3">Account / broker</th>
-                <th className="p-3">Lots / amount</th>
-                <th className="p-3">Application</th>
+                <th scope="col" className="p-3 text-center">Select</th>
+                <th scope="col" className="p-3 text-left">IPO / category</th>
+                <th scope="col" className="p-3 text-left">Account / broker</th>
+                <th scope="col" className="p-3 text-right">Lots / amount</th>
+                <th scope="col" className="p-3 text-center">Application</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-border">
-                  <td className="p-3">
+                  <td className="p-3 text-center">
                     <input
                       aria-label={`Select application ${row.id}`}
                       className="size-5"
@@ -470,6 +483,7 @@ export function ApplicationListPage() {
                     <Link
                       className="font-semibold text-action underline"
                       to={`/applications/${row.id}`}
+                      state={{ from: `${location.pathname}${location.search}` }}
                     >
                       {row.ipos?.symbol ?? "IPO"} · {row.ipo_categories?.category ?? "Category"}
                     </Link>
@@ -479,10 +493,10 @@ export function ApplicationListPage() {
                     <br />
                     <span className="text-sm text-muted">{row.demat_accounts?.broker_name}</span>
                   </td>
-                  <td className="p-3">
+                  <td className="p-3 text-right tabular-nums whitespace-nowrap">
                     {row.lots} lots · {row.application_amount}
                   </td>
-                  <td className="p-3">{prettyStatus(row.application_status)}</td>
+                  <td className="p-3 text-center">{prettyStatus(row.application_status)}</td>
                 </tr>
               ))}
             </tbody>
@@ -492,25 +506,13 @@ export function ApplicationListPage() {
             <p className="p-4">No applications match these filters.</p>
           ) : null}
         </div>
-        <div className="mt-4 flex items-center justify-between">
-          <Button
-            variant="outline"
-            disabled={page <= 1}
-            onClick={() => setPage((value) => value - 1)}
-          >
-            Previous page
-          </Button>
-          <span>
-            Page {page} of {data?.data.pagination.total_pages ?? 1}
-          </span>
-          <Button
-            variant="outline"
-            disabled={page >= (data?.data.pagination.total_pages ?? 1)}
-            onClick={() => setPage((value) => value + 1)}
-          >
-            Next page
-          </Button>
-        </div>
+        <Pagination
+          label="Application list pages"
+          page={page}
+          totalPages={data?.data.pagination.total_pages ?? 1}
+          total={data?.data.pagination.total}
+          onPageChange={changePage}
+        />
       </Card>
     </div>
   );
@@ -874,6 +876,7 @@ export function ApplicationDetailsPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
+          <BackLink fallback="/applications/list" allowedPath={/^\/applications(\/list)?$/}>Back to applications</BackLink>
           <h1 className="text-3xl font-bold text-navy">Application details</h1>
           <p className="mt-2 text-base text-muted">
             Historical calculation rules are retained with this record.

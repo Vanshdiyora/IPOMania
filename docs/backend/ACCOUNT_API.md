@@ -8,15 +8,15 @@ payloads do not accept `user_id`.
 
 ## Account routes
 
-| Method and path                         | Behavior                                                |
-| --------------------------------------- | ------------------------------------------------------- |
-| `GET /api/accounts`                     | List, filters, pagination, and account-capacity summary |
-| `POST /api/accounts`                    | Create an account                                       |
-| `GET /api/accounts/:accountId`          | Read one owned account                                  |
-| `PATCH /api/accounts/:accountId`        | Update a non-archived owned account                     |
-| `POST /api/accounts/:accountId/archive` | Soft-archive an account                                 |
-| `POST /api/accounts/:accountId/restore` | Restore an account, subject to the capacity guard       |
-| `DELETE /api/accounts/:accountId`       | Permanently delete an archived account only             |
+| Method and path                         | Behavior                                      |
+| --------------------------------------- | --------------------------------------------- |
+| `GET /api/accounts`                     | List, filters, pagination, and account totals |
+| `POST /api/accounts`                    | Create an account                             |
+| `GET /api/accounts/:accountId`          | Read one owned account                        |
+| `PATCH /api/accounts/:accountId`        | Update a non-archived owned account           |
+| `POST /api/accounts/:accountId/archive` | Soft-archive an account                       |
+| `POST /api/accounts/:accountId/restore` | Restore an account                            |
+| `DELETE /api/accounts/:accountId`       | Permanently delete an archived account only   |
 
 Create and update accept only the account fields in
 [DEMAT_ACCOUNT_SPECIFICATION.md](../product/DEMAT_ACCOUNT_SPECIFICATION.md). Unknown properties
@@ -35,7 +35,7 @@ ACCOUNT_HAS_HISTORY`.
 - `archived`: `false` (default), `true`, or `all`
 
 The response contains `accounts`, `pagination` (`page`, `pageSize`, `total`, `totalPages`), and
-`summary` (`total`, `active`, `archived`, `remainingCapacity`). `total` includes inactive and
+`summary` (`total`, `active`, `archived`). `total` includes inactive and
 closed records; `active` counts only unarchived active records.
 
 ## Import routes
@@ -61,19 +61,18 @@ columns. Every input row is stored in the preview report as `ready`, `duplicate`
 duplicate/invalid rows are not imported.
 
 Confirm uses one database function and transaction. A repeated confirm returns the stored result
-instead of inserting a second set of accounts. The database capacity trigger can reject an import
-atomically if it would exceed the active-account limit. Reversal is all-or-nothing and fails with
+instead of inserting a second set of accounts. Reversal is all-or-nothing and fails with
 `409 IMPORT_REVERSAL_BLOCKED` if any created account has since changed or been archived.
 
 ## Error codes
 
-| HTTP | Codes                                                                                                                   |
-| ---- | ----------------------------------------------------------------------------------------------------------------------- |
-| 400  | `VALIDATION_ERROR`, `INVALID_HEADERS`, `INVALID_ROW_COUNT`, `INVALID_FILE`                                              |
-| 401  | `UNAUTHORIZED`                                                                                                          |
-| 404  | `ACCOUNT_NOT_FOUND`, `IMPORT_NOT_FOUND`                                                                                 |
-| 409  | `ACCOUNT_LIMIT_REACHED`, `DUPLICATE_ACCOUNT`, `ACCOUNT_HAS_HISTORY`, `IMPORT_NOT_REVERSIBLE`, `IMPORT_REVERSAL_BLOCKED` |
-| 413  | `FILE_TOO_LARGE`                                                                                                        |
-| 415  | `UNSUPPORTED_FILE_TYPE`                                                                                                 |
+| HTTP | Codes                                                                                          |
+| ---- | ---------------------------------------------------------------------------------------------- |
+| 400  | `VALIDATION_ERROR`, `INVALID_HEADERS`, `INVALID_ROW_COUNT`, `INVALID_FILE`                     |
+| 401  | `UNAUTHORIZED`                                                                                 |
+| 404  | `ACCOUNT_NOT_FOUND`, `IMPORT_NOT_FOUND`                                                        |
+| 409  | `DUPLICATE_ACCOUNT`, `ACCOUNT_HAS_HISTORY`, `IMPORT_NOT_REVERSIBLE`, `IMPORT_REVERSAL_BLOCKED` |
+| 413  | `FILE_TOO_LARGE`                                                                               |
+| 415  | `UNSUPPORTED_FILE_TYPE`                                                                        |
 
 Errors contain no stack trace, bearer token, database connection information, or secrets.

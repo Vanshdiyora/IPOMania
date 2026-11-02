@@ -23,17 +23,10 @@ The same user cannot register the same normalized masked demat identifier twice 
 depository, including while an earlier record is archived. Masked client references are not used
 as unique identity.
 
-## Capacity and archive behavior
-
-The limit is **500 unarchived accounts with `account_status = active` per user**. Inactive, closed,
-and archived accounts do not consume capacity. This is both a product rule and a database
-invariant. An atomic guarded update to a private per-user capacity-counter row serializes active
-membership changes. Create, status changes, restore, and imports cannot bypass the limit through
-simultaneous requests.
+## Archive behavior
 
 Archiving preserves the record and makes it eligible for deletion only when it has no linked
-history. Restoring an active account is rejected if it would exceed the limit. Restoring an
-inactive or closed account does not consume active capacity.
+history. Users can create or restore any number of accounts, regardless of account status.
 
 Accounts are never hard-deleted as the normal removal action. The delete endpoint requires an
 archived record; future financial-history relations must prevent deletion with a restrictive
@@ -42,7 +35,7 @@ and still unarchived; reversal archives those accounts rather than deleting them
 
 ## Pages
 
-- **Dashboard:** total, active, archived, and remaining active capacity.
+- **Dashboard:** total, active, and archived account counts.
 - **Account list:** server-side search, filters, pagination, a virtualized desktop table, and
   readable mobile cards.
 - **Add, edit, and details:** validated masked account fields, lifecycle actions, and ownership
@@ -67,5 +60,5 @@ from the identity verified by Supabase Auth and uses the caller's JWT with the a
 PostgreSQL RLS is the final ownership boundary. Clients cannot supply or update `user_id`.
 
 Only masked identifiers should be entered. Validation is performed in the browser and API, with
-database constraints as the final shape and capacity guard. Do not put credentials or unmasked
+database constraints as the final shape guard. Do not put credentials or unmasked
 account identifiers in notes or uploaded files.

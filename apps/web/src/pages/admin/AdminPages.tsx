@@ -37,6 +37,8 @@ import { SearchInput, Select } from "../../components/ui/Input";
 import { FormDrawer } from "../../components/ui/FormDrawer";
 import { FormInput, FormSelect } from "../../components/ui/FormControls";
 import { Pagination } from "../../components/ui/Pagination";
+import { PageHeader, StatCard } from "../../components/ui/PageHeader";
+import { StatusBadge } from "../../components/ui/Badge";
 import { ErrorNotice, EmptyState } from "../../components/ui/States";
 import { Toast, ToastViewport, type ToastProps } from "../../components/ui/Toast";
 
@@ -103,6 +105,7 @@ export function AdminLayout() {
             key={path}
             to={path}
             onClick={() => setOpen(false)}
+            aria-current={location.pathname === path ? "page" : undefined}
             className={`flex min-h-11 items-center rounded-lg px-3 text-sm font-medium ${location.pathname === path ? "bg-white text-slate-950" : "text-slate-300 hover:bg-slate-800 hover:text-white"}`}
           >
             <Icon className="mr-3 h-4 w-4" />
@@ -177,7 +180,7 @@ export function AdminLayout() {
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-surface p-5 shadow-card">
       {children}
     </section>
   );
@@ -246,14 +249,10 @@ export function AdminOverviewPage() {
           </Button>
         </div>
       )}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Overview</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Live IPO catalog and synchronization status.
-          </p>
-        </div>
-        <ConfirmButton
+      <PageHeader
+        title="IPO overview"
+        description="Live catalog counts and synchronization status."
+        actions={<ConfirmButton
           disabled={
             syncing ||
             syncCoolingDown ||
@@ -266,12 +265,12 @@ export function AdminOverviewPage() {
           description="Fetch the latest provider records and update the shared IPO catalog."
           confirmLabel="Start synchronization"
           danger={false}
-          className="inline-flex min-h-touch items-center justify-center rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white disabled:opacity-50"
+          className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-4 py-2 font-semibold text-white disabled:opacity-50"
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
           Fetch Latest IPO Data
-        </ConfirmButton>
-      </div>
+        </ConfirmButton>}
+      />
       {message && (
         <div role="status" className="rounded-lg border bg-white px-4 py-3 text-sm">
           {message}
@@ -279,10 +278,7 @@ export function AdminOverviewPage() {
       )}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {cards.map(([label, value]) => (
-          <Card key={String(label)}>
-            <p className="text-sm text-slate-500">{label}</p>
-            <p className="mt-2 text-3xl font-bold">{String(value)}</p>
-          </Card>
+          <StatCard key={String(label)} label={String(label)} value={String(value)} />
         ))}
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
@@ -480,13 +476,11 @@ export function AdminIposPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-xl font-bold">IPO catalog</h2>
-          <p className="text-sm text-slate-500">{filtered.length} records</p>
-        </div>
-        <Button onClick={openCreate}>Add IPO</Button>
-      </div>
+      <PageHeader
+        title="IPO catalog"
+        description={`${filtered.length} records`}
+        actions={<Button onClick={openCreate}>Add IPO</Button>}
+      />
       <SearchInput
         aria-label="Search IPO catalog"
         value={search}
@@ -544,9 +538,7 @@ export function AdminIposPage() {
                       </h3>
                       <p className="text-sm text-slate-500">{row.symbol || "No symbol"}</p>
                     </div>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium capitalize">
-                      {row.ipo_status}
-                    </span>
+                    <StatusBadge status={row.ipo_status} />
                   </div>
                   <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                     <div>
@@ -577,17 +569,17 @@ export function AdminIposPage() {
             <table className="hidden min-w-[820px] w-full text-left text-sm md:table">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Company</th>
-                  <th className="px-4 py-3">Symbol</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Listing date</th>
-                  <th className="sticky right-0 bg-slate-50 px-4 py-3 text-right">Actions</th>
+                  <th scope="col" className="px-4 py-3 text-left">Company</th>
+                  <th scope="col" className="px-4 py-3 text-left">Symbol</th>
+                  <th scope="col" className="px-4 py-3 text-left">Type</th>
+                  <th scope="col" className="px-4 py-3 text-center">Status</th>
+                  <th scope="col" className="px-4 py-3 text-center">Listing date</th>
+                  <th scope="col" className="sticky right-0 bg-slate-50 px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleRows.map((row) => (
-                  <tr key={row.id} className="border-t">
+                  <tr key={row.id} className="border-t border-border hover:bg-canvas">
                     <td
                       className="max-w-xs truncate px-4 py-3 font-semibold"
                       title={row.company_name}
@@ -596,8 +588,8 @@ export function AdminIposPage() {
                     </td>
                     <td className="px-4 py-3">{row.symbol ?? "—"}</td>
                     <td className="px-4 py-3 capitalize">{row.issue_type}</td>
-                    <td className="px-4 py-3 capitalize">{row.ipo_status}</td>
-                    <td className="px-4 py-3">{row.listing_date ?? "—"}</td>
+                    <td className="px-4 py-3 text-center"><StatusBadge status={row.ipo_status} /></td>
+                    <td className="px-4 py-3 text-center tabular-nums whitespace-nowrap">{row.listing_date ?? "—"}</td>
                     <td className="sticky right-0 bg-white px-4 py-2">
                       <div className="flex justify-end gap-1">
                         <Button size="sm" variant="ghost" onClick={() => openEdit(row)}>
@@ -881,7 +873,7 @@ export function AdminHistoryPage() {
               <thead className="bg-slate-50">
                 <tr>
                   {["Started", "Trigger", "Provider", "Status"].map((label) => (
-                    <th key={label} scope="col" className="px-4 py-3 text-left">
+                    <th key={label} scope="col" className={`px-4 py-3 ${label === "Started" || label === "Status" ? "text-center" : "text-left"}`}>
                       {label}
                     </th>
                   ))}
@@ -895,12 +887,12 @@ export function AdminHistoryPage() {
               <tbody>
                 {visibleRows.map((row) => (
                   <tr key={row.id} className="border-t">
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-center tabular-nums whitespace-nowrap">
                       {new Date(row.started_at).toLocaleString("en-IN")}
                     </td>
                     <td className="px-4 py-3">{row.trigger_type}</td>
                     <td className="px-4 py-3">{row.provider}</td>
-                    <td className="px-4 py-3">{row.status}</td>
+                    <td className="px-4 py-3 text-center">{row.status}</td>
                     {metrics.map(([key]) => (
                       <td key={key} className="px-4 py-3 text-right tabular-nums">
                         {row[key]}

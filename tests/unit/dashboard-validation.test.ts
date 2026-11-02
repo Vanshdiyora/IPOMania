@@ -11,6 +11,7 @@ describe("dashboard analytics query validation", () => {
         date_from: "2026-10-01",
         date_to: "2026-10-31",
         ipo_id: "88888888-8888-4888-8888-888888888888",
+        catalog_ipo_id: "99999999-9999-4999-8999-999999999999",
         category: "SHAREHOLDER",
         account_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         limit: "20",
@@ -19,6 +20,7 @@ describe("dashboard analytics query validation", () => {
       date_from: "2026-10-01",
       date_to: "2026-10-31",
       category: "SHAREHOLDER",
+      catalog_ipo_id: "99999999-9999-4999-8999-999999999999",
       limit: 20,
     });
   });
@@ -37,6 +39,7 @@ describe("dashboard analytics query validation", () => {
       }).success,
     ).toBe(false);
     expect(dashboardAnalyticsQuerySchema.safeParse({ limit: 51 }).success).toBe(false);
+    expect(dashboardAnalyticsQuerySchema.safeParse({ catalog_ipo_id: "invalid" }).success).toBe(false);
   });
 
   it("rejects unrecognized parameters and defaults exports to CSV", () => {

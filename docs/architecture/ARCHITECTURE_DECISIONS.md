@@ -47,14 +47,13 @@ user-scoped PostgREST operations.
 PostgreSQL RLS remains the final owner-isolation boundary. Service-role access is isolated to the
 verified account-deletion operation.
 
-## ADR 007 — database-enforced active demat-account capacity
+## ADR 007 — unrestricted demat-account counts
 
-**Decision:** Limit each user's unarchived active demat accounts to 500 with a private per-user
-counter row and a PostgreSQL trigger that atomically increments/decrements it.
+**Decision:** Allow any number of user-owned demat accounts. Migration
+`20261102120000_remove_demat_account_capacity.sql` removes the former 500-active-account guard.
 
-**Reasoning:** API preflight counts are racy under concurrent requests. A guarded atomic counter
-update locks the user's capacity row and protects creation, restoration, status changes, and
-imports regardless of caller path.
+**Reasoning:** Account count is not a product restriction. Existing owner isolation, uniqueness,
+and field validation remain enforced by PostgreSQL.
 
 ## ADR 008 — staged and idempotent account imports
 

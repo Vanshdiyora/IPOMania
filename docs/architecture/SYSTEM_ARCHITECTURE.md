@@ -45,8 +45,8 @@ Shared packages: API types | validation exports | financial engine boundary
   shared catalog with explicit admin authorization and public read policies.
 - `apps/web` provides IPO list/details/forms, a date-ordered calendar, category configuration, and
   a calculator with explicit eligibility explanations.
-- PostgreSQL serializes each user's account-capacity changes through a private, atomically updated
-  counter row; its trigger is the authoritative 500-active-account limit.
+- PostgreSQL enforces owner isolation, account-field constraints, and per-owner masked identifier
+  uniqueness without an account-count limit.
 
 Dependencies point inward to shared contracts and validation. Shared packages must not import
 from apps or workers, preventing circular dependencies.

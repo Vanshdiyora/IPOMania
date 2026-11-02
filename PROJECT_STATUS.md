@@ -83,15 +83,14 @@ production configuration follow-ups are resolved.
 **Status: Implemented; local database/RLS/concurrency verification remains open.**
 
 The implementation adds user-owned `demat_accounts`, import history/staging tables, forced RLS,
-caller-JWT API routes, a database-serialized 500-active-account cap, responsive account pages, and
-CSV/XLSX import with row reports and retry-safe confirmation. The active limit counts only records
-whose `account_status` is `active` and `archived_at` is null. Archived, inactive, and closed
-accounts do not consume capacity.
+caller-JWT API routes, responsive account pages, and CSV/XLSX import with row reports and retry-safe
+confirmation. A later migration removes the former 500-active-account limit. The account dashboard
+reports total, active, and archived counts.
 
-Direct SQL coverage seeds 499 test accounts and exercises the 500th/501st account, owner
-isolation, account lifecycle, duplicates, and import retry/reversal. A separate disposable
-loopback-only PostgreSQL test is provided for truly simultaneous account creation; it creates 500
-fixture accounts and cleans its fixture user up afterward. These database tests are not verified
+Direct SQL coverage seeds 499 test accounts and exercises creation and restoration beyond 500,
+owner isolation, account lifecycle, duplicates, and import retry/reversal. A separate disposable
+loopback-only PostgreSQL test is provided for truly simultaneous account creation above 500
+existing accounts and cleans its fixture user up afterward. These database tests are not verified
 until run against a local Supabase/PostgreSQL test environment. The integration test is opt-in via
 `DEMAT_TEST_DATABASE_URL` and is skipped when that variable is unset.
 

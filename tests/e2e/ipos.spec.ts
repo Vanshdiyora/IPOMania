@@ -172,6 +172,23 @@ test("catalog search and status filters reach the shared endpoint", async ({ pag
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await filtered;
   await expect(page.getByRole("link", { name: catalogIpo.company_name })).toBeVisible();
+  await page.getByRole("link", { name: catalogIpo.company_name }).click();
+  await page.getByRole("link", { name: "Back to IPOs" }).click();
+  await expect(page).toHaveURL(/\/ipos\?search=Catalog&status=OPEN$/);
+  await expect(page.getByRole("textbox", { name: "Search company or exact symbol" })).toHaveValue(
+    "Catalog",
+  );
+  await expect(page.getByRole("button", { name: "Open", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
+
+test("a direct catalog detail link returns to the catalog", async ({ page }) => {
+  await prepareAuthenticatedPage(page);
+  await page.goto(`/ipos/catalog/${ipoId}`);
+  await page.getByRole("link", { name: "Back to IPOs" }).click();
+  await expect(page).toHaveURL(/\/ipos$/);
 });
 
 test("IPO calendar uses the shared catalog and retains access to personal records", async ({

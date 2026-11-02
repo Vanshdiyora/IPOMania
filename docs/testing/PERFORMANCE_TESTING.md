@@ -6,13 +6,13 @@ the web build.
 
 ## Workload matrix
 
-| Scenario                           | Available harness / preparation                                                                                                                                      | Evidence status                                                            |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| 500 active demat accounts per user | `supabase/tests/demat_accounts.test.sql` tests capacity boundaries; `tests/integration/demat-account-capacity.test.ts` races two creates at the 500-account boundary | Run database/concurrency suites; no latency target recorded                |
-| 1,000 / 5,000 applications         | Use synthetic records with the application schema and its required ownership/calculation references                                                                  | Not yet implemented as a performance benchmark                             |
-| Concurrent users                   | Existing account capacity and application external-reference tests use independent PostgreSQL transactions                                                           | Concurrency correctness only; no throughput measurement                    |
-| Bulk import                        | `tests/security/accounts-import.test.ts` and application import API tests cover parsing/validation, including bounded row workloads                                  | Functional, mocked API tests; no throughput benchmark                      |
-| Dashboard aggregation              | `supabase/tests/dashboard_analytics.test.sql` exercises an aggregate over 5,000 generated application rows                                                           | Functional correctness only; no isolated latency or query-plan measurement |
+| Scenario                              | Available harness / preparation                                                                                                                                                        | Evidence status                                                            |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| More than 500 demat accounts per user | `supabase/tests/demat_accounts.test.sql` tests creation and restoration beyond 500; `tests/integration/demat-account-concurrency.test.ts` creates two accounts concurrently beyond 500 | Run database/concurrency suites; no latency target recorded                |
+| 1,000 / 5,000 applications            | Use synthetic records with the application schema and its required ownership/calculation references                                                                                    | Not yet implemented as a performance benchmark                             |
+| Concurrent users                      | Account creation and application external-reference tests use independent PostgreSQL transactions                                                                                      | Concurrency correctness only; no throughput measurement                    |
+| Bulk import                           | `tests/security/accounts-import.test.ts` and application import API tests cover parsing/validation, including bounded row workloads                                                    | Functional, mocked API tests; no throughput benchmark                      |
+| Dashboard aggregation                 | `supabase/tests/dashboard_analytics.test.sql` exercises an aggregate over 5,000 generated application rows                                                                             | Functional correctness only; no isolated latency or query-plan measurement |
 
 ## Benchmark protocol
 
@@ -25,6 +25,6 @@ the web build.
 5. Store raw measurements as CI artifacts or a separately reviewed report; do not commit secrets or
    transient customer data.
 
-The functional 500-account cap, concurrent insert tests, and 5,000-row dashboard SQL test do not
+The concurrent account inserts and 5,000-row dashboard SQL test do not
 establish service-level performance. Record dashboard measurements with the benchmark protocol
 after choosing representative workloads and an isolated target environment.

@@ -1,6 +1,6 @@
 begin;
 
-select plan(11);
+select plan(17);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -55,6 +55,15 @@ values
     'Dashboard IPO Large', 'DASHL', 'Test', 'Test Exchange', 10, 20, 10, 100000,
     current_date + 1, current_date + 3, 'UPCOMING'
   );
+
+insert into public.ipo_catalog (
+  id, company_name, symbol, ipo_status, bidding_start_date, bidding_end_date, data_source, archived_at
+)
+values
+  ('16161616-1616-4161-8161-161616161616', 'Shared Dashboard IPO', 'SHARED',
+    'upcoming', current_date + 1, current_date + 3, 'MANUAL', null),
+  ('17171717-1717-4171-8171-171717171717', 'Archived Shared IPO', 'ARCHIVED',
+    'open', current_date + 1, current_date + 3, 'MANUAL', now());
 
 insert into public.ipo_categories (
   id, user_id, ipo_id, category, lot_limit_status, minimum_lots, maximum_lots,
@@ -198,12 +207,42 @@ select is(
   '44444444-4444-4444-8444-444444444444',
   'Upcoming IPO results contain the callers owned record'
 );
+select is(
+  public.get_dashboard_catalog_analytics()->>'total',
+  '1',
+  'Shared catalog totals exclude archived IPOs'
+);
+select is(
+  public.get_dashboard_catalog_analytics()->'by_status'->0->>'count',
+  '1',
+  'Shared IPO status analytics use active catalog records'
+);
+select is(
+  public.get_dashboard_catalog_analytics()->'issues'->0->>'company_name',
+  'Shared Dashboard IPO',
+  'Shared IPO details are returned to the authenticated caller'
+);
+select is(
+  public.get_dashboard_catalog_analytics(p_catalog_ipo_id => '17171717-1717-4171-8171-171717171717')->>'total',
+  '0',
+  'An archived shared IPO cannot be exposed by filtering'
+);
+select is(
+  public.get_dashboard_catalog_analytics()->'upcoming'->0->>'ipo_id',
+  '16161616-1616-4161-8161-161616161616',
+  'Shared upcoming closing dates include the catalog issue'
+);
 
 select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', true);
 select is(
   public.get_dashboard_analytics()->'totals'->>'applications',
   '1',
   'User B receives their own independent dashboard totals'
+);
+select is(
+  public.get_dashboard_catalog_analytics()->>'total',
+  '1',
+  'A second user sees the shared catalog without seeing the first user applications'
 );
 
 select set_config('request.jwt.claim.sub', '12121212-1212-4121-8121-121212121212', true);

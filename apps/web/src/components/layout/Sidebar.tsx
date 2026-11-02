@@ -98,10 +98,21 @@ function NavGroup({
 }
 
 // ─── Sub-NavItem ──────────────────────────────────────────────────────────────
-function SubNavItem({ to, label, onClick }: { to: string; label: string; onClick?: () => void }) {
+function SubNavItem({
+  to,
+  label,
+  end = false,
+  onClick,
+}: {
+  to: string;
+  label: string;
+  end?: boolean;
+  onClick?: () => void;
+}) {
   return (
     <NavLink
       to={to}
+      end={end}
       onClick={onClick}
       className={({ isActive }) =>
         cn(
@@ -214,7 +225,7 @@ export function Sidebar({
               label="Demat Accounts"
               basePath="/accounts"
             >
-              <SubNavItem to="/accounts" label="Account dashboard" onClick={onNavigate} />
+              <SubNavItem to="/accounts" end label="Account dashboard" onClick={onNavigate} />
               <SubNavItem to="/accounts/list" label="Account list" onClick={onNavigate} />
               <SubNavItem to="/accounts/import" label="Bulk import" onClick={onNavigate} />
               <SubNavItem
@@ -230,7 +241,7 @@ export function Sidebar({
               label="Applications"
               basePath="/applications"
             >
-              <SubNavItem to="/applications" label="App dashboard" onClick={onNavigate} />
+              <SubNavItem to="/applications" end label="App dashboard" onClick={onNavigate} />
               <SubNavItem to="/applications/list" label="Application table" onClick={onNavigate} />
               <SubNavItem to="/applications/bulk" label="Bulk entry" onClick={onNavigate} />
               <SubNavItem to="/applications/import" label="Import wizard" onClick={onNavigate} />

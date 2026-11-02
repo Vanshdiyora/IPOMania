@@ -89,7 +89,7 @@ async function prepare(page: Page, admin = false) {
         data: {
           accounts: [account],
           pagination: { page: 1, pageSize: 50, total: 1, totalPages: 1 },
-          summary: { total: 1, active: 1, archived: 0, remainingCapacity: 499 },
+          summary: { total: 1, active: 1, archived: 0 },
         },
       },
     }),

@@ -104,12 +104,14 @@ async function loadAnalytics(
     date_from?: string;
     date_to?: string;
     ipo_id?: string;
+    catalog_ipo_id?: string;
     category?: string;
     account_id?: string;
     limit: number;
   },
 ): Promise<DashboardAnalytics> {
-  const { data, error } = await context.get("rlsSupabase").rpc("get_dashboard_analytics", {
+  const supabase = context.get("rlsSupabase");
+  const { data, error } = await supabase.rpc("get_dashboard_analytics", {
     p_date_from: query.date_from ?? null,
     p_date_to: query.date_to ?? null,
     p_ipo_id: query.ipo_id ?? null,
@@ -121,7 +123,15 @@ async function loadAnalytics(
   if (!data || typeof data !== "object") {
     throw new Error("The dashboard analytics query returned an invalid response.");
   }
-  return data as DashboardAnalytics;
+  const { data: catalog, error: catalogError } = await supabase.rpc(
+    "get_dashboard_catalog_analytics",
+    { p_catalog_ipo_id: query.catalog_ipo_id ?? null, p_limit: query.limit },
+  );
+  if (catalogError) throw catalogError;
+  if (!catalog || typeof catalog !== "object") {
+    throw new Error("The IPO catalog analytics query returned an invalid response.");
+  }
+  return { ...(data as Omit<DashboardAnalytics, "catalog">), catalog: catalog as DashboardAnalytics["catalog"] };
 }
 
 function createReportRows(analytics: DashboardAnalytics): ReportRow[] {
@@ -137,6 +147,18 @@ function createReportRows(analytics: DashboardAnalytics): ReportRow[] {
       actual_debit: "",
       refund_received: "",
     },
+    reportRow("catalog totals", "", "Shared IPOs", analytics.catalog.total),
+    ...analytics.catalog.by_status.map((item) =>
+      reportRow("catalog status", "", item.status, item.count),
+    ),
+    ...analytics.catalog.issues.map((item) =>
+      reportRow(
+        "catalog IPO",
+        item.closing_date ?? "",
+        `${item.company_name}${item.symbol ? ` (${item.symbol})` : ""}`,
+        item.status,
+      ),
+    ),
     {
       section: "totals",
       period: "",
@@ -248,6 +270,7 @@ function createWorkbookSheets(analytics: DashboardAnalytics): Array<[string, obj
         { metric: "Applications", value: analytics.totals.applications },
         { metric: "Active demat accounts", value: analytics.totals.active_demat_accounts },
         { metric: "Tracked IPOs", value: analytics.totals.tracked_ipos },
+        { metric: "Shared IPOs", value: analytics.catalog.total },
         { metric: "Allotment records", value: analytics.allotment_performance.total },
         { metric: "Successful allotments", value: analytics.allotment_performance.successful },
         {
@@ -268,6 +291,9 @@ function createWorkbookSheets(analytics: DashboardAnalytics): Array<[string, obj
     ["Capital totals", analytics.capital_event_totals],
     ["Recent activity", analytics.recent_applications],
     ["Upcoming IPOs", analytics.upcoming_ipos],
+    ["Catalog status", analytics.catalog.by_status],
+    ["Catalog IPOs", analytics.catalog.issues],
+    ["Catalog upcoming", analytics.catalog.upcoming],
   ];
 }
 

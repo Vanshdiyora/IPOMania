@@ -19,6 +19,7 @@ forms, details, bulk import, and import history. TanStack Query handles API stat
 and Virtual render the desktop account list, with readable mobile account cards. The forms and
 import mapping use accessible labels and inline validation. The fixed light palette and minimum
 touch-target styles apply throughout.
+Sidebar dashboard links match their exact routes, so a nested list page highlights only its own link.
 
 Protected IPO list and opening-date calendar routes show the shared admin-managed catalog by
 default, with server-side search, status filters, and pagination. Catalog details are read-only and

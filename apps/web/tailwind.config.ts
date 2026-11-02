@@ -60,6 +60,9 @@ const config: Config = {
         info: "#0369A1",
         "info-bg": "#F0F9FF",
         "info-border": "#BAE6FD",
+        listed: "#6D28D9",
+        "listed-bg": "#F5F3FF",
+        "listed-border": "#DDD6FE",
 
         // ── Chart palette ────────────────────────────────────────────────────
         "chart-1": "#2563EB",

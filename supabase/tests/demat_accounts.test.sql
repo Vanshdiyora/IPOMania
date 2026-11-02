@@ -82,70 +82,72 @@ select is(
 select lives_ok(
   $$insert into public.demat_accounts
     (user_id, holder_name, broker_name, depository_type, masked_demat_identifier)
-    values ('33333333-3333-4333-8333-333333333333', 'At Capacity', 'Test Broker', 'CDSL', 'XXXXCAPACITY500')$$,
-  'User A can create the 500th active account'
+    values ('33333333-3333-4333-8333-333333333333', 'Account 500', 'Test Broker', 'CDSL', 'XXXXCAPACITY500')$$,
+  'User A can create a 500th active account'
 );
 select is(
   (select count(*) from public.demat_accounts
    where user_id = '33333333-3333-4333-8333-333333333333'
      and account_status = 'active' and archived_at is null),
   500::bigint,
-  'User A has exactly 500 active unarchived accounts'
+  'User A has 500 active unarchived accounts'
 );
-select throws_ok(
+select lives_ok(
   $$insert into public.demat_accounts
     (user_id, holder_name, broker_name, depository_type, masked_demat_identifier)
-    values ('33333333-3333-4333-8333-333333333333', 'Over Limit', 'Test Broker', 'CDSL', 'XXXXCAPACITY501')$$,
-  '23514',
-  null,
-  'The database rejects a 501st active account'
+    values ('33333333-3333-4333-8333-333333333333', 'Account 501', 'Test Broker', 'CDSL', 'XXXXCAPACITY501')$$,
+  'User A can create a 501st active account'
 );
 
 select lives_ok(
   $$update public.demat_accounts set archived_at = now()
     where user_id = '33333333-3333-4333-8333-333333333333'
       and masked_demat_identifier = 'XXXX000001'$$,
-  'Archiving an account is allowed at capacity'
+  'Archiving an account is allowed with over 500 accounts'
 );
 select is(
   (select count(*) from public.demat_accounts
    where user_id = '33333333-3333-4333-8333-333333333333'
      and account_status = 'active' and archived_at is null),
-  499::bigint,
-  'Archived accounts do not count toward the active limit'
+  500::bigint,
+  'Archived accounts do not count toward the active total'
 );
 select lives_ok(
   $$insert into public.demat_accounts
     (user_id, holder_name, broker_name, depository_type, masked_demat_identifier)
     values ('33333333-3333-4333-8333-333333333333', 'Replacement at Capacity', 'Test Broker', 'CDSL', 'XXXXREPLACEMENT500')$$,
-  'A new active account can use the capacity freed by archiving'
+  'A new active account can be created after archiving'
 );
-select throws_ok(
+select lives_ok(
   $$update public.demat_accounts set archived_at = null
     where user_id = '33333333-3333-4333-8333-333333333333'
       and masked_demat_identifier = 'XXXX000001'$$,
-  '23514',
-  null,
-  'Restoring an active account is rejected when it would exceed the limit'
+  'An active account can be restored with over 500 active accounts'
+);
+select lives_ok(
+  $$update public.demat_accounts set account_status = 'inactive', archived_at = now()
+    where user_id = '33333333-3333-4333-8333-333333333333'
+      and masked_demat_identifier = 'XXXX000001'$$,
+  'An active account can be archived and marked inactive'
 );
 select lives_ok(
   $$update public.demat_accounts
     set account_status = 'inactive', archived_at = null
     where user_id = '33333333-3333-4333-8333-333333333333'
       and masked_demat_identifier = 'XXXX000001'$$,
-  'Restoring an inactive account does not consume active capacity'
+  'An inactive account can also be restored'
 );
 select lives_ok(
   $$update public.demat_accounts set account_status = 'inactive'
     where user_id = '33333333-3333-4333-8333-333333333333'
       and masked_demat_identifier = 'XXXXREPLACEMENT500'$$,
-  'Changing the replacement account to inactive frees active capacity'
+  'Changing an account to inactive removes it from the active total'
 );
 select is(
   (select count(*) from public.demat_accounts
    where user_id = '33333333-3333-4333-8333-333333333333'
      and account_status = 'active' and archived_at is null),
-  499::bigint,
+  500::bigint,
   'Inactive restored account is excluded from active count'
 );
 select lives_ok(
@@ -206,12 +208,10 @@ select throws_ok(
   null,
   'Duplicate masked demat identifiers are rejected per user and depository'
 );
-select throws_ok(
-  $$select * from public.user_demat_account_capacity
-    where user_id = '44444444-4444-4444-8444-444444444444'$$,
-  '42501',
-  'permission denied for table user_demat_account_capacity',
-  'Clients cannot read private capacity counters'
+select is(
+  to_regclass('public.user_demat_account_capacity'),
+  null::regclass,
+  'The removed capacity counter table is absent'
 );
 select set_config('request.jwt.claim.sub', '33333333-3333-4333-8333-333333333333', true);
 select lives_ok(
@@ -290,12 +290,6 @@ select is(
   'Retrying reversal returns the existing result'
 );
 reset role;
-select is(
-  (select active_count from public.user_demat_account_capacity
-   where user_id = '33333333-3333-4333-8333-333333333333'),
-  499,
-  'The private counter stays consistent after import reversal'
-);
 
 select * from finish();
 rollback;

@@ -23,24 +23,12 @@ A unique index on `(user_id, depository_type, masked_demat_identifier_normalized
 duplicate records, including archived ones. Owner/date, broker, status/depository/archive, and
 trigram search indexes support the API filters.
 
-## Capacity invariant
+## Account count
 
-The cap is 500 rows per user where `account_status = 'active' AND archived_at IS NULL`.
-`enforce_demat_account_capacity()` maintains one private counter row per user. A guarded atomic
-`UPDATE ... WHERE active_count < 500` locks that counter row and serializes concurrent increments;
-deactivation/archive decrements it in the same transaction. The counter table has forced RLS and
-no client grants, and only the fixed trigger function can change it. Insert and update triggers
-enforce this invariant in PostgreSQL, including restoration and transactional imports. A
-concurrent insert that would become number 501 fails with SQLSTATE `23514` and
-`ACTIVE_ACCOUNT_LIMIT`; the API maps it to HTTP 409.
-
-`user_demat_account_capacity` stores the private active count for each owner. Its owner foreign key
-cascades with Auth deletion; forced RLS is enabled and no client privileges or policies are
-granted. The security-definer trigger function is the sole writer and handles account membership
-transitions transactionally.
-
-Do not replace this with an API-only count check. API preflight may improve UX, but only the
-trigger is authoritative.
+There is no per-user account count limit. The
+`20261102120000_remove_demat_account_capacity.sql` migration removes the former 500-account
+trigger, function, private counter table, and capacity-only index. The API still reports total,
+active, and archived counts from `demat_accounts`.
 
 ## Import tables
 
@@ -74,10 +62,10 @@ cascades all of the user's account and import data.
 ## Verification
 
 `supabase/tests/demat_accounts.test.sql` exercises actual two-user RLS, invalid values, duplicate
-identifiers, create/archive/restore/delete, the 500 active-account boundary, import confirmation
+identifiers, create/archive/restore/delete beyond 500 active accounts, import confirmation
 retry, and safe reversal. Run it with the other pgTAP tests using `npm run test:security:db`.
 
-`tests/integration/demat-account-capacity.test.ts` uses two independent PostgreSQL transactions to
-attempt simultaneous creation at 499 existing active accounts. It is skipped unless
+`tests/integration/demat-account-concurrency.test.ts` uses two independent PostgreSQL transactions to
+create accounts simultaneously above 500 existing active accounts. It is skipped unless
 `DEMAT_TEST_DATABASE_URL` is explicitly set, and rejects non-loopback hosts. Use a disposable local
-Supabase database only; the fixture user and its 500 records are removed after the test.
+Supabase database only; the fixture user and its 502 records are removed after the test.

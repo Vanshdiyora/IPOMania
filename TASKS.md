@@ -43,18 +43,18 @@
 - [x] Read the existing architecture, auth, UI, database, and security documentation.
 - [x] Add the owned demat account schema, constraints, search indexes, updated-at behavior, and
       forced RLS policies.
-- [x] Enforce a 500 unarchived-active-account limit with per-user transaction serialization in
-      PostgreSQL and map capacity/duplicate conflicts in the API.
+- [x] Remove the former 500-account cap from PostgreSQL, API, and UI while retaining duplicate
+      account conflict handling.
 - [x] Add authenticated account CRUD, archive/restore, archived-only deletion, filtering, and
       server-side pagination.
 - [x] Add owned import history and row staging, CSV/XLSX parsing, mapping, validation, duplicate
       reports, confirmation retry safety, and safe archive-based reversal.
 - [x] Add responsive dashboard, account list/details/forms, bulk import, and import-history pages.
-- [x] Add unit/API/import tests and direct pgTAP lifecycle, isolation, limit, and retry tests.
-- [x] Add an opt-in two-connection capacity race test that uses a disposable loopback database.
+- [x] Add unit/API/import tests and direct pgTAP lifecycle, isolation, unrestricted-count, and retry tests.
+- [x] Add an opt-in two-connection account creation test that uses a disposable loopback database.
 - [x] Add the requested account product, API, schema, and import documentation.
 - [ ] Run the local Supabase migration and all database/RLS tests (requires Supabase CLI + Docker).
-- [ ] Run the two-connection capacity test with `DEMAT_TEST_DATABASE_URL` against a disposable
+- [ ] Run the two-connection account creation test with `DEMAT_TEST_DATABASE_URL` against a disposable
       loopback database.
 - [x] Run `npm run lint`, `npm run typecheck`, `npm test` (26 passed, 1 skipped),
       `npm run build:web`, and `npm run build:api` using a temporary Node.js 22 runtime.
@@ -171,7 +171,7 @@ gates remain open.
 - [ ] Resolve the existing dependency advisories without introducing a breaking toolchain change.
 - [ ] Add workload benchmarks for 1,000/5,000 applications and dashboard queries; record only
       measurements actually obtained against an isolated test database.
-- [ ] Run opt-in two-transaction account-capacity and application-reference concurrency tests
+- [ ] Run opt-in two-transaction account-creation and application-reference concurrency tests
       against a disposable loopback database; both currently skip without `DEMAT_TEST_DATABASE_URL`.
 - [ ] Complete the final integrated security and accessibility audit after all parallel changes
       are merged; do not certify production readiness in this preparation stage.
