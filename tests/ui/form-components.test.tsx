@@ -113,6 +113,13 @@ it("keeps a failed confirmation retryable and disables repeated submissions", as
 
 describe("drawer focus", () => {
   it("does not reset focus or selection when form edits change the close callback", async () => {
+    let initialFocusFrame: FrameRequestCallback | undefined;
+    const requestFrame = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        initialFocusFrame = callback;
+        return 1;
+      });
     function Editor() {
       const [name, setName] = useState("");
       const [symbol, setSymbol] = useState("");
@@ -137,16 +144,24 @@ describe("drawer focus", () => {
         </SideDrawer>
       );
     }
-    render(<Editor />);
-    const user = userEvent.setup();
-    const symbol = screen.getByLabelText("Symbol");
-    await user.click(symbol);
-    await user.type(symbol, "TEST");
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    expect(symbol).toHaveFocus();
-    expect(symbol).toHaveValue("TEST");
-    expect(screen.getByLabelText("Company")).toHaveValue("");
-    expect(document.body.style.overflow).toBe("hidden");
+    try {
+      render(<Editor />);
+      const user = userEvent.setup();
+      const symbol = screen.getByLabelText("Symbol") as HTMLInputElement;
+      await user.click(symbol);
+      await user.type(symbol, "TEST");
+      symbol.setSelectionRange(2, 2);
+      expect(initialFocusFrame).toBeDefined();
+      initialFocusFrame?.(0);
+      expect(symbol).toHaveFocus();
+      expect(symbol).toHaveValue("TEST");
+      expect(symbol.selectionStart).toBe(2);
+      expect(symbol.selectionEnd).toBe(2);
+      expect(screen.getByLabelText("Company")).toHaveValue("");
+      expect(document.body.style.overflow).toBe("hidden");
+    } finally {
+      requestFrame.mockRestore();
+    }
   });
 
   it("traps the top confirmation, keeps edits on Escape, and restores focus and scroll", async () => {

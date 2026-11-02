@@ -39,12 +39,12 @@ export function useModalLayer(
     document.body.style.overflow = "hidden";
     layers.push(panel);
     const frame = requestAnimationFrame(() => {
-      if (layers.at(-1) === panel)
-        (
-          panel.querySelector<HTMLElement>(initialFocus) ??
-          panel.querySelector<HTMLElement>("button:not(:disabled)") ??
-          panel
-        ).focus();
+      if (layers.at(-1) !== panel || panel.contains(document.activeElement)) return;
+      (
+        panel.querySelector<HTMLElement>(initialFocus) ??
+        panel.querySelector<HTMLElement>("button:not(:disabled)") ??
+        panel
+      ).focus();
     });
     const onKeyDown = (event: KeyboardEvent) => {
       if (layers.at(-1) !== panel) return;
