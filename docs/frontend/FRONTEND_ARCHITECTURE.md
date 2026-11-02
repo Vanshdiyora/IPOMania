@@ -19,6 +19,9 @@ forms, details, bulk import, and import history. TanStack Query handles API stat
 and Virtual render the desktop account list, with readable mobile account cards. The forms and
 import mapping use accessible labels and inline validation. The fixed light palette and minimum
 touch-target styles apply throughout.
+Sidebar dashboard links match their exact routes, so a nested list page highlights only its own link.
+Account and application lists retain filter and page state in URL parameters. Their detail pages
+use the originating list URL when navigating back, with a safe parent fallback for direct links.
 
 Protected IPO list and opening-date calendar routes show the shared admin-managed catalog by
 default, with server-side search, status filters, and pagination. Catalog details are read-only and
@@ -29,6 +32,10 @@ Category forms expose explicit
 unknown/unpublished/configured states rather than applying defaults. Calculator results show
 validation reasons, source/rule version, calculation inputs, and a clear notice that self-reported
 shareholder conditions are not independently verified.
+IPO list search, status and page state also live in URL parameters. Shared and personal detail
+views use the same issue and date presentation without inventing unavailable market statistics.
+The admin catalog also keeps search, status, and pagination in its URL. Its View action carries
+that URL to the catalog detail page so Back returns to the filtered admin list.
 
 The authenticated home route shows the responsive dashboard and analytics page. TanStack Query
 loads bounded PostgreSQL aggregates, the canonical Phase 6 capital summary, and paginated IPO and

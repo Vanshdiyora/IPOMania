@@ -64,3 +64,17 @@ Component regressions are covered in `tests/ui/form-components.test.tsx`; browse
 accessibility, and viewport checks are in `tests/e2e/forms.spec.ts`. Browser tests use isolated
 API fixtures and do not establish live Supabase persistence, RLS, or concurrency verification.
 The Phase 3 database/RLS, concurrency, and repository-wide formatting gate remains open.
+
+## Detail and list navigation
+
+- IPO, account, and application list filters and pagination are stored in the URL. Detail links
+  carry their originating list URL, and the visible back link returns to that exact URL.
+- Direct detail links use their corresponding parent list as the fallback. The back link accepts
+  only allowed local parent routes from navigation state.
+- IPO detail views share issue, date, and source sections. They show only API-backed fields;
+  unavailable subscription, GMP, financial, and listing data are described as unavailable.
+- IPO status badges use semantic colors: upcoming blue, open green, closed neutral, and listed
+  purple. Admin catalog and application tables align their headers with their data cells.
+- Admin catalog search, status and page state live in the URL. Its View action opens the shared
+  detail page with a return link to the exact management list state. Archive confirmation names
+  the selected company.

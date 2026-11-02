@@ -103,6 +103,41 @@ const dashboardData = {
       data_source: "MANUAL",
     },
   ],
+  catalog: {
+    total: 1,
+    by_status: [
+      { status: "upcoming", count: 1 },
+      { status: "open", count: 0 },
+      { status: "closed", count: 0 },
+      { status: "listed", count: 0 },
+    ],
+    issues: [
+      {
+        ipo_id: "99999999-9999-4999-8999-999999999999",
+        company_name: "Shared Dashboard IPO",
+        symbol: null,
+        status: "UPCOMING",
+        issue_type: "mainboard",
+        exchange: null,
+        price_band_min: null,
+        price_band_max: null,
+        lot_size: null,
+        opening_date: null,
+        closing_date: "2099-12-30",
+        data_source: "MANUAL",
+      },
+    ],
+    upcoming: [
+      {
+        ipo_id: "99999999-9999-4999-8999-999999999999",
+        company_name: "Shared Dashboard IPO",
+        symbol: null,
+        status: "UPCOMING",
+        closing_date: "2099-12-30",
+        data_source: "MANUAL",
+      },
+    ],
+  },
 };
 
 async function prepareDashboard(page: Page) {
@@ -172,7 +207,22 @@ async function prepareDashboard(page: Page) {
       },
     }),
   );
-  await page.route(/\/api\/ipos(?:\/catalog)?(?:\?.*)?$/, (route) =>
+  await page.route(/\/api\/ipos\/catalog(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          ipos: [
+            {
+              id: "99999999-9999-4999-8999-999999999999",
+              company_name: "Shared Dashboard IPO",
+              symbol: null,
+            },
+          ],
+        },
+      },
+    }),
+  );
+  await page.route(/\/api\/ipos(?:\?.*)?$/, (route) =>
     route.fulfill({
       json: { data: { ipos: [{ id: ipoId, company_name: "Dashboard Test IPO", symbol: "DASH" }] } },
     }),
@@ -203,6 +253,13 @@ test("dashboard exposes analytics, filters and downloadable reports", async ({ p
   await expect(page.getByRole("region", { name: "Capital summary" })).toHaveCount(0);
   await expect(page.getByRole("img", { name: "Applications grouped by status" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Dashboard Test IPO (DASH)" }).first()).toBeVisible();
+  await expect(page.getByRole("region", { name: "Shared IPO analytics" })).toContainText(
+    "Shared Dashboard IPO",
+  );
+  await expect(page.getByRole("link", { name: "Shared Dashboard IPO" }).first()).toHaveAttribute(
+    "href",
+    "/ipos/catalog/99999999-9999-4999-8999-999999999999",
+  );
   expect(await auditAccessibility(page)).toEqual([]);
 
   const downloadWait = page.waitForEvent("download");
@@ -212,6 +269,10 @@ test("dashboard exposes analytics, filters and downloadable reports", async ({ p
 
   await page.getByLabel("Category filter").selectOption("RETAIL");
   await expect(page.getByLabel("Category filter")).toHaveValue("RETAIL");
+  await page.getByLabel("Shared IPO filter").selectOption("99999999-9999-4999-8999-999999999999");
+  await expect(page.getByLabel("Shared IPO filter")).toHaveValue(
+    "99999999-9999-4999-8999-999999999999",
+  );
 });
 
 test("financial pages are unavailable in the web app", async ({ page }) => {
@@ -241,7 +302,8 @@ test("dashboard remains usable across responsive viewports with accessible filte
     await expect(page.getByRole("heading", { name: "Dashboard & analytics" })).toBeVisible();
     await expect(page.getByLabel("From date")).toBeVisible();
     await expect(page.getByLabel("To date")).toBeVisible();
-    await expect(page.getByLabel("IPO filter")).toBeVisible();
+    await expect(page.getByLabel("My IPO filter")).toBeVisible();
+    await expect(page.getByLabel("Shared IPO filter")).toBeVisible();
     await expect(page.getByLabel("Category filter")).toBeVisible();
     await expect(page.getByLabel("Demat account filter")).toBeVisible();
     const widths = await page.evaluate(() => ({

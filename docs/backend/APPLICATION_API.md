@@ -31,6 +31,10 @@ List query parameters: `page` (1), `page_size` (25, max 100), `ipo_id`,
 `submission_from`, `submission_to`, `search` (application number/external reference), and
 `include_archived` (`false` or `true`).
 
+List, export, and detail reads use the `applications_category_owner_issue_fk` relationship to
+display the category selected on the application. The database also has category relationships
+for capital tracking, so the category embed must name this foreign key explicitly.
+
 Creation input includes IPO/account/category IDs, positive integer `lots`, explicit `price_type`
 and decimal `price`, nullable `shareholder_shares`, and explicit `eligibility_answers`. Optional
 application fields include number, external reference, submission date, statuses, and notes. Unknown

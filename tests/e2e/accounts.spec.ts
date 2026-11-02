@@ -59,7 +59,7 @@ async function prepareAccountPage(page: Page) {
         data: {
           accounts: [account],
           pagination: { page: 1, pageSize: 50, total: 1, totalPages: 1 },
-          summary: { total: 1, active: 1, archived: 0, remainingCapacity: 499 },
+          summary: { total: 1, active: 1, archived: 0 },
         },
       }),
     }),
@@ -89,6 +89,16 @@ test("account list renders the TanStack table on desktop", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Account list" })).toBeVisible();
   await expect(page.getByRole("table").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Asha Mehta" })).toBeVisible();
+});
+
+test("account dashboard shows totals without a capacity limit", async ({ page }) => {
+  await prepareAccountPage(page);
+  await page.goto("/accounts");
+
+  await expect(page.getByText("Total accounts")).toBeVisible();
+  await expect(page.getByText("Active accounts")).toBeVisible();
+  await expect(page.getByText("Archived accounts")).toBeVisible();
+  await expect(page.getByText(/capacity remaining|up to 500 unarchived/i)).toHaveCount(0);
 });
 
 test("account list passes automated WCAG 2.2 AA checks", async ({ page }) => {

@@ -12,12 +12,12 @@ The `20261031120000_demat_accounts_rls.sql` migration adds:
 
 - `demat_accounts`, owned by `user_id` with an `auth.users(id) ON DELETE CASCADE` foreign key.
 - `account_imports` and `account_import_rows`, owner-scoped import history and row reports.
-- `user_demat_account_capacity`, a private capacity counter with no client privileges.
-- Forced RLS and authenticated-only, owner-scoped policies on the user-facing tables; the counter
-  has forced RLS and is maintained only by its fixed trigger function.
+- Forced RLS and authenticated-only, owner-scoped policies on the account and import tables.
 - Column-scoped insert/update grants. Account deletion is permitted only for an archived row.
-- A database trigger enforcing the 500 unarchived, active-account limit and a unique index on the
-  normalized masked identifier per user and depository.
+- A unique index on the normalized masked identifier per user and depository.
+
+The `20261102120000_remove_demat_account_capacity.sql` migration removes the former account-count
+trigger, function, counter table, and capacity-only index. Account ownership and RLS are unchanged.
 
 Import rows inherit ownership from their import record. Confirmation/reversal use narrowly scoped
 `SECURITY DEFINER` RPCs with an empty `search_path`, explicit `auth.uid()` ownership checks, and

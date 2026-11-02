@@ -10,7 +10,7 @@ npm run test:security:db
 ```
 
 The database test suite applies the local migrations and runs pgTAP files under
-`supabase/tests/`. Current files cover auth/profile RLS, demat-account limits and ownership,
+`supabase/tests/`. Current files cover auth/profile RLS, demat-account ownership and lifecycle,
 IPO/category ownership, application records/imports, and capital/allotment/refund ledger
 invariants. Two-user SQL tests are the required evidence for data isolation; API mocks do not
 substitute for them. Tests insert synthetic Auth users and roll back transactional fixtures where
@@ -18,7 +18,7 @@ supported.
 
 ## Opt-in concurrency tests
 
-The account-capacity and application external-reference race tests require a disposable PostgreSQL
+The account-creation and application external-reference race tests require a disposable PostgreSQL
 database on loopback:
 
 ```powershell

@@ -5,7 +5,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { z } from "@ipo-mania/validation";
 import { dematAccountSchema } from "@ipo-mania/validation";
 import type { AccountImportPreviewRow, DematAccount } from "@ipo-mania/shared";
@@ -16,13 +16,13 @@ import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormCon
 import { RouteFormDrawer } from "../../components/ui/FormDrawer";
 import { FormSection } from "../../components/ui/FormSection";
 import { Card } from "../../components/ui/Card";
+import { BackLink } from "../../components/ui/BackLink";
 import { ApiRequestError, apiRequest } from "../../lib/api";
 
 type AccountSummary = {
   total: number;
   active: number;
   archived: number;
-  remainingCapacity: number;
 };
 type AccountListResponse = {
   data: {
@@ -91,9 +91,7 @@ const accountColumns: ColumnDef<DematAccount>[] = [
     accessorKey: "holder_name",
     header: "Holder",
     cell: ({ row }) => (
-      <Link className="font-semibold text-action underline" to={`/accounts/${row.original.id}`}>
-        {row.original.holder_name}
-      </Link>
+      <AccountDetailLink account={row.original}>{row.original.holder_name}</AccountDetailLink>
     ),
   },
   { accessorKey: "broker_name", header: "Broker" },
@@ -114,6 +112,27 @@ const accountColumns: ColumnDef<DematAccount>[] = [
     cell: ({ row }) => formatDate(row.original.created_at),
   },
 ];
+
+function AccountDetailLink({
+  account,
+  children,
+  className = "font-semibold text-action underline",
+}: {
+  account: DematAccount;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const location = useLocation();
+  return (
+    <Link
+      className={className}
+      to={`/accounts/${account.id}`}
+      state={{ from: `${location.pathname}${location.search}` }}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export function AccountDashboardPage() {
   const { session, markSessionExpired } = useAuth();
@@ -150,23 +169,15 @@ export function AccountDashboardPage() {
         </div>
       </header>
       {error ? <ErrorNotice error={error} /> : null}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Account totals">
+      <section className="grid gap-4 sm:grid-cols-3" aria-label="Account totals">
         <SummaryCard label="Total accounts" value={summary?.total} loading={isLoading} />
         <SummaryCard label="Active accounts" value={summary?.active} loading={isLoading} />
         <SummaryCard label="Archived accounts" value={summary?.archived} loading={isLoading} />
-        <SummaryCard
-          label="Active-account capacity remaining"
-          value={summary?.remainingCapacity}
-          loading={isLoading}
-        />
       </section>
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-ink">Account management</h2>
-            <p className="mt-1 text-base text-muted">
-              Up to 500 unarchived, active accounts per user.
-            </p>
           </div>
           <div className="flex flex-wrap gap-4 text-base font-semibold">
             <Link className="text-action underline" to="/accounts/list">
@@ -184,14 +195,36 @@ export function AccountDashboardPage() {
 
 export function AccountListPage() {
   const { session, markSessionExpired } = useAuth();
-  const [page, setPage] = useState(1);
-  const [holderName, setHolderName] = useState("");
-  const [broker, setBroker] = useState("");
-  const [depository, setDepository] = useState("");
-  const [status, setStatus] = useState("");
-  const [archived, setArchived] = useState("false");
-  const [createdFrom, setCreatedFrom] = useState("");
-  const [createdTo, setCreatedTo] = useState("");
+  const [listParams, setListParams] = useSearchParams();
+  const pageValue = Number(listParams.get("page"));
+  const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const holderName = listParams.get("holder_name") ?? "";
+  const broker = listParams.get("broker") ?? "";
+  const depository = listParams.get("depository") ?? "";
+  const status = listParams.get("status") ?? "";
+  const archived = listParams.get("archived") ?? "false";
+  const createdFrom = listParams.get("created_from") ?? "";
+  const createdTo = listParams.get("created_to") ?? "";
+  const updateFilter = (key: string, value: string) => {
+    setListParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (value && !(key === "archived" && value === "false")) next.set(key, value);
+        else next.delete(key);
+        next.delete("page");
+        return next;
+      },
+      { replace: true },
+    );
+  };
+  const changePage = (nextPage: number) => {
+    setListParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (nextPage > 1) next.set("page", String(nextPage));
+      else next.delete("page");
+      return next;
+    });
+  };
   const queryString = new URLSearchParams({
     page: String(page),
     pageSize: "50",
@@ -233,14 +266,7 @@ export function AccountListPage() {
   const totalPages = data?.data.pagination.totalPages ?? 0;
 
   function resetFilters() {
-    setPage(1);
-    setHolderName("");
-    setBroker("");
-    setDepository("");
-    setStatus("");
-    setArchived("false");
-    setCreatedFrom("");
-    setCreatedTo("");
+    setListParams({}, { replace: true });
   }
 
   return (
@@ -265,16 +291,14 @@ export function AccountListPage() {
             label="Holder name"
             value={holderName}
             onChange={(value) => {
-              setHolderName(value);
-              setPage(1);
+              updateFilter("holder_name", value);
             }}
           />
           <FilterInput
             label="Broker"
             value={broker}
             onChange={(value) => {
-              setBroker(value);
-              setPage(1);
+              updateFilter("broker", value);
             }}
           />
           <label className="block text-base font-semibold text-ink">
@@ -283,8 +307,7 @@ export function AccountListPage() {
               className={inputClass}
               value={depository}
               onChange={(event) => {
-                setDepository(event.target.value);
-                setPage(1);
+                updateFilter("depository", event.target.value);
               }}
             >
               <option value="">All depositories</option>
@@ -298,8 +321,7 @@ export function AccountListPage() {
               className={inputClass}
               value={status}
               onChange={(event) => {
-                setStatus(event.target.value);
-                setPage(1);
+                updateFilter("status", event.target.value);
               }}
             >
               <option value="">All statuses</option>
@@ -314,8 +336,7 @@ export function AccountListPage() {
               className={inputClass}
               value={archived}
               onChange={(event) => {
-                setArchived(event.target.value);
-                setPage(1);
+                updateFilter("archived", event.target.value);
               }}
             >
               <option value="false">Not archived</option>
@@ -330,8 +351,7 @@ export function AccountListPage() {
               type="date"
               value={createdFrom}
               onChange={(event) => {
-                setCreatedFrom(event.target.value);
-                setPage(1);
+                updateFilter("created_from", event.target.value);
               }}
             />
           </label>
@@ -342,8 +362,7 @@ export function AccountListPage() {
               type="date"
               value={createdTo}
               onChange={(event) => {
-                setCreatedTo(event.target.value);
-                setPage(1);
+                updateFilter("created_to", event.target.value);
               }}
             />
           </label>
@@ -370,7 +389,10 @@ export function AccountListPage() {
                 {table.getHeaderGroups().map((group) => (
                   <tr key={group.id}>
                     {group.headers.map((header) => (
-                      <th key={header.id} className="border-b border-border px-3 py-4 font-bold">
+                      <th
+                        key={header.id}
+                        className={`border-b border-border px-3 py-4 font-bold ${["depository_type", "account_status", "created_at"].includes(header.column.id) ? "text-center" : "text-left"}`}
+                      >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                       </th>
                     ))}
@@ -390,7 +412,10 @@ export function AccountListPage() {
                       }}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="truncate px-3 py-4">
+                        <td
+                          key={cell.id}
+                          className={`truncate px-3 py-4 ${["depository_type", "account_status", "created_at"].includes(cell.column.id) ? "text-center tabular-nums" : "text-left"}`}
+                        >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>
                       ))}
@@ -404,12 +429,12 @@ export function AccountListPage() {
         <div className="space-y-3 md:hidden">
           {accounts.map((account) => (
             <article key={account.id} className="rounded-lg border border-border p-4 text-base">
-              <Link
+              <AccountDetailLink
+                account={account}
                 className="text-lg font-bold text-action underline"
-                to={`/accounts/${account.id}`}
               >
                 {account.holder_name}
-              </Link>
+              </AccountDetailLink>
               <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-y-2">
                 <dt className="font-semibold">Broker</dt>
                 <dd>{account.broker_name}</dd>
@@ -435,17 +460,13 @@ export function AccountListPage() {
             Page {page} of {totalPages || 1}
           </p>
           <div className="flex gap-3">
-            <Button
-              variant="outline"
-              disabled={page <= 1}
-              onClick={() => setPage((value) => value - 1)}
-            >
+            <Button variant="outline" disabled={page <= 1} onClick={() => changePage(page - 1)}>
               Previous
             </Button>
             <Button
               variant="outline"
               disabled={page >= totalPages}
-              onClick={() => setPage((value) => value + 1)}
+              onClick={() => changePage(page + 1)}
             >
               Next
             </Button>
@@ -645,6 +666,9 @@ export function AccountDetailsPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
+          <BackLink fallback="/accounts/list" allowedPath={/^\/accounts(\/list)?$/}>
+            Back to accounts
+          </BackLink>
           <h1 className="text-3xl font-bold text-navy">Account details</h1>
           <p className="mt-2 text-base text-muted">
             Only masked account identifiers are displayed.

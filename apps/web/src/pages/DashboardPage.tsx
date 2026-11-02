@@ -29,7 +29,12 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import type { DashboardAnalytics, DematAccount, IpoRecord } from "@ipo-mania/shared";
+import type {
+  DashboardAnalytics,
+  DematAccount,
+  IpoCatalogRecord,
+  IpoRecord,
+} from "@ipo-mania/shared";
 import { useAuth } from "../auth/useAuth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -41,7 +46,10 @@ import { WelcomePage } from "./WelcomePage";
 
 type AnalyticsResponse = { data: DashboardAnalytics };
 type IpoOptionsResponse = {
-  data: { ipos: IpoRecord[]; pagination?: { page: number; total_pages: number } };
+  data: {
+    ipos: Array<IpoRecord | IpoCatalogRecord>;
+    pagination?: { page: number; total_pages: number };
+  };
 };
 type AccountOptionsResponse = {
   data: {
@@ -53,6 +61,7 @@ type Filters = {
   date_from: string;
   date_to: string;
   ipo_id: string;
+  catalog_ipo_id: string;
   category: string;
   account_id: string;
 };
@@ -61,6 +70,7 @@ const emptyFilters: Filters = {
   date_from: "",
   date_to: "",
   ipo_id: "",
+  catalog_ipo_id: "",
   category: "",
   account_id: "",
 };
@@ -100,7 +110,19 @@ export function DashboardPage() {
       ),
   });
   const ipoOptionsQuery = useInfiniteQuery({
-    queryKey: ["analytics", "ipo-options"],
+    queryKey: ["analytics", "personal-ipo-options"],
+    enabled: Boolean(session),
+    staleTime: 60_000,
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      apiRequest<IpoOptionsResponse>(`/api/ipos?page=${pageParam}&page_size=100`, session!),
+    getNextPageParam: (lastPage) => {
+      const { page, total_pages: totalPages } = lastPage.data.pagination ?? {};
+      return page && totalPages && page < totalPages ? page + 1 : undefined;
+    },
+  });
+  const catalogOptionsQuery = useInfiniteQuery({
+    queryKey: ["analytics", "catalog-ipo-options"],
     enabled: Boolean(session),
     staleTime: 60_000,
     initialPageParam: 1,
@@ -134,7 +156,11 @@ export function DashboardPage() {
       setExportError(error instanceof Error ? error.message : "The report could not be exported."),
   });
 
-  const queryError = analyticsQuery.error ?? ipoOptionsQuery.error ?? accountOptionsQuery.error;
+  const queryError =
+    analyticsQuery.error ??
+    ipoOptionsQuery.error ??
+    catalogOptionsQuery.error ??
+    accountOptionsQuery.error;
   useEffect(() => {
     if (queryError instanceof ApiRequestError && queryError.status === 401) {
       markSessionExpired();
@@ -142,12 +168,21 @@ export function DashboardPage() {
   }, [markSessionExpired, queryError]);
 
   const analytics = analyticsQuery.data?.data;
+  const upcomingIpos = [
+    ...(analytics?.upcoming_ipos.map((ipo) => ({ ...ipo, source: "personal" as const })) ?? []),
+    ...(analytics?.catalog.upcoming.map((ipo) => ({ ...ipo, source: "catalog" as const })) ?? []),
+  ].sort((left, right) => left.closing_date.localeCompare(right.closing_date));
   const ipoOptions = ipoOptionsQuery.data?.pages.flatMap((page) => page.data.ipos) ?? [];
+  const catalogOptions = catalogOptionsQuery.data?.pages.flatMap((page) => page.data.ipos) ?? [];
   const accountOptions =
     accountOptionsQuery.data?.pages.flatMap((page) => page.data.accounts) ?? [];
   const loading =
-    analyticsQuery.isLoading || ipoOptionsQuery.isLoading || accountOptionsQuery.isLoading;
-  const optionsError = ipoOptionsQuery.error ?? accountOptionsQuery.error;
+    analyticsQuery.isLoading ||
+    ipoOptionsQuery.isLoading ||
+    catalogOptionsQuery.isLoading ||
+    accountOptionsQuery.isLoading;
+  const optionsError =
+    ipoOptionsQuery.error ?? catalogOptionsQuery.error ?? accountOptionsQuery.error;
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
 
@@ -228,7 +263,7 @@ export function DashboardPage() {
           )}
         </div>
         <div className="p-5">
-          <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <div>
               <label className="text-xs font-semibold text-muted block mb-1">From date</label>
               <input
@@ -250,14 +285,14 @@ export function DashboardPage() {
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted block mb-1">IPO Issue</label>
+              <label className="text-xs font-semibold text-muted block mb-1">My IPO</label>
               <select
-                aria-label="IPO filter"
+                aria-label="My IPO filter"
                 className={selectClass}
                 value={filters.ipo_id}
                 onChange={(event) => updateFilter("ipo_id", event.target.value)}
               >
-                <option value="">All IPOs</option>
+                <option value="">All my IPOs</option>
                 {ipoOptions.map((ipo) => (
                   <option key={ipo.id} value={ipo.id}>
                     {ipo.company_name} ({ipo.symbol})
@@ -271,7 +306,34 @@ export function DashboardPage() {
                   disabled={ipoOptionsQuery.isFetchingNextPage}
                   onClick={() => void ipoOptionsQuery.fetchNextPage()}
                 >
-                  {ipoOptionsQuery.isFetchingNextPage ? "Loading…" : "+ Load more IPOs"}
+                  {ipoOptionsQuery.isFetchingNextPage ? "Loading…" : "+ Load more my IPOs"}
+                </button>
+              ) : null}
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted block mb-1">Shared IPO</label>
+              <select
+                aria-label="Shared IPO filter"
+                className={selectClass}
+                value={filters.catalog_ipo_id}
+                onChange={(event) => updateFilter("catalog_ipo_id", event.target.value)}
+              >
+                <option value="">All shared IPOs</option>
+                {catalogOptions.map((ipo) => (
+                  <option key={ipo.id} value={ipo.id}>
+                    {ipo.company_name}
+                    {ipo.symbol ? ` (${ipo.symbol})` : ""}
+                  </option>
+                ))}
+              </select>
+              {catalogOptionsQuery.hasNextPage ? (
+                <button
+                  type="button"
+                  className="mt-1 text-xs font-medium text-action hover:underline"
+                  disabled={catalogOptionsQuery.isFetchingNextPage}
+                  onClick={() => void catalogOptionsQuery.fetchNextPage()}
+                >
+                  {catalogOptionsQuery.isFetchingNextPage ? "Loading…" : "+ Load more shared IPOs"}
                 </button>
               ) : null}
             </div>
@@ -319,8 +381,8 @@ export function DashboardPage() {
             </div>
           </div>
           <p className="mt-3 text-xs text-muted">
-            Date filters scope application submissions. Current inventory is shown for accounts
-            &amp; IPOs.
+            Date, category, account, and My IPO filters scope personal applications. Shared IPO
+            filters scope catalog details. Current inventory is shown for accounts and IPOs.
           </p>
         </div>
       </Card>
@@ -339,12 +401,13 @@ export function DashboardPage() {
 
       {/* ─── Core KPI Metric Grid ────────────────────────────────────────── */}
       <section
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
         aria-label="Dashboard totals"
         aria-busy={loading}
       >
         {loading ? (
           <>
+            <SkeletonStatCard />
             <SkeletonStatCard />
             <SkeletonStatCard />
             <SkeletonStatCard />
@@ -366,7 +429,13 @@ export function DashboardPage() {
             <MetricCard
               label="Tracked IPOs"
               value={analyticsCount(analytics?.totals.tracked_ipos)}
-              detail="Available in catalog"
+              detail="My saved IPOs"
+              icon={<TrendingUp size={18} className="text-action" />}
+            />
+            <MetricCard
+              label="Shared IPOs"
+              value={analyticsCount(analytics?.catalog.total)}
+              detail="Admin managed catalog"
               icon={<TrendingUp size={18} className="text-action" />}
             />
           </>
@@ -374,6 +443,88 @@ export function DashboardPage() {
       </section>
 
       {/* ─── Visual Analytics Charts ──────────────────────────────────────── */}
+      <section className="space-y-4" aria-label="Shared IPO analytics">
+        <div>
+          <h2 className="text-lg font-bold text-navy">Shared IPO catalog</h2>
+          <p className="mt-1 text-sm text-muted">
+            Admin managed issue information. Unpublished values remain unavailable.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {analytics?.catalog.by_status.map((row) => (
+            <Card key={row.status} className="border-border/80">
+              <CardContent className="p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                  {humanize(row.status)} IPOs
+                </p>
+                <p className="mt-2 text-2xl font-bold tabular text-navy">{row.count}</p>
+              </CardContent>
+            </Card>
+          )) ?? (
+            <AnalyticsStateMessage
+              label="Shared IPO analytics are unavailable."
+              loading={analyticsQuery.isLoading}
+              error={analyticsQuery.error}
+            />
+          )}
+        </div>
+        <Card className="border-border/80">
+          <CardHeader>
+            <CardTitle>IPO issue details</CardTitle>
+            <CardDescription>Current catalog records, with open issues first</CardDescription>
+          </CardHeader>
+          <CardContent noPadding>
+            {analytics?.catalog.issues.length ? (
+              <ul className="divide-y divide-border/60">
+                {analytics.catalog.issues.map((ipo) => (
+                  <li
+                    key={ipo.ipo_id}
+                    className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                  >
+                    <div className="min-w-0">
+                      <Link
+                        className="font-semibold text-ink hover:text-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+                        to={`/ipos/catalog/${ipo.ipo_id}`}
+                      >
+                        {ipo.company_name}
+                        {ipo.symbol ? ` (${ipo.symbol})` : ""}
+                      </Link>
+                      <p className="mt-1 text-xs text-muted">
+                        {ipo.issue_type === "SME" ? "SME" : "Mainboard"} ·{" "}
+                        {ipo.exchange ?? "Exchange not published"} · {ipo.data_source}
+                      </p>
+                      <p className="mt-1 text-xs text-muted">
+                        Price band:{" "}
+                        {ipo.price_band_min && ipo.price_band_max
+                          ? `₹${ipo.price_band_min}–₹${ipo.price_band_max}`
+                          : "Not published"}{" "}
+                        · Lot size: {ipo.lot_size ?? "Not published"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs sm:justify-end">
+                      <StatusBadge status={ipo.status} />
+                      <span className="text-muted">
+                        {ipo.opening_date ? formatDate(ipo.opening_date) : "Opening not published"}{" "}
+                        →{" "}
+                        {ipo.closing_date ? formatDate(ipo.closing_date) : "Closing not published"}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="p-5">
+                <AnalyticsStateMessage
+                  label="No shared IPO details are available for this filter."
+                  loading={analyticsQuery.isLoading}
+                  error={analyticsQuery.error}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
       <section className="grid min-w-0 gap-6 xl:grid-cols-2" aria-label="Application charts">
         <ChartCard title="Applications by Status" subtitle="Breakdown across active bid stages">
           {analytics?.applications_by_status.some((row) => row.count > 0) ? (
@@ -658,25 +809,30 @@ export function DashboardPage() {
             <CardDescription>Active issues nearing their application deadline</CardDescription>
           </CardHeader>
           <CardContent noPadding>
-            {analytics?.upcoming_ipos.length ? (
+            {upcomingIpos.length ? (
               <ul className="divide-y divide-border/60">
-                {analytics.upcoming_ipos.map((ipo) => (
+                {upcomingIpos.map((ipo) => (
                   <li
-                    key={ipo.ipo_id}
+                    key={`${ipo.source}-${ipo.ipo_id}`}
                     className="flex items-center justify-between gap-4 p-4 hover:bg-canvas/30 transition-colors"
                   >
                     <div>
                       <Link
                         className="font-semibold text-ink hover:text-action transition-colors"
-                        to={`/ipos/${ipo.ipo_id}`}
+                        to={
+                          ipo.source === "catalog"
+                            ? `/ipos/catalog/${ipo.ipo_id}`
+                            : `/ipos/${ipo.ipo_id}`
+                        }
                       >
-                        {ipo.company_name} ({ipo.symbol})
+                        {ipo.company_name}
+                        {ipo.symbol ? ` (${ipo.symbol})` : ""}
                       </Link>
                       <p className="mt-0.5 text-xs text-muted flex items-center gap-2">
                         <StatusBadge status={ipo.status} />
                         <span>·</span>
                         <span>
-                          {ipo.data_source === "MANUAL" ? "Self-maintained" : "System record"}
+                          {ipo.source === "catalog" ? "Shared catalog" : "Self-maintained"}
                         </span>
                       </p>
                     </div>

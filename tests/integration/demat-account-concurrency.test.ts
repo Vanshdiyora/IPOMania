@@ -4,7 +4,7 @@ import { getLoopbackTestDatabaseUrl } from "../helpers/database";
 
 const databaseUrl = getLoopbackTestDatabaseUrl("DEMAT_TEST_DATABASE_URL");
 
-describe.skipIf(!databaseUrl)("demat account capacity concurrency", () => {
+describe.skipIf(!databaseUrl)("demat account creation concurrency", () => {
   let sql: ReturnType<typeof postgres>;
   let userId: string;
 
@@ -16,8 +16,8 @@ describe.skipIf(!databaseUrl)("demat account capacity concurrency", () => {
         raw_app_meta_data, raw_user_meta_data, created_at, updated_at
       ) values (
         gen_random_uuid(), 'authenticated', 'authenticated',
-        ${`capacity-${crypto.randomUUID()}@example.test`}, '',
-        now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Capacity Test"}',
+        ${`account-concurrency-${crypto.randomUUID()}@example.test`}, '',
+        now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Concurrency Test"}',
         now(), now()
       )
       returning id
@@ -31,10 +31,10 @@ describe.skipIf(!databaseUrl)("demat account capacity concurrency", () => {
       select
         ${userId}::uuid,
         'Concurrency seed ' || account_number,
-        'Capacity Test Broker',
+        'Concurrency Test Broker',
         'NSDL',
         'XXXXCONC' || lpad(account_number::text, 6, '0')
-      from generate_series(1, 499) as account_number
+      from generate_series(1, 500) as account_number
     `;
   });
 
@@ -44,7 +44,7 @@ describe.skipIf(!databaseUrl)("demat account capacity concurrency", () => {
     await sql.end();
   });
 
-  it("serializes simultaneous creates so the active count cannot exceed 500", async () => {
+  it("allows simultaneous creates beyond 500 active accounts", async () => {
     const createAccount = (suffix: string) =>
       sql.begin(async (transaction) => {
         await transaction`set local role authenticated`;
@@ -53,17 +53,14 @@ describe.skipIf(!databaseUrl)("demat account capacity concurrency", () => {
           insert into public.demat_accounts (
             user_id, holder_name, broker_name, depository_type, masked_demat_identifier
           ) values (
-            ${userId}::uuid, ${`Concurrent ${suffix}`}, 'Capacity Test Broker',
+            ${userId}::uuid, ${`Concurrent ${suffix}`}, 'Concurrency Test Broker',
             'CDSL', ${`XXXXCONCURRENT${suffix}`}
           )
         `;
       });
 
     const attempts = await Promise.allSettled([createAccount("A"), createAccount("B")]);
-    expect(attempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
-    expect(attempts.filter((attempt) => attempt.status === "rejected")).toHaveLength(1);
-    const rejected = attempts.find((attempt) => attempt.status === "rejected");
-    expect(rejected?.status === "rejected" && rejected.reason.code).toBe("23514");
+    expect(attempts.every((attempt) => attempt.status === "fulfilled")).toBe(true);
 
     const [result] = await sql<{ count: string }[]>`
       select count(*)::text as count
@@ -72,6 +69,6 @@ describe.skipIf(!databaseUrl)("demat account capacity concurrency", () => {
         and account_status = 'active'
         and archived_at is null
     `;
-    expect(Number(result.count)).toBe(500);
+    expect(Number(result.count)).toBe(502);
   });
 });

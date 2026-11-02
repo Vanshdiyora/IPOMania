@@ -66,6 +66,32 @@ const analytics = {
   recent_applications: [],
   upcoming_ipos: [],
 };
+const catalog = {
+  total: 1,
+  by_status: [
+    { status: "upcoming", count: 1 },
+    { status: "open", count: 0 },
+    { status: "closed", count: 0 },
+    { status: "listed", count: 0 },
+  ],
+  issues: [
+    {
+      ipo_id: ipoId,
+      company_name: "=Shared IPO",
+      symbol: "SHARED",
+      status: "UPCOMING",
+      issue_type: "mainboard",
+      exchange: "NSE",
+      price_band_min: "100",
+      price_band_max: "120",
+      lot_size: 10,
+      opening_date: "2026-11-03",
+      closing_date: "2026-11-05",
+      data_source: "MANUAL",
+    },
+  ],
+  upcoming: [],
+};
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -81,9 +107,14 @@ function installMock(restResponse = JSON.stringify(analytics)) {
         });
       }
       requests.push(request.clone());
-      return new Response(restResponse, {
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        new URL(request.url).pathname.endsWith("/rpc/get_dashboard_catalog_analytics")
+          ? JSON.stringify(catalog)
+          : restResponse,
+        {
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }),
   );
   return requests;
@@ -97,14 +128,14 @@ describe("dashboard analytics API", () => {
   it("uses the caller JWT, validates filters, and never accepts a user ID", async () => {
     const requests = installMock();
     const response = await createApp().request(
-      `/api/analytics?date_from=2026-10-01&date_to=2026-10-31&ipo_id=${ipoId}&category=RETAIL&account_id=${accountId}&limit=7`,
+      `/api/analytics?date_from=2026-10-01&date_to=2026-10-31&ipo_id=${ipoId}&catalog_ipo_id=${ipoId}&category=RETAIL&account_id=${accountId}&limit=7`,
       { headers: authHeaders() },
       bindings,
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ data: analytics });
-    expect(requests).toHaveLength(1);
+    await expect(response.json()).resolves.toMatchObject({ data: { ...analytics, catalog } });
+    expect(requests).toHaveLength(2);
     expect(new URL(requests[0]!.url).pathname).toContain("/rpc/get_dashboard_analytics");
     expect(requests[0]!.headers.get("authorization")).toBe("Bearer test-access-token");
     await expect(requests[0]!.json()).resolves.toEqual({
@@ -115,6 +146,9 @@ describe("dashboard analytics API", () => {
       p_account_id: accountId,
       p_limit: 7,
     });
+    expect(new URL(requests[1]!.url).pathname).toContain("/rpc/get_dashboard_catalog_analytics");
+    expect(requests[1]!.headers.get("authorization")).toBe("Bearer test-access-token");
+    await expect(requests[1]!.json()).resolves.toEqual({ p_catalog_ipo_id: ipoId, p_limit: 7 });
 
     const invalid = await createApp().request(
       `/api/analytics?ipo_id=${ipoId}&user_id=${userId}`,
@@ -122,7 +156,7 @@ describe("dashboard analytics API", () => {
       bindings,
     );
     expect(invalid.status).toBe(400);
-    expect(requests).toHaveLength(1);
+    expect(requests).toHaveLength(2);
   });
 
   it("requires authentication and reports an empty result without fabricating totals", async () => {
@@ -149,7 +183,7 @@ describe("dashboard analytics API", () => {
     await expect(empty.json()).resolves.toMatchObject({
       data: { totals: { applications: 0 }, allotment_performance: { success_rate_percent: null } },
     });
-    expect(emptyRequests).toHaveLength(1);
+    expect(emptyRequests).toHaveLength(2);
   });
 
   it("exports exact decimal strings and formula-safe CSV", async () => {
@@ -165,6 +199,11 @@ describe("dashboard analytics API", () => {
     expect(response.headers.get("access-control-expose-headers")).toContain("Content-Disposition");
     const csv = await response.text();
     expect(csv).toContain("'=Formula");
+    expect(csv).toContain("'=Shared IPO");
+    expect(csv).toContain(
+      "ipo_id,issue_type,exchange,price_band_min,price_band_max,lot_size,opening_date,closing_date,data_source",
+    );
+    expect(csv).toContain('"mainboard","NSE","100","120","10","2026-11-03","2026-11-05","MANUAL"');
     expect(csv).toContain("123456789012345678901234.567891");
     expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
@@ -184,6 +223,7 @@ describe("dashboard analytics API", () => {
     const workbook = XLSX.read(await response.arrayBuffer(), { type: "array" });
     expect(workbook.SheetNames).toContain("Summary");
     expect(workbook.SheetNames).toContain("Capital utilization");
+    expect(workbook.SheetNames).toContain("Catalog IPOs");
     const summary = XLSX.utils.sheet_to_json(workbook.Sheets.Summary);
     expect(summary).toContainEqual({ metric: "Allotment success rate (%)", value: "Unavailable" });
     const ipoRows = XLSX.utils.sheet_to_json(workbook.Sheets.IPO) as Array<{

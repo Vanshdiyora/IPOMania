@@ -378,6 +378,32 @@ export interface DashboardAnalytics {
     closing_date: string;
     data_source: "MANUAL" | "PUBLISHED_SOURCE";
   }>;
+  catalog: {
+    total: number;
+    by_status: Array<{ status: "upcoming" | "open" | "closed" | "listed"; count: number }>;
+    issues: Array<{
+      ipo_id: string;
+      company_name: string;
+      symbol: string | null;
+      status: "UPCOMING" | "OPEN" | "CLOSED" | "LISTED";
+      issue_type: "mainboard" | "SME";
+      exchange: string | null;
+      price_band_min: string | null;
+      price_band_max: string | null;
+      lot_size: number | null;
+      opening_date: string | null;
+      closing_date: string | null;
+      data_source: string;
+    }>;
+    upcoming: Array<{
+      ipo_id: string;
+      company_name: string;
+      symbol: string | null;
+      status: "UPCOMING" | "OPEN";
+      closing_date: string;
+      data_source: string;
+    }>;
+  };
 }
 
 export interface ApplicationImportRow {

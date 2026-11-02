@@ -11,18 +11,20 @@ the caller's JWT with the project anon key; the request never accepts a `user_id
 | `GET /api/analytics/export?format=csv\|xlsx` | Export the same filtered aggregates as a formula-safe CSV or a multi-sheet Excel workbook.                        |
 | `GET /api/capital/summary`                   | Reuse the Phase 6 decimal financial engine for per-currency blocked, invested, refund, and listing-P&L summaries. |
 
-Analytics filters are `date_from`, `date_to` (inclusive ISO calendar dates), `ipo_id`, `category`
+Analytics filters are `date_from`, `date_to` (inclusive ISO calendar dates), `ipo_id`, `catalog_ipo_id`, `category`
 (`RETAIL`, `SHNI`, `BHNI`, or `SHAREHOLDER`), `account_id`, and `limit` (default 10, maximum 50).
 Unknown query parameters are rejected. A two-sided date range cannot exceed 10 years. IPO,
 demat-account, and category filters are applied to application, allotment, refund, and
 application-linked ledger aggregates. The date range applies to application `created_at` and ledger
 `effective_at` in UTC. Current active-account and tracked-IPO inventory counts are not affected by
-application/date filters. Upcoming IPOs are selected from the caller's active records whose status
-is `UPCOMING` or `OPEN` and whose closing date has not passed.
+application/date filters. `catalog_ipo_id` scopes only shared catalog totals, status counts, issue
+details, and upcoming dates. Personal upcoming IPOs are selected from the caller's active records
+whose status is `UPCOMING` or `OPEN` and whose closing date has not passed. Shared upcoming IPOs
+come from active catalog records with a published, unexpired closing date.
 
 The IPO, account, and broker charts return the top `limit` groups. Recent activity and upcoming IPO
-lists are bounded by the same limit. The dashboard loads its filter options with the existing
-paginated IPO and account endpoints rather than downloading records for aggregation.
+lists are bounded by the same limit. The dashboard loads personal and shared IPO filter options
+from their respective paginated endpoints, without downloading records for aggregation.
 
 ## Aggregation and financial semantics
 
@@ -31,7 +33,11 @@ function `public.get_dashboard_analytics`. It performs grouping, counts, and per
 sums in the database, returns financial values as decimal strings, and applies explicit `auth.uid()`
 predicates in addition to forced RLS. Application breakdowns use counts only, avoiding the addition
 of application amounts across currencies. Execute permission is limited to `authenticated`; no new
-table or index is introduced. Existing owner/date/status indexes support the filtered queries.
+user-owned table or index is introduced. Existing owner/date/status indexes support the filtered queries.
+`supabase/migrations/20261102010000_dashboard_catalog_analytics.sql` adds the invoker-rights
+`get_dashboard_catalog_analytics` function. It reads only non-archived shared IPOs under their
+existing read policy and requires an authenticated caller. Its totals, four status counts, bounded
+issue details, and upcoming dates are merged into the authenticated analytics response.
 
 Capital ledger trends and gross debit totals keep each currency separate and report `CAPITAL_BLOCKED`,
 `CAPITAL_RELEASED`, `ACTUAL_DEBIT`, and `REFUND_RECEIVED` as distinct event types. They do not add

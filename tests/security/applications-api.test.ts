@@ -204,6 +204,33 @@ function form(file: Blob, name: string, mapping?: Record<string, string>) {
 }
 
 describe("application API", () => {
+  it("selects the owned category relationship for list, export, and detail reads", async () => {
+    const requests = installMock({ exportRows: true });
+    for (const path of [
+      "/api/applications?page=1&page_size=50&include_archived=false",
+      "/api/applications/export",
+      "/api/applications/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    ]) {
+      const response = await createApp().request(
+        path,
+        { headers: { Authorization: "Bearer test-token" } },
+        bindings,
+      );
+      expect(response.status, path).toBe(200);
+    }
+
+    const applicationReads = requests.filter(
+      (request) =>
+        request.method === "GET" && new URL(request.url).pathname.endsWith("/applications"),
+    );
+    expect(applicationReads).toHaveLength(3);
+    for (const request of applicationReads) {
+      expect(new URL(request.url).searchParams.get("select")).toContain(
+        "ipo_categories!applications_category_owner_issue_fk(category)",
+      );
+    }
+  });
+
   it("creates an owned application with exact amount and an immutable calculation snapshot", async () => {
     const requests = installMock();
     const response = await createApp().request(

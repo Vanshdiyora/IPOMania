@@ -807,6 +807,7 @@ const dashboardFilterFields = {
   date_from: z.iso.date().optional(),
   date_to: z.iso.date().optional(),
   ipo_id: z.uuid().optional(),
+  catalog_ipo_id: z.uuid().optional(),
   category: ipoCategorySchema.optional(),
   account_id: z.uuid().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(10),
