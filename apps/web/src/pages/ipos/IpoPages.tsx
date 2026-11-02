@@ -141,23 +141,29 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
     <div className="space-y-6">
       <PageHeader
         title={calendar ? "IPO calendar" : "IPOs"}
-        description={calendar ? "View IPOs in opening-date order." : "Browse the IPO catalog or manage your personal IPO records."}
-        actions={<>
-          <Link
-            className={secondaryLinkClass}
-            to={`${calendar ? "/ipos" : "/ipo-calendar"}${personal ? "?source=personal" : ""}`}
-          >
-            {calendar ? "IPO list" : "IPO calendar"}
-          </Link>
-          {!calendar ? (
+        description={
+          calendar
+            ? "View IPOs in opening-date order."
+            : "Browse the IPO catalog or manage your personal IPO records."
+        }
+        actions={
+          <>
             <Link
-              className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-5 py-2 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
-              to="/ipos/new"
+              className={secondaryLinkClass}
+              to={`${calendar ? "/ipos" : "/ipo-calendar"}${personal ? "?source=personal" : ""}`}
             >
-              Add IPO
+              {calendar ? "IPO list" : "IPO calendar"}
             </Link>
-          ) : null}
-        </>}
+            {!calendar ? (
+              <Link
+                className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-5 py-2 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+                to="/ipos/new"
+              >
+                Add IPO
+              </Link>
+            ) : null}
+          </>
+        }
       />
       <div className="flex flex-wrap gap-3" role="group" aria-label="IPO source">
         {[
@@ -299,7 +305,11 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
         <Card>
           <EmptyState
             title="No IPO records match these filters."
-            description={personal ? "Add an issue to start an issue-specific rule record." : "Try another search or status. New IPOs appear here when added to the catalog."}
+            description={
+              personal
+                ? "Add an issue to start an issue-specific rule record."
+                : "Try another search or status. New IPOs appear here when added to the catalog."
+            }
           />
         </Card>
       ) : null}

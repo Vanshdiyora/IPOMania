@@ -870,7 +870,10 @@ export function AdminHistoryPage() {
   ] as const;
   return (
     <div className="space-y-5">
-      <PageHeader title="Synchronization history" description="Review provider runs and record changes." />
+      <PageHeader
+        title="Synchronization history"
+        description="Review provider runs and record changes."
+      />
       <SearchInput
         aria-label="Search synchronization history"
         placeholder="Search trigger, provider or status"
@@ -1012,7 +1015,10 @@ export function AdminSyncPage() {
   };
   return (
     <div className="space-y-5">
-      <PageHeader title="IPO data sync" description="Review provider availability and start a permitted synchronization run." />
+      <PageHeader
+        title="IPO data sync"
+        description="Review provider availability and start a permitted synchronization run."
+      />
       {loadError && (
         <div>
           <ErrorNotice error={loadError} />
@@ -1101,25 +1107,28 @@ export function AdminSettingsPage() {
     );
   return (
     <div className="space-y-5">
-      <PageHeader title="Administration settings" description="Provider connection and scheduled synchronization details." />
+      <PageHeader
+        title="Administration settings"
+        description="Provider connection and scheduled synchronization details."
+      />
       <div className="grid gap-5 lg:grid-cols-2">
-      <Card>
-        <h2 className="font-bold">Data provider</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          IPO Guru:{" "}
-          {settings.data?.data.providerConfigured ? "Configured" : "Requires Worker secret"}
-        </p>
-        <p className="mt-2 text-sm text-slate-600">
-          IPO Guru attribution is shown with provider-sourced catalog records.
-        </p>
-      </Card>
-      <Card>
-        <h2 className="font-bold">Scheduling</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Interval: {status.data?.data.syncIntervalHours ?? "Not available"} hours
-        </p>
-        <p className="text-sm text-slate-600">Managed through the Worker configuration.</p>
-      </Card>
+        <Card>
+          <h2 className="font-bold">Data provider</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            IPO Guru:{" "}
+            {settings.data?.data.providerConfigured ? "Configured" : "Requires Worker secret"}
+          </p>
+          <p className="mt-2 text-sm text-slate-600">
+            IPO Guru attribution is shown with provider-sourced catalog records.
+          </p>
+        </Card>
+        <Card>
+          <h2 className="font-bold">Scheduling</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Interval: {status.data?.data.syncIntervalHours ?? "Not available"} hours
+          </p>
+          <p className="text-sm text-slate-600">Managed through the Worker configuration.</p>
+        </Card>
       </div>
     </div>
   );
