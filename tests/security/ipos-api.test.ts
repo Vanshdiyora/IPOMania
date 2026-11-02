@@ -47,6 +47,27 @@ const ipoRow = {
   updated_at: "2026-10-31T12:00:00.000Z",
   archived_at: null,
 };
+const catalogRow = {
+  id: ipoId,
+  provider_id: "test-provider-reference",
+  company_name: "Admin Catalog Test Company",
+  symbol: "CATALOG",
+  issue_type: "mainboard",
+  exchange: "NSE",
+  price_band_min: 10,
+  price_band_max: 20,
+  issue_price: null,
+  lot_size: 10,
+  issue_size: null,
+  bidding_start_date: null,
+  bidding_end_date: null,
+  allotment_date: null,
+  listing_date: null,
+  ipo_status: "upcoming",
+  data_source: "IPO_GURU",
+  last_synced_at: "2026-11-01T12:00:00.000Z",
+  archived_at: null,
+};
 const categoryRow = {
   id: categoryId,
   ipo_id: ipoId,
@@ -96,6 +117,146 @@ function authHeaders() {
 }
 
 describe("IPO management API", () => {
+  it("lets a regular user read the shared catalog with their own JWT and filters", async () => {
+    const requests = installSupabaseMock(
+      () =>
+        new Response(JSON.stringify([catalogRow]), {
+          headers: { "Content-Type": "application/json", "Content-Range": "25-25/26" },
+        }),
+    );
+    const response = await createApp().request(
+      "/api/ipos/catalog?page=2&page_size=25&search=Catalog&status=UPCOMING",
+      { headers: authHeaders() },
+      bindings,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: {
+        ipos: [
+          {
+            company_name: catalogRow.company_name,
+            status: "UPCOMING",
+            issue_price_min: "10",
+            issue_price_max: "20",
+            issue_size: null,
+            opening_date: null,
+            source_reference: catalogRow.provider_id,
+          },
+        ],
+        pagination: { page: 2, page_size: 25, total: 26, total_pages: 2 },
+      },
+    });
+    const request = requests[0]!;
+    const url = new URL(request.url);
+    expect(url.pathname).toBe("/rest/v1/ipo_catalog");
+    expect(url.searchParams.get("user_id")).toBeNull();
+    expect(url.searchParams.get("archived_at")).toBe("is.null");
+    expect(url.searchParams.get("ipo_status")).toBe("eq.upcoming");
+    expect(url.searchParams.get("or")).toBe(
+      '(company_name.ilike."%Catalog%",symbol.ilike."Catalog")',
+    );
+    expect(url.searchParams.get("offset")).toBe("25");
+    expect(url.searchParams.get("limit")).toBe("25");
+    expect(request.headers.get("authorization")).toBe("Bearer user-session-token");
+    expect(request.headers.get("apikey")).toBe(bindings.SUPABASE_ANON_KEY);
+  });
+
+  it("quotes catalog search punctuation and escapes literal wildcards", async () => {
+    const requests = installSupabaseMock(
+      () => new Response("[]", { headers: { "Content-Type": "application/json" } }),
+    );
+    const search = 'Test_%,"(Company)';
+    const response = await createApp().request(
+      `/api/ipos/catalog?search=${encodeURIComponent(search)}`,
+      { headers: authHeaders() },
+      bindings,
+    );
+    expect(response.status).toBe(200);
+    expect(new URL(requests[0]!.url).searchParams.get("or")).toBe(
+      '(company_name.ilike."%Test\\\\_\\\\%,\\"(Company)%",symbol.ilike."Test\\\\_\\\\%,\\"(Company)")',
+    );
+  });
+
+  it("rejects invalid catalog filters without querying the database", async () => {
+    const requests = installSupabaseMock();
+    for (const query of [
+      "page=0",
+      "page_size=101",
+      "status=WITHDRAWN",
+      "include_archived=true",
+      `user_id=${otherUserId}`,
+    ]) {
+      const response = await createApp().request(
+        `/api/ipos/catalog?${query}`,
+        { headers: authHeaders() },
+        bindings,
+      );
+      expect(response.status).toBe(400);
+    }
+    expect(requests).toHaveLength(0);
+  });
+
+  it("reads active catalog details without accessing personal IPOs", async () => {
+    const requests = installSupabaseMock(
+      () =>
+        new Response(JSON.stringify(catalogRow), {
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    const response = await createApp().request(
+      `/api/ipos/catalog/${ipoId}`,
+      { headers: authHeaders() },
+      bindings,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { id: ipoId, company_name: catalogRow.company_name, status: "UPCOMING" },
+    });
+    expect(requests).toHaveLength(1);
+    const url = new URL(requests[0]!.url);
+    expect(url.pathname).toBe("/rest/v1/ipo_catalog");
+    expect(url.searchParams.get("id")).toBe(`eq.${ipoId}`);
+    expect(url.searchParams.get("archived_at")).toBe("is.null");
+    expect(requests[0]!.headers.get("authorization")).toBe("Bearer user-session-token");
+  });
+
+  it("returns not found for missing or archived catalog details and validates IDs", async () => {
+    const requests = installSupabaseMock(
+      () => new Response("null", { headers: { "Content-Type": "application/json" } }),
+    );
+    for (const id of [ipoId, "invalid-id"]) {
+      const response = await createApp().request(
+        `/api/ipos/catalog/${id}`,
+        { headers: authHeaders() },
+        bindings,
+      );
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({
+        error: { code: "IPO_NOT_FOUND", message: "The IPO record was not found." },
+      });
+    }
+    expect(requests).toHaveLength(1);
+  });
+
+  it("requires authentication for catalog reads and does not expose catalog writes", async () => {
+    const requests = installSupabaseMock();
+    for (const path of ["/api/ipos/catalog", `/api/ipos/catalog/${ipoId}`]) {
+      expect((await createApp().request(path, {}, bindings)).status).toBe(401);
+    }
+    for (const method of ["PATCH", "DELETE", "POST"]) {
+      expect(
+        (
+          await createApp().request(
+            `/api/ipos/catalog/${ipoId}`,
+            { method, headers: authHeaders() },
+            bindings,
+          )
+        ).status,
+      ).toBe(404);
+    }
+    expect(requests).toHaveLength(0);
+  });
+
   it("creates an IPO under the verified owner and rejects request-supplied ownership", async () => {
     let inserted: Record<string, unknown> | undefined;
     const requests = installSupabaseMock(async (request) => {

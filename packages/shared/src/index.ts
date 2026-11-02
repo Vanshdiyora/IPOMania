@@ -80,6 +80,33 @@ export interface IpoRecord {
   archived_at: string | null;
 }
 
+/** Shared admin-managed issue data may be incomplete until published by its source. */
+export interface IpoCatalogRecord
+  extends Omit<
+    IpoRecord,
+    | "symbol"
+    | "exchange"
+    | "issue_price_min"
+    | "issue_price_max"
+    | "lot_size"
+    | "issue_size"
+    | "opening_date"
+    | "closing_date"
+    | "status"
+    | "data_source"
+  > {
+  symbol: string | null;
+  exchange: string | null;
+  issue_price_min: string | null;
+  issue_price_max: string | null;
+  lot_size: number | null;
+  issue_size: string | null;
+  opening_date: string | null;
+  closing_date: string | null;
+  status: "UPCOMING" | "OPEN" | "CLOSED" | "LISTED";
+  data_source: string;
+}
+
 export interface IpoEligibilityCondition {
   id: string;
   description: string;

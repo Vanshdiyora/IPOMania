@@ -38,6 +38,12 @@ The API URL defaults to `https://www.ipoguru.in/api/v2/ipos`; requests use the k
 
 Only configure IPO Guru when the API plan permits the intended production usage. Data provenance must still be displayed in the catalog.
 
+Active records saved or synchronized in `/admin/ipos` appear for signed-in users by default on
+`/ipos` and `/ipo-calendar`, through the caller-authenticated shared catalog API. Users can search,
+filter, paginate, and open read-only issue details at `/ipos/catalog/:ipoId`. Missing source values
+remain explicitly unset. Archived records are excluded. The **My IPOs** view preserves personal
+issue records and their existing editing, category configuration, and quota workflows.
+
 ## Scheduling
 
 The existing Worker contains:

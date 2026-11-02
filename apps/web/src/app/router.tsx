@@ -27,6 +27,7 @@ import {
   AdminSyncPage,
 } from "../pages/admin/AdminPages";
 import {
+  IpoCatalogDetailsPage,
   IpoCategoryConfigurationPage,
   IpoDetailsPage,
   IpoFormPage,
@@ -100,6 +101,7 @@ export const router = createBrowserRouter([
       { path: "ipos", element: protectedPage(<IpoListPage />) },
       { path: "ipo-calendar", element: protectedPage(<IpoListPage calendar />) },
       { path: "ipos/new", element: protectedPage(<IpoFormPage />) },
+      { path: "ipos/catalog/:ipoId", element: protectedPage(<IpoCatalogDetailsPage />) },
       { path: "ipos/:ipoId/edit", element: protectedPage(<IpoFormPage editing />) },
       { path: "ipos/:ipoId/categories", element: protectedPage(<IpoCategoryConfigurationPage />) },
       { path: "ipos/:ipoId", element: protectedPage(<IpoDetailsPage />) },

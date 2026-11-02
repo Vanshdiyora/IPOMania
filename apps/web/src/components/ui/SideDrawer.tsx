@@ -1,8 +1,9 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "./Button";
+import { useModalLayer } from "./useModalLayer";
 
 type SideDrawerProps = {
   open: boolean;
@@ -12,6 +13,7 @@ type SideDrawerProps = {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
+  busy?: boolean;
 };
 
 export function SideDrawer({
@@ -22,51 +24,13 @@ export function SideDrawer({
   children,
   footer,
   className,
+  busy = false,
 }: SideDrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const titleId = `side-drawer-title-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const titleId = useId();
   const descriptionId = description ? `${titleId}-description` : undefined;
-
-  useEffect(() => {
-    if (!open) return;
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const panel = panelRef.current;
-    window.requestAnimationFrame(() =>
-      panel?.querySelector<HTMLElement>("[autofocus], input, button")?.focus(),
-    );
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab" || !panel) return;
-      const focusable = Array.from(
-        panel.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
-        ),
-      );
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      previouslyFocused?.focus();
-    };
-  }, [open, onClose]);
+  const requestClose = () => { if (!busy) onClose(); };
+  useModalLayer(open, panelRef, requestClose);
 
   if (!open) return null;
 
@@ -76,16 +40,19 @@ export function SideDrawer({
         type="button"
         className="absolute inset-0 cursor-default bg-slate-950/40"
         aria-label="Close drawer"
-        onClick={onClose}
+        disabled={busy}
+        onClick={requestClose}
       />
       <div
         ref={panelRef}
+        tabIndex={-1}
         role="dialog"
+        aria-busy={busy}
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         className={cn(
-          "relative flex h-full w-full max-w-xl flex-col bg-white shadow-2xl",
+          "drawer-panel relative flex h-dvh w-full max-w-xl flex-col bg-white shadow-2xl",
           className,
         )}
       >
@@ -100,12 +67,13 @@ export function SideDrawer({
               </p>
             )}
           </div>
-          <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close drawer">
+          <Button size="icon" variant="ghost" onClick={requestClose} aria-label="Close drawer"
+        disabled={busy}>
             <X className="h-5 w-5" />
           </Button>
         </header>
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
-        {footer && <footer className="border-t bg-white px-6 py-4">{footer}</footer>}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">{children}</div>
+        {footer && <footer className="shrink-0 border-t bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">{footer}</footer>}
       </div>
     </div>,
     document.body,

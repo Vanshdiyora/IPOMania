@@ -264,6 +264,15 @@ export const ipoUpdateSchema = ipoObjectSchema.partial().superRefine((ipo, conte
   }
 });
 
+export const ipoCatalogListQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    page_size: z.coerce.number().int().min(1).max(100).default(25),
+    search: z.string().trim().max(160).optional(),
+    status: ipoStatusSchema.extract(["UPCOMING", "OPEN", "CLOSED", "LISTED"]).optional(),
+  })
+  .strict();
+
 export const ipoListQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).default(1),

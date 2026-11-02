@@ -81,6 +81,19 @@ async function seedAuthenticatedUser(page: Page) {
       },
     }),
   );
+  await page.route("**/api/ipos/catalog?*", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          ipos: [ipo],
+          pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+        },
+      },
+    }),
+  );
+  await page.route(`**/api/ipos/catalog/${ipoId}`, (route) =>
+    route.fulfill({ json: { data: ipo } }),
+  );
   await page.route(`**/api/ipos/${ipoId}`, (route) => route.fulfill({ json: { data: ipo } }));
   await page.route(`**/api/ipos/${ipoId}/categories`, (route) =>
     route.fulfill({ json: { data: { configurations: [] } } }),
@@ -134,7 +147,7 @@ for (const viewport of viewports) {
     await expect(
       page.getByRole("textbox", { name: "Search company or exact symbol" }),
     ).toBeVisible();
-    await expect(page.getByLabel("Status")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Filters", exact: true })).toBeVisible();
     await page.getByRole("textbox", { name: "Search company or exact symbol" }).fill("IPO Test");
     await expect(page.getByRole("link", { name: "IPO Test Company" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
