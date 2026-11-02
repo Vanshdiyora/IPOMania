@@ -24,7 +24,36 @@ type ReportRow = {
   capital_released: string;
   actual_debit: string;
   refund_received: string;
+  ipo_id?: string;
+  issue_type?: string;
+  exchange?: string;
+  price_band_min?: string;
+  price_band_max?: string;
+  lot_size?: string;
+  opening_date?: string;
+  closing_date?: string;
+  data_source?: string;
 };
+const reportHeaders: Array<keyof ReportRow> = [
+  "section",
+  "period",
+  "label",
+  "count",
+  "amount",
+  "capital_blocked",
+  "capital_released",
+  "actual_debit",
+  "refund_received",
+  "ipo_id",
+  "issue_type",
+  "exchange",
+  "price_band_min",
+  "price_band_max",
+  "lot_size",
+  "opening_date",
+  "closing_date",
+  "data_source",
+];
 
 export const analyticsRoutes = new Hono<AnalyticsContext>();
 analyticsRoutes.use("*", authenticate);
@@ -45,32 +74,8 @@ analyticsRoutes.get("/export", async (context) => {
 
   if (parsed.data.format === "csv") {
     const csv = [
-      [
-        "section",
-        "period",
-        "label",
-        "count",
-        "amount",
-        "capital_blocked",
-        "capital_released",
-        "actual_debit",
-        "refund_received",
-      ].join(","),
-      ...rows.map((row) =>
-        [
-          row.section,
-          row.period,
-          row.label,
-          row.count,
-          row.amount,
-          row.capital_blocked,
-          row.capital_released,
-          row.actual_debit,
-          row.refund_received,
-        ]
-          .map(csvCell)
-          .join(","),
-      ),
+      reportHeaders.join(","),
+      ...rows.map((row) => reportHeaders.map((header) => csvCell(row[header] ?? "")).join(",")),
     ].join("\r\n");
     return context.body(csv, 200, {
       "Content-Type": "text/csv; charset=utf-8",
@@ -131,7 +136,10 @@ async function loadAnalytics(
   if (!catalog || typeof catalog !== "object") {
     throw new Error("The IPO catalog analytics query returned an invalid response.");
   }
-  return { ...(data as Omit<DashboardAnalytics, "catalog">), catalog: catalog as DashboardAnalytics["catalog"] };
+  return {
+    ...(data as Omit<DashboardAnalytics, "catalog">),
+    catalog: catalog as DashboardAnalytics["catalog"],
+  };
 }
 
 function createReportRows(analytics: DashboardAnalytics): ReportRow[] {
@@ -151,14 +159,23 @@ function createReportRows(analytics: DashboardAnalytics): ReportRow[] {
     ...analytics.catalog.by_status.map((item) =>
       reportRow("catalog status", "", item.status, item.count),
     ),
-    ...analytics.catalog.issues.map((item) =>
-      reportRow(
+    ...analytics.catalog.issues.map((item) => ({
+      ...reportRow(
         "catalog IPO",
         item.closing_date ?? "",
         `${item.company_name}${item.symbol ? ` (${item.symbol})` : ""}`,
         item.status,
       ),
-    ),
+      ipo_id: item.ipo_id,
+      issue_type: item.issue_type,
+      exchange: item.exchange ?? "",
+      price_band_min: item.price_band_min ?? "",
+      price_band_max: item.price_band_max ?? "",
+      lot_size: item.lot_size == null ? "" : String(item.lot_size),
+      opening_date: item.opening_date ?? "",
+      closing_date: item.closing_date ?? "",
+      data_source: item.data_source,
+    })),
     {
       section: "totals",
       period: "",

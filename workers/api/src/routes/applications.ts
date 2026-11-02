@@ -22,6 +22,7 @@ const maxUploadBytes = 5 * 1024 * 1024;
 const maxImportRows = 500;
 const applicationColumns =
   "id, user_id, ipo_id, demat_account_id, category_id, lots, total_shares, application_amount, application_number, external_reference, submission_date, application_status, mandate_status, allotment_status, notes, rule_version, calculation_snapshot, created_at, updated_at, archived_at";
+const applicationCategoryEmbed = "ipo_categories!applications_category_owner_issue_fk(category)";
 
 type ApplicationContext = {
   Bindings: EnvironmentBindings;
@@ -157,7 +158,7 @@ applicationsRoutes.get("/", async (context) => {
   let query = supabase
     .from("applications")
     .select(
-      `${applicationColumns}, ipos(company_name, symbol), demat_accounts(holder_name, broker_name), ipo_categories(category)`,
+      `${applicationColumns}, ipos(company_name, symbol), demat_accounts(holder_name, broker_name), ${applicationCategoryEmbed}`,
       { count: "exact" },
     )
     .eq("user_id", userId)
@@ -206,7 +207,7 @@ applicationsRoutes.get("/export", async (context) => {
   let query = supabase
     .from("applications")
     .select(
-      `${applicationColumns}, ipos(symbol, company_name), demat_accounts(masked_demat_identifier, broker_name), ipo_categories(category)`,
+      `${applicationColumns}, ipos(symbol, company_name), demat_accounts(masked_demat_identifier, broker_name), ${applicationCategoryEmbed}`,
       { count: "exact" },
     )
     .eq("user_id", context.get("authenticatedUser").id)
@@ -426,7 +427,7 @@ applicationsRoutes.get("/:applicationId", async (context) => {
     .get("rlsSupabase")
     .from("applications")
     .select(
-      `${applicationColumns}, ipos(company_name, symbol), demat_accounts(holder_name, broker_name, masked_demat_identifier), ipo_categories(category)`,
+      `${applicationColumns}, ipos(company_name, symbol), demat_accounts(holder_name, broker_name, masked_demat_identifier), ${applicationCategoryEmbed}`,
     )
     .eq("id", applicationId)
     .eq("user_id", context.get("authenticatedUser").id)

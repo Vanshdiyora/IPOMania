@@ -121,11 +121,9 @@ article {
   @keyframes drawer-mobile-in {
     from {
       transform: translateY(24px);
-      opacity: 0.4;
     }
     to {
       transform: translateY(0);
-      opacity: 1;
     }
   }
   h1 {

@@ -29,7 +29,12 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import type { DashboardAnalytics, DematAccount, IpoCatalogRecord, IpoRecord } from "@ipo-mania/shared";
+import type {
+  DashboardAnalytics,
+  DematAccount,
+  IpoCatalogRecord,
+  IpoRecord,
+} from "@ipo-mania/shared";
 import { useAuth } from "../auth/useAuth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -41,7 +46,10 @@ import { WelcomePage } from "./WelcomePage";
 
 type AnalyticsResponse = { data: DashboardAnalytics };
 type IpoOptionsResponse = {
-  data: { ipos: Array<IpoRecord | IpoCatalogRecord>; pagination?: { page: number; total_pages: number } };
+  data: {
+    ipos: Array<IpoRecord | IpoCatalogRecord>;
+    pagination?: { page: number; total_pages: number };
+  };
 };
 type AccountOptionsResponse = {
   data: {
@@ -149,7 +157,10 @@ export function DashboardPage() {
   });
 
   const queryError =
-    analyticsQuery.error ?? ipoOptionsQuery.error ?? catalogOptionsQuery.error ?? accountOptionsQuery.error;
+    analyticsQuery.error ??
+    ipoOptionsQuery.error ??
+    catalogOptionsQuery.error ??
+    accountOptionsQuery.error;
   useEffect(() => {
     if (queryError instanceof ApiRequestError && queryError.status === 401) {
       markSessionExpired();
@@ -170,7 +181,8 @@ export function DashboardPage() {
     ipoOptionsQuery.isLoading ||
     catalogOptionsQuery.isLoading ||
     accountOptionsQuery.isLoading;
-  const optionsError = ipoOptionsQuery.error ?? catalogOptionsQuery.error ?? accountOptionsQuery.error;
+  const optionsError =
+    ipoOptionsQuery.error ?? catalogOptionsQuery.error ?? accountOptionsQuery.error;
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
 
@@ -309,7 +321,8 @@ export function DashboardPage() {
                 <option value="">All shared IPOs</option>
                 {catalogOptions.map((ipo) => (
                   <option key={ipo.id} value={ipo.id}>
-                    {ipo.company_name}{ipo.symbol ? ` (${ipo.symbol})` : ""}
+                    {ipo.company_name}
+                    {ipo.symbol ? ` (${ipo.symbol})` : ""}
                   </option>
                 ))}
               </select>
@@ -368,8 +381,8 @@ export function DashboardPage() {
             </div>
           </div>
           <p className="mt-3 text-xs text-muted">
-            Date, category, account, and My IPO filters scope personal applications. Shared IPO filters
-            scope catalog details. Current inventory is shown for accounts and IPOs.
+            Date, category, account, and My IPO filters scope personal applications. Shared IPO
+            filters scope catalog details. Current inventory is shown for accounts and IPOs.
           </p>
         </div>
       </Card>
@@ -464,27 +477,36 @@ export function DashboardPage() {
             {analytics?.catalog.issues.length ? (
               <ul className="divide-y divide-border/60">
                 {analytics.catalog.issues.map((ipo) => (
-                  <li key={ipo.ipo_id} className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                  <li
+                    key={ipo.ipo_id}
+                    className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                  >
                     <div className="min-w-0">
                       <Link
                         className="font-semibold text-ink hover:text-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
                         to={`/ipos/catalog/${ipo.ipo_id}`}
                       >
-                        {ipo.company_name}{ipo.symbol ? ` (${ipo.symbol})` : ""}
+                        {ipo.company_name}
+                        {ipo.symbol ? ` (${ipo.symbol})` : ""}
                       </Link>
                       <p className="mt-1 text-xs text-muted">
-                        {ipo.issue_type === "SME" ? "SME" : "Mainboard"} · {ipo.exchange ?? "Exchange not published"} · {ipo.data_source}
+                        {ipo.issue_type === "SME" ? "SME" : "Mainboard"} ·{" "}
+                        {ipo.exchange ?? "Exchange not published"} · {ipo.data_source}
                       </p>
                       <p className="mt-1 text-xs text-muted">
-                        Price band: {ipo.price_band_min && ipo.price_band_max
+                        Price band:{" "}
+                        {ipo.price_band_min && ipo.price_band_max
                           ? `₹${ipo.price_band_min}–₹${ipo.price_band_max}`
-                          : "Not published"} · Lot size: {ipo.lot_size ?? "Not published"}
+                          : "Not published"}{" "}
+                        · Lot size: {ipo.lot_size ?? "Not published"}
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs sm:justify-end">
                       <StatusBadge status={ipo.status} />
                       <span className="text-muted">
-                        {ipo.opening_date ? formatDate(ipo.opening_date) : "Opening not published"} → {ipo.closing_date ? formatDate(ipo.closing_date) : "Closing not published"}
+                        {ipo.opening_date ? formatDate(ipo.opening_date) : "Opening not published"}{" "}
+                        →{" "}
+                        {ipo.closing_date ? formatDate(ipo.closing_date) : "Closing not published"}
                       </span>
                     </div>
                   </li>
@@ -797,9 +819,14 @@ export function DashboardPage() {
                     <div>
                       <Link
                         className="font-semibold text-ink hover:text-action transition-colors"
-                        to={ipo.source === "catalog" ? `/ipos/catalog/${ipo.ipo_id}` : `/ipos/${ipo.ipo_id}`}
+                        to={
+                          ipo.source === "catalog"
+                            ? `/ipos/catalog/${ipo.ipo_id}`
+                            : `/ipos/${ipo.ipo_id}`
+                        }
                       >
-                        {ipo.company_name}{ipo.symbol ? ` (${ipo.symbol})` : ""}
+                        {ipo.company_name}
+                        {ipo.symbol ? ` (${ipo.symbol})` : ""}
                       </Link>
                       <p className="mt-0.5 text-xs text-muted flex items-center gap-2">
                         <StatusBadge status={ipo.status} />

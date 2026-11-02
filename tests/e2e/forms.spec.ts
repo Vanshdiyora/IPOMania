@@ -451,6 +451,26 @@ test("admin catalog filters, paginates, and recovers from a loading failure", as
   await expect(page.getByText("No IPOs found.").filter({ visible: true })).toBeVisible();
 });
 
+test("admin catalog view returns to the filtered management list", async ({ page }) => {
+  await prepare(page, true);
+  await page.route(`**/api/ipos/catalog/${recordId}`, (route) =>
+    route.fulfill({
+      json: { data: { ...ipo, company_name: "Catalog test company", data_source: "IPO_GURU" } },
+    }),
+  );
+  await page.goto("/admin/ipos?search=Catalog&status=upcoming");
+  await expect(page.getByRole("searchbox", { name: "Search IPO catalog" })).toHaveValue("Catalog");
+  await page
+    .getByRole("link", { name: "View", exact: true })
+    .filter({ visible: true })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Catalog test company" })).toBeVisible();
+  await page.getByRole("link", { name: "Back to IPOs" }).click();
+  await expect(page).toHaveURL(/\/admin\/ipos\?search=Catalog&status=upcoming$/);
+  await expect(page.getByRole("searchbox", { name: "Search IPO catalog" })).toHaveValue("Catalog");
+});
+
 test("category switching protects unsaved rule changes", async ({ page }) => {
   await prepare(page);
   await page.goto(`/ipos/${recordId}/categories`);

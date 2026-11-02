@@ -26,6 +26,9 @@ import { Card } from "../../components/ui/Card";
 import { BackLink } from "../../components/ui/BackLink";
 import { StatusBadge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
+import { PageHeader } from "../../components/ui/PageHeader";
+import { EmptyState } from "../../components/ui/States";
+import { SkeletonCard } from "../../components/ui/Skeleton";
 import { ActiveFilterChips } from "../../components/filters/ActiveFilterChips";
 import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
 import { ApiRequestError, apiRequest } from "../../lib/api";
@@ -136,16 +139,10 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-navy">{calendar ? "IPO calendar" : "IPOs"}</h1>
-          <p className="mt-2 text-base text-muted">
-            {calendar
-              ? "View IPOs in opening-date order."
-              : "Browse the IPO catalog or manage your personal IPO records."}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
+      <PageHeader
+        title={calendar ? "IPO calendar" : "IPOs"}
+        description={calendar ? "View IPOs in opening-date order." : "Browse the IPO catalog or manage your personal IPO records."}
+        actions={<>
           <Link
             className={secondaryLinkClass}
             to={`${calendar ? "/ipos" : "/ipo-calendar"}${personal ? "?source=personal" : ""}`}
@@ -160,8 +157,8 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
               Add IPO
             </Link>
           ) : null}
-        </div>
-      </header>
+        </>}
+      />
       <div className="flex flex-wrap gap-3" role="group" aria-label="IPO source">
         {[
           { value: false, name: "IPO catalog" },
@@ -174,10 +171,8 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
             onClick={() =>
               updateListParams({
                 source: source.value ? "personal" : null,
-                status:
-                  !source.value && ["ALLOTMENT_PENDING", "WITHDRAWN"].includes(status)
-                    ? null
-                    : status,
+                search: null,
+                status: null,
                 page: null,
               })
             }
@@ -293,15 +288,19 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
         </FilterSection>
       </FilterDrawer>
       {error ? <ErrorNotice error={error} /> : null}
-      {isLoading ? <p role="status">Loading IPO records…</p> : null}
+      {isLoading ? (
+        <div role="status" aria-label="Loading IPO records" className="grid gap-4">
+          <span className="sr-only">Loading IPO records…</span>
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      ) : null}
       {!isLoading && !error && ipos.length === 0 ? (
         <Card>
-          <p className="font-semibold text-ink">No IPO records match these filters.</p>
-          <p className="mt-2 text-muted">
-            {personal
-              ? "Add an issue to start an issue-specific rule record."
-              : "Try another search or status. New IPOs appear here when added to the catalog."}
-          </p>
+          <EmptyState
+            title="No IPO records match these filters."
+            description={personal ? "Add an issue to start an issue-specific rule record." : "Try another search or status. New IPOs appear here when added to the catalog."}
+          />
         </Card>
       ) : null}
       <div className="grid gap-4">
@@ -366,10 +365,12 @@ export function IpoCatalogDetailsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <BackLink fallback="/ipos" allowedPath={/^\/(ipos|ipo-calendar)$/} />
+        <BackLink fallback="/ipos" allowedPath={/^\/(ipos|ipo-calendar|admin\/ipos)$/} />
         <h1 className="mt-3 text-3xl font-bold text-navy">{ipo.company_name}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-3 text-muted">
-          <span>{ipo.symbol ?? "Symbol not set"} · {ipo.exchange ?? "Exchange not set"}</span>
+          <span>
+            {ipo.symbol ?? "Symbol not set"} · {ipo.exchange ?? "Exchange not set"}
+          </span>
           <StatusBadge status={ipo.status} />
         </div>
       </header>
@@ -416,7 +417,9 @@ export function IpoDetailsPage() {
           <p className="text-sm font-semibold uppercase tracking-wide text-muted">{ipo.symbol}</p>
           <h1 className="mt-1 text-3xl font-bold text-navy">{ipo.company_name}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-muted">
-            <span>{ipo.exchange} · {ipo.ipo_type}</span>
+            <span>
+              {ipo.exchange} · {ipo.ipo_type}
+            </span>
             <StatusBadge status={ipo.status} />
           </div>
         </div>
@@ -1545,7 +1548,10 @@ function IssueSummary({ ipo, personal }: { ipo: IpoRecord | IpoCatalogRecord; pe
           <dl className="mt-4 grid gap-4 sm:grid-cols-2">
             <Detail label="IPO type" value={ipo.ipo_type || "Not published"} />
             <Detail label="Symbol" value={ipo.symbol ?? "Not published"} />
-            <Detail label="Cut-off price" value={ipo.cut_off_price ? formatRupees(ipo.cut_off_price) : "Not published"} />
+            <Detail
+              label="Cut-off price"
+              value={ipo.cut_off_price ? formatRupees(ipo.cut_off_price) : "Not published"}
+            />
             <Detail label="Status" value={label(ipo.status)} />
           </dl>
         </Card>
@@ -1562,9 +1568,15 @@ function IssueSummary({ ipo, personal }: { ipo: IpoRecord | IpoCatalogRecord; pe
       <Card>
         <h2 className="text-lg font-bold text-ink">Source and availability</h2>
         <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Detail label="Data source" value={ipo.data_source === "IPO_GURU" ? "IPO Guru" : labelValue(ipo.data_source)} />
+          <Detail
+            label="Data source"
+            value={ipo.data_source === "IPO_GURU" ? "IPO Guru" : labelValue(ipo.data_source)}
+          />
           <Detail label="Source reference" value={ipo.source_reference ?? "Not provided"} />
-          <Detail label={personal ? "User-entered verification date" : "Last synchronized"} value={ipo.last_verified_at ? formatDateTime(ipo.last_verified_at) : "Not available"} />
+          <Detail
+            label={personal ? "User-entered verification date" : "Last synchronized"}
+            value={ipo.last_verified_at ? formatDateTime(ipo.last_verified_at) : "Not available"}
+          />
         </dl>
         <p className="mt-5 rounded-lg border border-warning-border bg-warning-bg p-4 text-sm text-ink">
           {personal

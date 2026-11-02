@@ -199,13 +199,16 @@ export function ApplicationListPage() {
   const from = listParams.get("submission_from") ?? "";
   const to = listParams.get("submission_to") ?? "";
   const updateFilter = (key: string, value: string) => {
-    setListParams((previous) => {
-      const next = new URLSearchParams(previous);
-      if (value && !(key === "include_archived" && value === "false")) next.set(key, value);
-      else next.delete(key);
-      next.delete("page");
-      return next;
-    }, { replace: true });
+    setListParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (value && !(key === "include_archived" && value === "false")) next.set(key, value);
+        else next.delete(key);
+        next.delete("page");
+        return next;
+      },
+      { replace: true },
+    );
   };
   const changePage = (nextPage: number) => {
     setListParams((previous) => {
@@ -454,11 +457,21 @@ export function ApplicationListPage() {
           <table className="w-full min-w-[760px] text-left">
             <thead>
               <tr className="border-b border-border text-sm text-muted">
-                <th scope="col" className="p-3 text-center">Select</th>
-                <th scope="col" className="p-3 text-left">IPO / category</th>
-                <th scope="col" className="p-3 text-left">Account / broker</th>
-                <th scope="col" className="p-3 text-right">Lots / amount</th>
-                <th scope="col" className="p-3 text-center">Application</th>
+                <th scope="col" className="p-3 text-center">
+                  Select
+                </th>
+                <th scope="col" className="p-3 text-left">
+                  IPO / category
+                </th>
+                <th scope="col" className="p-3 text-left">
+                  Account / broker
+                </th>
+                <th scope="col" className="p-3 text-right">
+                  Lots / amount
+                </th>
+                <th scope="col" className="p-3 text-center">
+                  Application
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -876,7 +889,9 @@ export function ApplicationDetailsPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <BackLink fallback="/applications/list" allowedPath={/^\/applications(\/list)?$/}>Back to applications</BackLink>
+          <BackLink fallback="/applications/list" allowedPath={/^\/applications(\/list)?$/}>
+            Back to applications
+          </BackLink>
           <h1 className="text-3xl font-bold text-navy">Application details</h1>
           <p className="mt-2 text-base text-muted">
             Historical calculation rules are retained with this record.

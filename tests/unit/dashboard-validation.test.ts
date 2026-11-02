@@ -39,7 +39,9 @@ describe("dashboard analytics query validation", () => {
       }).success,
     ).toBe(false);
     expect(dashboardAnalyticsQuerySchema.safeParse({ limit: 51 }).success).toBe(false);
-    expect(dashboardAnalyticsQuerySchema.safeParse({ catalog_ipo_id: "invalid" }).success).toBe(false);
+    expect(dashboardAnalyticsQuerySchema.safeParse({ catalog_ipo_id: "invalid" }).success).toBe(
+      false,
+    );
   });
 
   it("rejects unrecognized parameters and defaults exports to CSV", () => {

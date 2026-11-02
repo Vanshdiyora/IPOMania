@@ -74,20 +74,22 @@ const catalog = {
     { status: "closed", count: 0 },
     { status: "listed", count: 0 },
   ],
-  issues: [{
-    ipo_id: ipoId,
-    company_name: "=Shared IPO",
-    symbol: "SHARED",
-    status: "UPCOMING",
-    issue_type: "mainboard",
-    exchange: "NSE",
-    price_band_min: "100",
-    price_band_max: "120",
-    lot_size: 10,
-    opening_date: "2026-11-03",
-    closing_date: "2026-11-05",
-    data_source: "MANUAL",
-  }],
+  issues: [
+    {
+      ipo_id: ipoId,
+      company_name: "=Shared IPO",
+      symbol: "SHARED",
+      status: "UPCOMING",
+      issue_type: "mainboard",
+      exchange: "NSE",
+      price_band_min: "100",
+      price_band_max: "120",
+      lot_size: 10,
+      opening_date: "2026-11-03",
+      closing_date: "2026-11-05",
+      data_source: "MANUAL",
+    },
+  ],
   upcoming: [],
 };
 
@@ -105,9 +107,14 @@ function installMock(restResponse = JSON.stringify(analytics)) {
         });
       }
       requests.push(request.clone());
-      return new Response(new URL(request.url).pathname.endsWith("/rpc/get_dashboard_catalog_analytics") ? JSON.stringify(catalog) : restResponse, {
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        new URL(request.url).pathname.endsWith("/rpc/get_dashboard_catalog_analytics")
+          ? JSON.stringify(catalog)
+          : restResponse,
+        {
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }),
   );
   return requests;
@@ -193,6 +200,10 @@ describe("dashboard analytics API", () => {
     const csv = await response.text();
     expect(csv).toContain("'=Formula");
     expect(csv).toContain("'=Shared IPO");
+    expect(csv).toContain(
+      "ipo_id,issue_type,exchange,price_band_min,price_band_max,lot_size,opening_date,closing_date,data_source",
+    );
+    expect(csv).toContain('"mainboard","NSE","100","120","10","2026-11-03","2026-11-05","MANUAL"');
     expect(csv).toContain("123456789012345678901234.567891");
     expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
