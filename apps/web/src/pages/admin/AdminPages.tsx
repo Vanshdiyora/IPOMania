@@ -1,13 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useModalLayer } from "../../components/ui/useModalLayer";
 import { useQuery } from "@tanstack/react-query";
@@ -41,7 +33,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { PageHeader, StatCard } from "../../components/ui/PageHeader";
 import { StatusBadge } from "../../components/ui/Badge";
 import { ErrorNotice, EmptyState } from "../../components/ui/States";
-import { Toast, ToastViewport, type ToastProps } from "../../components/ui/Toast";
+import { useToast } from "../../components/ui/ToastContext";
 
 const nav = [
   ["Overview", "/admin", BarChart3],
@@ -189,6 +181,7 @@ function Card({ children }: { children: ReactNode }) {
 
 export function AdminOverviewPage() {
   const { session } = useAuth();
+  const { notify } = useToast();
   const [overview, setOverview] = useState<any>(null);
   const [status, setStatus] = useState<any>(null);
   const [syncing, setSyncing] = useState(false);
@@ -219,12 +212,20 @@ export function AdminOverviewPage() {
     setMessage("Fetching provider data and saving records…");
     try {
       const result = await apiRequest<any>("/api/admin/ipos/sync", session, { method: "POST" });
-      setMessage(
-        `Completed: ${result.data?.recordsInserted ?? 0} inserted, ${result.data?.recordsUpdated ?? 0} updated.`,
-      );
+      setMessage("");
+      notify({
+        title: "IPO synchronization complete",
+        description: `${result.data?.recordsInserted ?? 0} inserted, ${result.data?.recordsUpdated ?? 0} updated.`,
+        tone: "success",
+      });
       await load();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Synchronization failed.");
+      setMessage("");
+      notify({
+        title: "IPO synchronization failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        tone: "error",
+      });
     } finally {
       setSyncing(false);
     }
@@ -320,6 +321,7 @@ export function AdminOverviewPage() {
 
 export function AdminIposPage() {
   const { session } = useAuth();
+  const { notify } = useToast();
   const location = useLocation();
   const [listParams, setListParams] = useSearchParams();
   const search = listParams.get("search") ?? "";
@@ -378,15 +380,6 @@ export function AdminIposPage() {
   const pageSize = 20;
   const [archiveId, setArchiveId] = useState<string | null>(null);
   const [archiving, setArchiving] = useState(false);
-  const [toasts, setToasts] = useState<ToastProps[]>([]);
-
-  const dismissToast = useCallback((id: string) => {
-    setToasts((current) => current.filter((toast) => toast.id !== id));
-  }, []);
-  const notify = (title: string, tone: ToastProps["tone"] = "info", description?: ReactNode) => {
-    const id = `${Date.now()}-${Math.random()}`;
-    setToasts((current) => [...current, { id, title, tone, description, onDismiss: dismissToast }]);
-  };
   const load = async () => {
     if (!session) return;
     setLoading(true);
@@ -475,12 +468,13 @@ export function AdminIposPage() {
         });
       }
       setDrawerOpen(false);
-      notify(editingId ? "IPO updated" : "IPO created", "success");
+      notify({ title: editingId ? "IPO updated" : "IPO created", tone: "success" });
       await load();
     } catch (error) {
-      setSaveError(
-        error instanceof Error ? error.message : "Unable to save IPO. Please try again.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Unable to save IPO. Please try again.";
+      setSaveError(message);
+      notify({ title: "Unable to save IPO", description: message, tone: "error" });
     } finally {
       setSaving(false);
     }
@@ -491,10 +485,14 @@ export function AdminIposPage() {
     try {
       await apiRequest(`/api/admin/ipos/catalog/${archiveId}`, session, { method: "DELETE" });
       setArchiveId(null);
-      notify("IPO archived", "success");
+      notify({ title: "IPO archived", tone: "success" });
       await load();
     } catch (error) {
-      notify("Unable to archive IPO", "error", error instanceof Error ? error.message : undefined);
+      notify({
+        title: "Unable to archive IPO",
+        description: error instanceof Error ? error.message : undefined,
+        tone: "error",
+      });
     } finally {
       setArchiving(false);
     }
@@ -824,11 +822,6 @@ export function AdminIposPage() {
         onCancel={() => !archiving && setArchiveId(null)}
         onConfirm={() => void archive()}
       />
-      <ToastViewport>
-        {toasts.map((toast) => (
-          <Toast key={toast.id} {...toast} />
-        ))}
-      </ToastViewport>
     </div>
   );
 }
@@ -981,6 +974,7 @@ export function AdminHistoryPage() {
 
 export function AdminSyncPage() {
   const { session } = useAuth();
+  const { notify } = useToast();
   const [status, setStatus] = useState<any>(null);
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState<Error | null>(null);
@@ -1005,12 +999,20 @@ export function AdminSyncPage() {
     setMessage("Fetching IPO list and saving records…");
     try {
       const r = await apiRequest<any>("/api/admin/ipos/sync", session, { method: "POST" });
-      setMessage(
-        `Completed: ${r.data?.recordsInserted ?? 0} inserted, ${r.data?.recordsUpdated ?? 0} updated.`,
-      );
+      setMessage("");
+      notify({
+        title: "IPO synchronization complete",
+        description: `${r.data?.recordsInserted ?? 0} inserted, ${r.data?.recordsUpdated ?? 0} updated.`,
+        tone: "success",
+      });
       await load();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Synchronization failed.");
+      setMessage("");
+      notify({
+        title: "IPO synchronization failed",
+        description: e instanceof Error ? e.message : "Please try again.",
+        tone: "error",
+      });
     }
   };
   return (

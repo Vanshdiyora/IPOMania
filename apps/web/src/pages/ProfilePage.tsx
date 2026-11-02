@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { profileUpdateSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
-import { AlertTriangle, CheckCircle2, ShieldAlert, Trash2 } from "lucide-react";
+import { AlertTriangle, ShieldAlert, Trash2 } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/Card";
 import { FormField, Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
+import { useToast } from "../components/ui/ToastContext";
 import { ApiRequestError, apiRequest } from "../lib/api";
 
 type Profile = {
@@ -22,8 +23,8 @@ type ProfileValues = z.infer<typeof profileUpdateSchema>;
 
 export function ProfilePage() {
   const { session, user, markSessionExpired, signOut } = useAuth();
+  const { notify } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [status, setStatus] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
@@ -58,20 +59,22 @@ export function ProfilePage() {
 
   async function save(values: ProfileValues) {
     if (!session) return;
-    setStatus("");
-    setErrorMessage("");
     try {
       const { data } = await apiRequest<ProfileResponse>("/api/me/profile", session, {
         method: "PATCH",
         body: JSON.stringify(values),
       });
       setProfile(data);
-      setStatus("Profile updated successfully.");
+      notify({ title: "Profile updated", tone: "success" });
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 401) {
         markSessionExpired();
       } else {
-        setErrorMessage("We could not save your profile. Please try again.");
+        notify({
+          title: "Profile could not be saved",
+          description: "Please try again.",
+          tone: "error",
+        });
       }
     }
   }
@@ -79,12 +82,16 @@ export function ProfilePage() {
   async function deleteAccount() {
     if (!session) return;
     setDeleting(true);
-    setErrorMessage("");
     try {
       await apiRequest("/api/auth/account", session, { method: "DELETE" });
+      notify({ title: "Account deleted", tone: "success" });
       await signOut("local");
     } catch {
-      setErrorMessage("We could not delete your account. Please try again or contact support.");
+      notify({
+        title: "Account could not be deleted",
+        description: "Please try again or contact support.",
+        tone: "error",
+      });
     } finally {
       setDeleting(false);
     }
@@ -139,16 +146,6 @@ export function ProfilePage() {
                 {...register("full_name")}
               />
             </FormField>
-
-            {status && (
-              <div
-                className="flex items-center gap-2 rounded-xl border border-action-emerald/30 bg-action-emerald/5 p-3.5 text-sm font-medium text-action-emerald"
-                role="status"
-              >
-                <CheckCircle2 size={16} />
-                <span>{status}</span>
-              </div>
-            )}
 
             <Button type="submit" disabled={isSubmitting} className="shadow-xs">
               {isSubmitting ? "Saving changes…" : "Save changes"}

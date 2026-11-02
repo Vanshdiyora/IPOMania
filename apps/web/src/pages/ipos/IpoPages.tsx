@@ -22,6 +22,7 @@ import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormCon
 import { FormSection } from "../../components/ui/FormSection";
 import { ConfirmationDialog } from "../../components/ui/ConfirmationDialog";
 import { RouteFormDrawer } from "../../components/ui/FormDrawer";
+import { useToast } from "../../components/ui/ToastContext";
 import { Card } from "../../components/ui/Card";
 import { BackLink } from "../../components/ui/BackLink";
 import { StatusBadge } from "../../components/ui/Badge";
@@ -394,6 +395,7 @@ export function IpoDetailsPage() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { notify } = useToast();
   const ipoQuery = useQuery({
     queryKey: ["ipo", ipoId],
     enabled: Boolean(session && ipoId),
@@ -409,8 +411,15 @@ export function IpoDetailsPage() {
       apiRequest<IpoResponse>(`/api/ipos/${ipoId}/archive`, session!, { method: "POST" }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["ipos"] });
+      notify({ title: "IPO archived", tone: "success" });
       navigate("/ipos?source=personal");
     },
+    onError: (error) =>
+      notify({
+        title: "IPO could not be archived",
+        description: error instanceof Error ? error.message : "Please try again.",
+        tone: "error",
+      }),
   });
   const ipo = ipoQuery.data?.data;
 
@@ -459,7 +468,6 @@ export function IpoDetailsPage() {
           ) : null}
         </div>
       </header>
-      {archive.error ? <ErrorNotice error={archive.error} /> : null}
       <IssueSummary ipo={ipo} personal />
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -496,7 +504,7 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
   const navigate = useNavigate();
-  const [errorMessage, setErrorMessage] = useState("");
+  const { notify } = useToast();
   const [verificationTime, setVerificationTime] = useState("");
   const loadedRecordId = useRef<string | null>(null);
   const queryClient = useQueryClient();
@@ -521,7 +529,6 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
 
   const submit = form.handleSubmit(async (values) => {
     if (!session) return;
-    setErrorMessage("");
     const payload = {
       ...values,
       source_reference: values.source_reference || null,
@@ -538,7 +545,11 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
         state: { successMessage: editing ? "IPO updated." : "IPO created." },
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "The IPO could not be saved.");
+      notify({
+        title: editing ? "IPO could not be updated" : "IPO could not be created",
+        description: error instanceof Error ? error.message : "Please try again.",
+        tone: "error",
+      });
     }
   });
 
@@ -561,11 +572,6 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
             : "")
       }
     >
-      {errorMessage ? (
-        <p role="alert" className="mb-4 text-danger">
-          {errorMessage}
-        </p>
-      ) : null}
       <form id="personal-ipo-form" className="space-y-5" onSubmit={submit} noValidate>
         <FormSection title="Company details">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -638,6 +644,7 @@ export function IpoCategoryConfigurationPage() {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  const { notify } = useToast();
   const [pendingCategory, setPendingCategory] = useState<IpoCategoryCode | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [categoryDirty, setCategoryDirty] = useState(false);
@@ -666,12 +673,22 @@ export function IpoCategoryConfigurationPage() {
     onSuccess: async () => {
       setCategoryDirty(false);
       setCategoryError(false);
-      setMessage("A new rule version was saved. Earlier versions remain unchanged.");
+      setMessage("");
+      notify({
+        title: "Category rule saved",
+        description: "A new immutable rule version was created.",
+        tone: "success",
+      });
       await queryClient.invalidateQueries({ queryKey: ["ipo-categories", ipoId] });
     },
     onError: (error) => {
-      setCategoryError(true);
-      setMessage(error instanceof Error ? error.message : "Rules were not saved.");
+      setCategoryError(false);
+      setMessage("");
+      notify({
+        title: "Category rules could not be saved",
+        description: error instanceof Error ? error.message : "Please try again.",
+        tone: "error",
+      });
     },
   });
   const configurations = rulesQuery.data?.data.configurations ?? [];

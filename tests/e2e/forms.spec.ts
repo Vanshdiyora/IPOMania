@@ -210,6 +210,7 @@ test("account form preserves typed values, validates, saves, and loads existing 
   });
   await page.getByRole("button", { name: "Save account", exact: true }).click();
   await expect(page).toHaveURL(/\/accounts\/list$/);
+  await expect(page.getByText("Account created.")).toBeVisible();
   await page.goto(`/accounts/${recordId}/edit`);
   await expect(page.getByLabel("Account holder name")).toHaveValue(account.holder_name);
   await expect(page.getByLabel("Depository", { exact: true })).toHaveValue("CDSL");
@@ -412,7 +413,8 @@ for (const width of [390, 1440]) {
     expect(runs).toBe(0);
     await page.getByRole("button", { name: "Fetch Latest IPO Data" }).click();
     await page.getByRole("button", { name: "Start synchronization", exact: true }).click();
-    await expect(page.getByText("Completed: 2 inserted, 1 updated.")).toBeVisible();
+    await expect(page.getByText("IPO synchronization complete")).toBeVisible();
+    await expect(page.getByText("2 inserted, 1 updated.")).toBeVisible();
     expect(runs).toBe(1);
     expect(errors).toEqual([]);
   });

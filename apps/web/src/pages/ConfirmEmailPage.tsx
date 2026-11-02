@@ -4,8 +4,10 @@ import { CheckCircle2, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
 import { AuthPage } from "../auth/AuthPage";
 import { Button } from "../components/ui/Button";
 import { getSupabaseClient } from "../lib/supabase";
+import { useToast } from "../components/ui/ToastContext";
 
 export function ConfirmEmailPage() {
+  const { notify } = useToast();
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("Verifying your email address…");
   const [failed, setFailed] = useState(false);
@@ -19,6 +21,7 @@ export function ConfirmEmailPage() {
       setMessage(
         "This verification link is invalid or has expired. Please request a new link by registering again.",
       );
+      notify({ title: "Email verification failed", tone: "error" });
       return;
     }
     try {
@@ -30,6 +33,7 @@ export function ConfirmEmailPage() {
           setMessage(
             "Your email address has been successfully verified. You can now access your account.",
           );
+          notify({ title: "Email verified", tone: "success" });
         })
         .catch(() => {
           setLoading(false);
@@ -37,13 +41,15 @@ export function ConfirmEmailPage() {
           setMessage(
             "This verification link is invalid or has expired. Please request a new link by registering again.",
           );
+          notify({ title: "Email verification failed", tone: "error" });
         });
     } catch {
       setLoading(false);
       setFailed(true);
       setMessage("Email verification is not configured. Please contact support.");
+      notify({ title: "Email verification unavailable", tone: "error" });
     }
-  }, []);
+  }, [notify]);
 
   return (
     <AuthPage

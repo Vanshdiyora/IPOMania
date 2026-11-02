@@ -20,6 +20,7 @@ import { applicationCreateSchema, applicationUpdateSchema } from "@ipo-mania/val
 import { Card } from "../../components/ui/Card";
 import { BackLink } from "../../components/ui/BackLink";
 import { Pagination } from "../../components/ui/Pagination";
+import { useToast } from "../../components/ui/ToastContext";
 import { ApiRequestError, apiRequest } from "../../lib/api";
 
 type ApplicationListResponse = {
@@ -185,6 +186,7 @@ export function ApplicationDashboardPage() {
 
 export function ApplicationListPage() {
   const { session } = useAuth();
+  const { notify } = useToast();
   const location = useLocation();
   const [listParams, setListParams] = useSearchParams();
   const pageValue = Number(listParams.get("page"));
@@ -233,7 +235,6 @@ export function ApplicationListPage() {
   });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState("");
-  const [bulkStatusMessage, setBulkStatusMessage] = useState("");
   const bulkStatusMutation = useMutation({
     mutationFn: () =>
       apiRequest("/api/applications/bulk/status", session!, {
@@ -242,9 +243,15 @@ export function ApplicationListPage() {
       }),
     onSuccess: async () => {
       setSelectedIds([]);
-      setBulkStatusMessage("Selected applications updated.");
+      notify({ title: "Selected applications updated", tone: "success" });
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
     },
+    onError: (error) =>
+      notify({
+        title: "Applications could not be updated",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   const params = new URLSearchParams({
     page: String(page),
@@ -295,7 +302,11 @@ export function ApplicationListPage() {
             variant="outline"
             onClick={() =>
               void exportCsv().catch((reason: unknown) =>
-                window.alert(reason instanceof Error ? reason.message : "Export failed."),
+                notify({
+                  title: "Export failed",
+                  description: errorMessage(reason),
+                  tone: "error",
+                }),
               )
             }
           >
@@ -450,8 +461,6 @@ export function ApplicationListPage() {
           >
             Update {selectedIds.length} selected
           </Button>
-          {bulkStatusMessage ? <p role="status">{bulkStatusMessage}</p> : null}
-          {bulkStatusMutation.error ? <ErrorMessage error={bulkStatusMutation.error} /> : null}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left">
@@ -586,6 +595,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     notes: notes || null,
   };
   const applicationFingerprint = JSON.stringify(applicationPayload);
+  const { notify } = useToast();
   const currentReview =
     reviewedApplication?.fingerprint === applicationFingerprint ? reviewedApplication.data : null;
   const calculation = useMutation({
@@ -630,6 +640,12 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     onSuccess: () =>
       navigate("/applications/list", {
         state: { successMessage: editing ? "Application updated." : "Application created." },
+      }),
+    onError: (error) =>
+      notify({
+        title: editing ? "Application could not be updated" : "Application could not be created",
+        description: errorMessage(error),
+        tone: "error",
       }),
   });
   const application = detail.data?.data;
@@ -853,11 +869,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
             />
           </div>
         </FormSection>
-        {mutation.error ? (
-          <p role="alert" className="mt-4 text-danger">
-            {errorMessage(mutation.error)}
-          </p>
-        ) : null}
       </form>
     </RouteFormDrawer>
   );
@@ -868,6 +879,7 @@ export function ApplicationDetailsPage() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { notify } = useToast();
   const detail = useQuery({
     queryKey: ["applications", applicationId],
     enabled: Boolean(session && applicationId),
@@ -878,8 +890,15 @@ export function ApplicationDetailsPage() {
       apiRequest(`/api/applications/${applicationId}`, session!, { method: "DELETE" }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
+      notify({ title: "Application archived", tone: "success" });
       navigate("/applications/list");
     },
+    onError: (error) =>
+      notify({
+        title: "Application could not be archived",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   const item = detail.data?.data;
   if (detail.isLoading) return <p>Loading application…</p>;
@@ -935,7 +954,6 @@ export function ApplicationDetailsPage() {
             {JSON.stringify(item.calculation_snapshot, null, 2)}
           </pre>
         </details>
-        {archive.error ? <ErrorMessage error={archive.error} /> : null}
         <ConfirmButton
           className="mt-5"
           variant="outline"
@@ -954,6 +972,7 @@ export function ApplicationDetailsPage() {
 
 export function BulkApplicationPage() {
   const { session } = useAuth();
+  const { notify } = useToast();
   const [ipoId, setIpoId] = useState("");
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState("");
@@ -961,7 +980,6 @@ export function BulkApplicationPage() {
   const [price, setPrice] = useState("");
   const [priceType, setPriceType] = useState<"BID" | "CUT_OFF">("CUT_OFF");
   const [preview, setPreview] = useState<ValidationRow[] | null>(null);
-  const [message, setMessage] = useState("");
   const [holdings, setHoldings] = useState<Record<string, string>>({});
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
   const lists = useOwnedLists();
@@ -990,7 +1008,6 @@ export function BulkApplicationPage() {
       }),
     onSuccess: (result) => {
       setPreview(result.data.rows);
-      setMessage("");
     },
   });
   const createMutation = useMutation({
@@ -1000,9 +1017,15 @@ export function BulkApplicationPage() {
         body: JSON.stringify({ applications: inputs }),
       }),
     onSuccess: () => {
-      setMessage("Applications created.");
+      notify({ title: "Applications created", tone: "success" });
       setPreview(null);
     },
+    onError: (error) =>
+      notify({
+        title: "Applications could not be created",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   const eligibleAccounts = lists.accounts.filter(
     (account) => account.account_status === "active" && !account.archived_at,
@@ -1201,14 +1224,7 @@ export function BulkApplicationPage() {
             </p>
           </div>
         ) : null}
-        {message ? (
-          <p role="status" className="mt-4 text-success">
-            {message}
-          </p>
-        ) : null}
-        {previewMutation.error || createMutation.error ? (
-          <ErrorMessage error={previewMutation.error ?? createMutation.error} />
-        ) : null}
+        {previewMutation.error ? <ErrorMessage error={previewMutation.error} /> : null}
         <div className="mt-5 flex flex-wrap gap-3">
           <Button
             disabled={
@@ -1231,6 +1247,7 @@ export function BulkApplicationPage() {
 
 export function ApplicationImportPage() {
   const { session } = useAuth();
+  const { notify } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
   const [sample, setSample] = useState<
@@ -1238,7 +1255,6 @@ export function ApplicationImportPage() {
   >([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<ImportPreviewResponse["data"] | null>(null);
-  const [message, setMessage] = useState("");
   const fields = [
     ["ipo", "IPO symbol or ID"],
     ["demat_account", "Demat account reference"],
@@ -1268,8 +1284,13 @@ export function ApplicationImportPage() {
       setPreview(data);
       if (data.headers) setHeaders(data.headers);
       if (data.sample_rows) setSample(data.sample_rows);
-      setMessage("");
     },
+    onError: (error) =>
+      notify({
+        title: "Application import preview failed",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   const confirmMutation = useMutation({
     mutationFn: () =>
@@ -1277,11 +1298,18 @@ export function ApplicationImportPage() {
         method: "POST",
         body: JSON.stringify({ import_id: preview?.import?.id }),
       }),
-    onSuccess: () => {
-      setMessage(
-        "Import confirmed. Imported applications remain drafts unless you explicitly mapped a status.",
-      );
-    },
+    onSuccess: () =>
+      notify({
+        title: "Application import confirmed",
+        description: "Imported applications remain drafts unless you explicitly mapped a status.",
+        tone: "success",
+      }),
+    onError: (error) =>
+      notify({
+        title: "Application import could not be confirmed",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -1411,14 +1439,6 @@ export function ApplicationImportPage() {
             </Button>
           </section>
         ) : null}
-        {previewMutation.error || confirmMutation.error ? (
-          <ErrorMessage error={previewMutation.error ?? confirmMutation.error} />
-        ) : null}
-        {message ? (
-          <p role="status" className="mt-4 text-success">
-            {message}
-          </p>
-        ) : null}
         <Link
           className="mt-5 inline-flex min-h-touch items-center text-action underline"
           to="/applications/import-history"
@@ -1504,6 +1524,7 @@ export function ApplicationImportHistoryPage() {
 
 function ImportReport({ importId }: { importId: string }) {
   const { session } = useAuth();
+  const { notify } = useToast();
   const queryClient = useQueryClient();
   const report = useQuery({
     queryKey: ["application-import-report", importId],
@@ -1526,7 +1547,14 @@ function ImportReport({ importId }: { importId: string }) {
     mutationFn: () => apiRequest(`/api/imports/${importId}/reverse`, session!, { method: "POST" }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["application-import-report", importId] });
+      notify({ title: "Application import reversed", tone: "success" });
     },
+    onError: (error) =>
+      notify({
+        title: "Application import could not be reversed",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   if (report.isLoading)
     return (
@@ -1577,7 +1605,6 @@ function ImportReport({ importId }: { importId: string }) {
           Reverse import
         </ConfirmButton>
       ) : null}
-      {reverse.error ? <ErrorMessage error={reverse.error} /> : null}
     </Card>
   );
 }

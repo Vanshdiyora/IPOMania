@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useOutlet, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/useAuth";
 import { Header } from "./Header";
-import { SuccessNotice } from "../ui/States";
 import { Sidebar } from "./Sidebar";
+import { useToast } from "../ui/ToastContext";
 
 export function AppLayout() {
   const { user } = useAuth();
-  const { pathname, state } = useLocation();
+  const location = useLocation();
+  const { pathname, state } = location;
+  const navigate = useNavigate();
+  const { notify } = useToast();
   const successMessage = (state as { successMessage?: unknown } | null)?.successMessage;
   const outlet = useOutlet();
   const drawerRoute =
@@ -20,6 +24,12 @@ export function AppLayout() {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuWasOpen = useRef(false);
   const pageContentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof successMessage !== "string") return;
+    notify({ title: successMessage, tone: "success" });
+    navigate(`${pathname}${location.search}${location.hash}`, { replace: true, state: null });
+  }, [location.hash, location.search, navigate, notify, pathname, successMessage]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -87,9 +97,6 @@ export function AppLayout() {
           id="main-content"
           className="mx-auto w-full max-w-7xl min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8 animate-fade-in"
         >
-          {!drawerRoute && typeof successMessage === "string" && (
-            <SuccessNotice className="mb-5" message={successMessage} />
-          )}
           <div aria-hidden={drawerRoute || undefined}>
             {drawerRoute
               ? (backgroundRef.current ?? (
