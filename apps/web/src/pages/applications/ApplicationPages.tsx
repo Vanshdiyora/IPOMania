@@ -1,3 +1,4 @@
+import { toIsoDateTime } from "../../lib/formValues";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -8,7 +9,14 @@ import type {
   IpoRecord,
 } from "@ipo-mania/shared";
 import { useAuth } from "../../auth/useAuth";
+import { ConfirmButton } from "../../components/ui/ConfirmButton";
 import { Button } from "../../components/ui/Button";
+import { RouteFormDrawer } from "../../components/ui/FormDrawer";
+import { SearchableFormSelect } from "../../components/ui/SearchableFormSelect";
+import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
+import { FormSection } from "../../components/ui/FormSection";
+import { useFormValidation } from "../../components/ui/useFormValidation";
+import { applicationCreateSchema, applicationUpdateSchema } from "@ipo-mania/validation";
 import { Card } from "../../components/ui/Card";
 import { ApiRequestError, apiRequest } from "../../lib/api";
 
@@ -133,7 +141,7 @@ export function ApplicationDashboardPage() {
         <div>
           <h1 className="text-3xl font-bold text-navy">Application manager</h1>
           <p className="mt-2 text-lg text-muted">
-            Track your IPO applications, mandates, and allotment updates.
+            Track your IPO applications across your demat accounts.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -160,7 +168,7 @@ export function ApplicationDashboardPage() {
       <Card>
         <h2 className="text-xl font-bold text-ink">Keep each status up to date</h2>
         <p className="mt-2 text-base text-muted">
-          Application progress, mandate progress, and allotment results are tracked separately.
+          Keep application progress up to date as your records change.
         </p>
         <Link
           className="mt-4 inline-flex min-h-touch items-center text-action underline"
@@ -180,7 +188,6 @@ export function ApplicationListPage() {
   const [accountId, setAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [applicationStatus, setApplicationStatus] = useState("");
-  const [mandateStatus, setMandateStatus] = useState("");
   const [broker, setBroker] = useState("");
   const [search, setSearch] = useState("");
   const [includeArchived, setIncludeArchived] = useState("false");
@@ -222,7 +229,6 @@ export function ApplicationListPage() {
     ...(accountId ? { demat_account_id: accountId } : {}),
     ...(categoryId ? { category_id: categoryId } : {}),
     ...(applicationStatus ? { application_status: applicationStatus } : {}),
-    ...(mandateStatus ? { mandate_status: mandateStatus } : {}),
     ...(broker ? { broker } : {}),
     ...(search ? { search } : {}),
     ...(from ? { submission_from: from } : {}),
@@ -377,15 +383,6 @@ export function ApplicationListPage() {
               setPage(1);
             }}
           />
-          <StatusSelect
-            label="Mandate status"
-            value={mandateStatus}
-            statuses={["UNKNOWN", "PENDING", "APPROVED", "REJECTED", "FAILED", "NOT_REQUIRED"]}
-            onChange={(value) => {
-              setMandateStatus(value);
-              setPage(1);
-            }}
-          />
           <label className="font-semibold">
             Submitted from
             <input
@@ -449,7 +446,6 @@ export function ApplicationListPage() {
                 <th className="p-3">Account / broker</th>
                 <th className="p-3">Lots / amount</th>
                 <th className="p-3">Application</th>
-                <th className="p-3">Mandate</th>
               </tr>
             </thead>
             <tbody>
@@ -487,7 +483,6 @@ export function ApplicationListPage() {
                     {row.lots} lots · {row.application_amount}
                   </td>
                   <td className="p-3">{prettyStatus(row.application_status)}</td>
-                  <td className="p-3">{prettyStatus(row.mandate_status)}</td>
                 </tr>
               ))}
             </tbody>
@@ -526,6 +521,8 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const navigate = useNavigate();
   const { session } = useAuth();
   const lists = useOwnedLists();
+  const [dirty, setDirty] = useState(false);
+  const validation = useFormValidation();
   const [ipoId, setIpoId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -536,8 +533,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const [externalReference, setExternalReference] = useState("");
   const [submissionDate, setSubmissionDate] = useState("");
   const [applicationStatus, setApplicationStatus] = useState("DRAFT");
-  const [mandateStatus, setMandateStatus] = useState("UNKNOWN");
-  const [allotmentStatus, setAllotmentStatus] = useState("UNKNOWN");
   const [shareholderShares, setShareholderShares] = useState("");
   const [eligibilityAnswers, setEligibilityAnswers] = useState<Record<string, boolean | null>>({});
   const [notes, setNotes] = useState("");
@@ -569,10 +564,10 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     eligibility_answers: eligibilityAnswers,
     application_number: applicationNumber || null,
     external_reference: externalReference || null,
-    submission_date: submissionDate ? new Date(submissionDate).toISOString() : null,
+    submission_date: submissionDate ? toIsoDateTime(submissionDate) : null,
     application_status: applicationStatus,
-    mandate_status: mandateStatus,
-    allotment_status: allotmentStatus,
+    mandate_status: "UNKNOWN",
+    allotment_status: "UNKNOWN",
     notes: notes || null,
   };
   const applicationFingerprint = JSON.stringify(applicationPayload);
@@ -582,7 +577,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     mutationFn: () =>
       apiRequest<CalculationResponse>("/api/applications/preview", session!, {
         method: "POST",
-        body: JSON.stringify(applicationPayload),
+        body: JSON.stringify(validation.validate(applicationCreateSchema, applicationPayload)),
       }),
     onSuccess: (result) =>
       setReviewedApplication({ fingerprint: applicationFingerprint, data: result.data }),
@@ -599,10 +594,8 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
         ? {
             application_number: applicationNumber || null,
             external_reference: externalReference || null,
-            submission_date: submissionDate ? new Date(submissionDate).toISOString() : null,
+            submission_date: submissionDate ? toIsoDateTime(submissionDate) : null,
             application_status: applicationStatus,
-            mandate_status: mandateStatus,
-            allotment_status: allotmentStatus,
             notes: notes || null,
           }
         : applicationPayload;
@@ -611,11 +604,18 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
         session,
         {
           method: editing ? "PATCH" : "POST",
-          body: JSON.stringify(body),
+          body: JSON.stringify(
+            editing
+              ? validation.validate(applicationUpdateSchema, body)
+              : validation.validate(applicationCreateSchema, body),
+          ),
         },
       );
     },
-    onSuccess: () => navigate("/applications/list"),
+    onSuccess: () =>
+      navigate("/applications/list", {
+        state: { successMessage: editing ? "Application updated." : "Application created." },
+      }),
   });
   const application = detail.data?.data;
   useEffect(() => {
@@ -628,65 +628,78 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     setExternalReference(application.external_reference ?? "");
     setSubmissionDate(application.submission_date?.slice(0, 10) ?? "");
     setApplicationStatus(application.application_status);
-    setMandateStatus(application.mandate_status);
-    setAllotmentStatus(application.allotment_status);
     setNotes(application.notes ?? "");
   }, [application, editing, ipoId]);
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold text-navy">
-          {editing ? "Edit application" : "Add application"}
-        </h1>
-        <p className="mt-2 text-base text-muted">
-          Choose an issue, a specific account, and a configured category. Eligibility is checked for
-          this account.
-        </p>
-      </header>
-      <Card>
+    <RouteFormDrawer
+      title={editing ? "Edit application" : "Add application"}
+      description="Choose an issue, an account, and a configured category. Existing manual records keep their calculation and rule version."
+      cancelTo="/applications/list"
+      formId="application-form"
+      submitLabel="Save application"
+      busy={mutation.isPending}
+      dirty={dirty}
+      disabled={
+        Boolean(detail.error || lists.error) ||
+        (editing && !application) ||
+        (!editing &&
+          (!ipoId ||
+            !accountId ||
+            !categoryId ||
+            !price ||
+            reviewedApplication?.fingerprint !== applicationFingerprint))
+      }
+    >
+      <form
+        id="application-form"
+        className="space-y-5"
+        noValidate
+        onChangeCapture={() => setDirty(true)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          mutation.mutate();
+        }}
+      >
+        {editing && detail.isLoading ? <p role="status">Loading application…</p> : null}
+        {detail.error ? <ErrorMessage error={detail.error} /> : null}
         {lists.error ? <ErrorMessage error={lists.error} /> : null}
         {!editing ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="font-semibold">
-              IPO
-              <select
-                className={fieldClass}
+          <FormSection title="Issue and account">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SearchableFormSelect
+                label="IPO"
+                required
+                error={validation.errors.ipo_id}
                 value={ipoId}
+                placeholder="Choose an IPO"
+                options={lists.ipos.map((item) => ({
+                  value: item.id,
+                  label: `${item.symbol} — ${item.company_name}`,
+                }))}
                 onChange={(event) => {
                   setIpoId(event.target.value);
                   setCategoryId("");
                   setPrice("");
                 }}
-              >
-                <option value="">Choose an IPO</option>
-                {lists.ipos.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.symbol} — {item.company_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="font-semibold">
-              Demat account
-              <select
-                className={fieldClass}
+              />
+              <SearchableFormSelect
+                label="Demat account"
+                required
+                error={validation.errors.demat_account_id}
                 value={accountId}
-                onChange={(event) => setAccountId(event.target.value)}
-              >
-                <option value="">Choose an active account</option>
-                {lists.accounts
+                placeholder="Choose an active account"
+                options={lists.accounts
                   .filter((account) => account.account_status === "active" && !account.archived_at)
-                  .map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.holder_name} — {account.masked_demat_identifier}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label className="font-semibold">
-              Application category
-              <select
-                className={fieldClass}
+                  .map((account) => ({
+                    value: account.id,
+                    label: `${account.holder_name} — ${account.masked_demat_identifier}`,
+                  }))}
+                onChange={(event) => setAccountId(event.target.value)}
+              />
+              <FormSelect
+                label="Application category"
+                error={validation.errors.category_id}
+                required
                 value={categoryId}
                 onChange={(event) => setCategoryId(event.target.value)}
               >
@@ -696,23 +709,20 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                     {item.category} (rules v{item.rule_version})
                   </option>
                 ))}
-              </select>
-            </label>
-            <label className="font-semibold">
-              Lots
-              <input
-                className={fieldClass}
+              </FormSelect>
+              <FormInput
+                label="Lots"
+                error={validation.errors.lots}
+                required
                 type="number"
                 min="1"
                 step="1"
                 value={lots}
                 onChange={(event) => setLots(event.target.value)}
               />
-            </label>
-            <label className="font-semibold">
-              Price type
-              <select
-                className={fieldClass}
+              <FormSelect
+                label="Price type"
+                error={validation.errors.price_type}
                 value={priceType}
                 onChange={(event) => {
                   setPriceType(event.target.value as "BID" | "CUT_OFF");
@@ -721,49 +731,46 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
               >
                 <option value="CUT_OFF">Cut-off</option>
                 <option value="BID">Bid price</option>
-              </select>
-            </label>
-            <label className="font-semibold">
-              Price
-              <input
-                className={fieldClass}
+              </FormSelect>
+              <FormInput
+                label="Price"
+                error={validation.errors.price}
+                required
                 inputMode="decimal"
                 value={price || (priceType === "CUT_OFF" ? (ipo?.cut_off_price ?? "") : "")}
                 onChange={(event) => setPrice(event.target.value)}
               />
-            </label>
-            {activeCategory?.category === "SHAREHOLDER" ? (
-              <label className="font-semibold">
-                Shareholder shares on configured record date
-                <input
-                  className={fieldClass}
+              {activeCategory?.category === "SHAREHOLDER" ? (
+                <FormInput
+                  label="Shareholder shares on configured record date"
+                  error={validation.errors.shareholder_shares}
                   type="number"
                   min="0"
                   value={shareholderShares}
                   onChange={(event) => setShareholderShares(event.target.value)}
                 />
-              </label>
-            ) : null}
-            {activeCategory?.eligibility_conditions.map((condition) => (
-              <label
-                key={condition.id}
-                className="flex min-h-touch items-center gap-3 rounded-lg border border-border p-3 sm:col-span-2"
-              >
-                <input
-                  className="size-5"
-                  type="checkbox"
-                  checked={eligibilityAnswers[condition.id] === true}
-                  onChange={(event) =>
-                    setEligibilityAnswers((current) => ({
-                      ...current,
-                      [condition.id]: event.target.checked,
-                    }))
-                  }
-                />
-                <span>{condition.description}</span>
-              </label>
-            ))}
-          </div>
+              ) : null}
+              {activeCategory?.eligibility_conditions.map((condition) => (
+                <label
+                  key={condition.id}
+                  className="flex min-h-touch items-center gap-3 rounded-lg border border-border p-3 sm:col-span-2"
+                >
+                  <input
+                    className="size-5"
+                    type="checkbox"
+                    checked={eligibilityAnswers[condition.id] === true}
+                    onChange={(event) =>
+                      setEligibilityAnswers((current) => ({
+                        ...current,
+                        [condition.id]: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>{condition.description}</span>
+                </label>
+              ))}
+            </div>
+          </FormSection>
         ) : (
           <p className="text-muted">
             Calculation inputs and rule version are preserved and cannot be changed here.
@@ -794,86 +801,50 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
             checked against the configured issue rules.
           </p>
         ) : null}
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <label className="font-semibold">
-            Application number
-            <input
-              className={fieldClass}
+        <FormSection title="Record details">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormInput
+              label="Application number"
+              error={validation.errors.application_number}
               value={applicationNumber}
               onChange={(event) => setApplicationNumber(event.target.value)}
             />
-          </label>
-          <label className="font-semibold">
-            External reference
-            <input
-              className={fieldClass}
+            <FormInput
+              label="External reference"
+              error={validation.errors.external_reference}
               value={externalReference}
               onChange={(event) => setExternalReference(event.target.value)}
             />
-          </label>
-          <label className="font-semibold">
-            Submission date
-            <input
-              className={fieldClass}
+            <FormInput
+              label="Submission date"
+              error={validation.errors.submission_date}
               type="date"
               value={submissionDate}
               onChange={(event) => setSubmissionDate(event.target.value)}
             />
-          </label>
-          <StatusSelect
-            label="Application status"
-            value={applicationStatus}
-            statuses={statuses}
-            onChange={setApplicationStatus}
-          />
-          <StatusSelect
-            label="Mandate status"
-            value={mandateStatus}
-            statuses={["UNKNOWN", "PENDING", "APPROVED", "REJECTED", "FAILED", "NOT_REQUIRED"]}
-            onChange={setMandateStatus}
-          />
-          <StatusSelect
-            label="Allotment status"
-            value={allotmentStatus}
-            statuses={["UNKNOWN", "PENDING", "ALLOTTED", "PARTIALLY_ALLOTTED", "NOT_ALLOTTED"]}
-            onChange={setAllotmentStatus}
-          />
-          <label className="font-semibold sm:col-span-2">
-            Notes
-            <textarea
-              className={fieldClass}
+            <StatusSelect
+              label="Application status"
+              value={applicationStatus}
+              statuses={statuses}
+              onChange={setApplicationStatus}
+            />
+            <FormTextarea
+              label="Notes"
+              error={validation.errors.notes}
+              fieldClassName="sm:col-span-2"
               rows={3}
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
             />
-          </label>
-        </div>
+          </div>
+        </FormSection>
         {mutation.error ? (
           <p role="alert" className="mt-4 text-danger">
             {errorMessage(mutation.error)}
           </p>
         ) : null}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Button
-            disabled={
-              mutation.isPending ||
-              (!editing &&
-                (!ipoId ||
-                  !accountId ||
-                  !categoryId ||
-                  !price ||
-                  reviewedApplication?.fingerprint !== applicationFingerprint))
-            }
-            onClick={() => mutation.mutate()}
-          >
-            {mutation.isPending ? "Saving…" : "Save application"}
-          </Button>
-          <Link className={linkClass} to="/applications/list">
-            Cancel
-          </Link>
-        </div>
-      </Card>
-    </div>
+      </form>
+    </RouteFormDrawer>
   );
 }
 
@@ -930,8 +901,6 @@ export function ApplicationDetailsPage() {
             ["Application number", item.application_number ?? "Not recorded"],
             ["External reference", item.external_reference ?? "Not recorded"],
             ["Application status", prettyStatus(item.application_status)],
-            ["Mandate status", prettyStatus(item.mandate_status)],
-            ["Allotment status", prettyStatus(item.allotment_status)],
             ["Rule version", item.rule_version],
           ].map(([label, value]) => (
             <div key={label}>
@@ -949,14 +918,17 @@ export function ApplicationDetailsPage() {
           </pre>
         </details>
         {archive.error ? <ErrorMessage error={archive.error} /> : null}
-        <Button
+        <ConfirmButton
           className="mt-5"
           variant="outline"
           disabled={archive.isPending}
-          onClick={() => archive.mutate()}
+          title="Archive this record?"
+          description="This record will be removed from the active list."
+          confirmLabel="Archive"
+          onConfirm={() => archive.mutateAsync()}
         >
           Archive application
-        </Button>
+        </ConfirmButton>
       </Card>
     </div>
   );
@@ -1260,8 +1232,6 @@ export function ApplicationImportPage() {
     ["external_reference", "External reference"],
     ["submission_date", "Submission date"],
     ["application_status", "Application status"],
-    ["mandate_status", "Mandate status"],
-    ["allotment_status", "Allotment status"],
     ["notes", "Notes"],
   ] as const;
   const previewMutation = useMutation({
@@ -1577,17 +1547,17 @@ function ImportReport({ importId }: { importId: string }) {
         ))}
       </div>
       {item.import.status === "confirmed" ? (
-        <Button
+        <ConfirmButton
           className="mt-4"
           variant="outline"
           disabled={reverse.isPending}
-          onClick={() => {
-            if (window.confirm("Archive only applications created by this import, if unchanged?"))
-              reverse.mutate();
-          }}
+          title="Confirm this action"
+          description="Archive only applications created by this import, if unchanged?"
+          confirmLabel="Continue"
+          onConfirm={() => reverse.mutateAsync()}
         >
           Reverse import
-        </Button>
+        </ConfirmButton>
       ) : null}
       {reverse.error ? <ErrorMessage error={reverse.error} /> : null}
     </Card>

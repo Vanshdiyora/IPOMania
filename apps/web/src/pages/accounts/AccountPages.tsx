@@ -10,7 +10,11 @@ import type { z } from "@ipo-mania/validation";
 import { dematAccountSchema } from "@ipo-mania/validation";
 import type { AccountImportPreviewRow, DematAccount } from "@ipo-mania/shared";
 import { useAuth } from "../../auth/useAuth";
+import { ConfirmButton } from "../../components/ui/ConfirmButton";
 import { Button } from "../../components/ui/Button";
+import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
+import { RouteFormDrawer } from "../../components/ui/FormDrawer";
+import { FormSection } from "../../components/ui/FormSection";
 import { Card } from "../../components/ui/Card";
 import { ApiRequestError, apiRequest } from "../../lib/api";
 
@@ -458,7 +462,11 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
   const navigate = useNavigate();
   const client = useQueryClient();
   const [formError, setFormError] = useState("");
-  const { data: loadedAccount, error: loadError } = useQuery({
+  const {
+    data: loadedAccount,
+    error: loadError,
+    isLoading: loadingAccount,
+  } = useQuery({
     queryKey: ["accounts", accountId],
     enabled: Boolean(session && editing && accountId),
     queryFn: () => apiRequest<AccountResponse>(`/api/accounts/${accountId}`, session!),
@@ -467,7 +475,7 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<AccountValues, unknown, ValidAccountValues>({
     resolver: zodResolver(dematAccountSchema),
     defaultValues: blankAccount,
@@ -475,7 +483,7 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
 
   useEffect(() => {
     const account = loadedAccount?.data;
-    if (!account) return;
+    if (!account || isDirty) return;
     reset({
       holder_name: account.holder_name,
       broker_name: account.broker_name,
@@ -486,7 +494,7 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
       account_status: account.account_status,
       notes: account.notes,
     });
-  }, [loadedAccount, reset]);
+  }, [loadedAccount, reset, isDirty]);
 
   useEffect(() => {
     if (loadError instanceof ApiRequestError && loadError.status === 401) markSessionExpired();
@@ -507,7 +515,9 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
         }),
       });
       await client.invalidateQueries({ queryKey: ["accounts"] });
-      navigate(editing ? `/accounts/${accountId}` : "/accounts/list");
+      navigate(editing ? `/accounts/${accountId}` : "/accounts/list", {
+        state: { successMessage: editing ? "Account updated." : "Account created." },
+      });
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 401) markSessionExpired();
       if (error instanceof ApiRequestError && error.status === 409) {
@@ -519,27 +529,31 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold text-navy">
-          {editing ? "Edit demat account" : "Add demat account"}
-        </h1>
-        <p className="mt-2 text-base text-muted">
-          Enter the masked account details only. Do not enter a full account number or password.
-        </p>
-      </header>
+    <RouteFormDrawer
+      title={editing ? "Edit demat account" : "Add demat account"}
+      description="Enter masked account details only. Do not enter a full account number or password."
+      cancelTo={editing && accountId ? `/accounts/${accountId}` : "/accounts/list"}
+      formId="account-form"
+      submitLabel="Save account"
+      busy={isSubmitting}
+      disabled={editing && (loadingAccount || Boolean(loadError) || !loadedAccount)}
+      dirty={isDirty}
+    >
+      {editing && loadingAccount ? <p role="status">Loading account…</p> : null}
       {loadError ? <ErrorNotice error={loadError} /> : null}
-      <Card>
-        <form className="space-y-5" noValidate onSubmit={handleSubmit(save)}>
+      <form id="account-form" className="space-y-5" noValidate onSubmit={handleSubmit(save)}>
+        <FormSection title="Account details">
           <div className="grid gap-5 sm:grid-cols-2">
             <FormInput
               label="Account holder name"
               error={errors.holder_name?.message}
+              required
               {...register("holder_name")}
             />
             <FormInput
               label="Broker name"
               error={errors.broker_name?.message}
+              required
               {...register("broker_name")}
             />
             <FormInput
@@ -559,6 +573,7 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
               label="Masked demat identifier"
               error={errors.masked_demat_identifier?.message}
               placeholder="For example, XXXX1234"
+              required
               {...register("masked_demat_identifier")}
             />
             <FormInput
@@ -576,30 +591,20 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
               <option value="closed">Closed</option>
             </FormSelect>
           </div>
-          <label className="block text-base font-semibold text-ink">
-            Notes (optional)
-            <textarea className={`${inputClass} min-h-28 py-3`} rows={4} {...register("notes")} />
-            <FieldError message={errors.notes?.message} />
-          </label>
-          {formError ? (
-            <p role="alert" className="text-base text-danger">
-              {formError}
-            </p>
-          ) : null}
-          <div className="flex flex-wrap gap-3">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving…" : "Save account"}
-            </Button>
-            <Link
-              className={secondaryLinkClass}
-              to={editing && accountId ? `/accounts/${accountId}` : "/accounts/list"}
-            >
-              Cancel
-            </Link>
-          </div>
-        </form>
-      </Card>
-    </div>
+        </FormSection>
+        <FormTextarea
+          label="Notes (optional)"
+          rows={4}
+          error={errors.notes?.message}
+          {...register("notes")}
+        />
+        {formError ? (
+          <p role="alert" className="text-base text-danger">
+            {formError}
+          </p>
+        ) : null}
+      </form>
+    </RouteFormDrawer>
   );
 }
 
@@ -682,13 +687,16 @@ export function AccountDetailsPage() {
           ) : null}
           <div className="mt-6 flex flex-wrap gap-3 border-t border-border pt-5">
             {!account.archived_at ? (
-              <Button
+              <ConfirmButton
                 variant="outline"
                 disabled={action.isPending}
-                onClick={() => action.mutate("archive")}
+                title="Archive this record?"
+                description="This record will be removed from the active list."
+                confirmLabel="Archive"
+                onConfirm={() => action.mutateAsync("archive")}
               >
                 Archive account
-              </Button>
+              </ConfirmButton>
             ) : (
               <>
                 <Button
@@ -698,21 +706,17 @@ export function AccountDetailsPage() {
                 >
                   Restore account
                 </Button>
-                <Button
+                <ConfirmButton
                   variant="outline"
                   className="border-danger text-danger"
                   disabled={action.isPending}
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "Permanently delete this archived account? This cannot be undone.",
-                      )
-                    )
-                      action.mutate("delete");
-                  }}
+                  title="Confirm this action"
+                  description="Permanently delete this archived account? This cannot be undone."
+                  confirmLabel="Continue"
+                  onConfirm={() => action.mutateAsync("delete")}
                 >
                   Delete archived account
-                </Button>
+                </ConfirmButton>
               </>
             )}
           </div>
@@ -1049,20 +1053,16 @@ export function ImportHistoryPage() {
               Download error report
             </Button>
             {detail.import.status === "confirmed" ? (
-              <Button
+              <ConfirmButton
                 variant="outline"
                 disabled={reverse.isPending}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "Reverse this import by archiving all unchanged accounts created by it?",
-                    )
-                  )
-                    reverse.mutate();
-                }}
+                title="Confirm this action"
+                description="Reverse this import by archiving all unchanged accounts created by it?"
+                confirmLabel="Continue"
+                onConfirm={() => reverse.mutateAsync()}
               >
                 {reverse.isPending ? "Reversing…" : "Reverse import"}
-              </Button>
+              </ConfirmButton>
             ) : null}
           </div>
           {actionError ? (
@@ -1172,45 +1172,6 @@ function FilterInput({
       />
     </label>
   );
-}
-
-function FormInput({
-  label,
-  error,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string }) {
-  const id = props.id ?? props.name;
-  return (
-    <label className="block text-base font-semibold text-ink" htmlFor={id}>
-      {label}
-      <input id={id} className={inputClass} aria-invalid={Boolean(error)} {...props} />
-      <FieldError message={error} />
-    </label>
-  );
-}
-
-function FormSelect({
-  label,
-  error,
-  children,
-  ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string; error?: string }) {
-  const id = props.id ?? props.name;
-  return (
-    <label className="block text-base font-semibold text-ink" htmlFor={id}>
-      {label}
-      <select id={id} className={inputClass} aria-invalid={Boolean(error)} {...props}>
-        {children}
-      </select>
-      <FieldError message={error} />
-    </label>
-  );
-}
-
-function FieldError({ message }: { message?: string }) {
-  return message ? (
-    <span className="mt-1 block text-sm font-normal text-danger">{message}</span>
-  ) : null;
 }
 
 function DetailItem({ label, value }: { label: string; value: string }) {

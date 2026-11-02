@@ -195,8 +195,12 @@ test("dashboard exposes analytics, filters and downloadable reports", async ({ p
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "Dashboard & analytics" })).toBeVisible();
-  await expect(page.getByText("INR 2,500", { exact: true })).toBeVisible();
-  await expect(page.getByText("Unavailable").first()).toBeVisible();
+  await expect(page.getByRole("region", { name: "Dashboard totals" })).toBeVisible();
+  const navigation = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(navigation.getByRole("button", { name: "Capital" })).toHaveCount(0);
+  await expect(navigation.getByRole("button", { name: "Mandates" })).toHaveCount(0);
+  await expect(navigation.getByRole("button", { name: "Allotments" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Capital summary" })).toHaveCount(0);
   await expect(page.getByRole("img", { name: "Applications grouped by status" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Dashboard Test IPO (DASH)" }).first()).toBeVisible();
   expect(await auditAccessibility(page)).toEqual([]);
@@ -208,6 +212,14 @@ test("dashboard exposes analytics, filters and downloadable reports", async ({ p
 
   await page.getByLabel("Category filter").selectOption("RETAIL");
   await expect(page.getByLabel("Category filter")).toHaveValue("RETAIL");
+});
+
+test("financial pages are unavailable in the web app", async ({ page }) => {
+  await prepareDashboard(page);
+  for (const path of ["/mandates", "/allotments", "/capital", "/capital/refunds"]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { name: "We couldn't find this page" })).toBeVisible();
+  }
 });
 
 test("dashboard remains usable across responsive viewports with accessible filters", async ({

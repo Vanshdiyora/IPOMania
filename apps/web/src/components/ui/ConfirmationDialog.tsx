@@ -30,7 +30,9 @@ export function ConfirmationDialog({
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
-  const cancel = () => { if (!busy) onCancel(); };
+  const cancel = () => {
+    if (!busy) onCancel();
+  };
   useModalLayer(open, panelRef, cancel, "[data-confirmation-cancel]");
 
   if (!open) return null;
@@ -40,7 +42,8 @@ export function ConfirmationDialog({
         className="absolute inset-0 bg-slate-950/50"
         type="button"
         aria-label="Cancel"
-        onClick={cancel} disabled={busy}
+        onClick={cancel}
+        disabled={busy}
       />
       <div
         ref={panelRef}

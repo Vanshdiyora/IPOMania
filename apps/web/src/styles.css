@@ -229,3 +229,23 @@ a {
 .link-animated:focus-visible::after {
   width: 100%;
 }
+
+/* Closing surfaces retain their focus and scroll lock until the transition ends. */
+.drawer-panel[data-state="closed"] {
+  animation: drawer-panel-out 180ms ease-in forwards;
+}
+.drawer-backdrop[data-state="closed"] {
+  animation: drawer-backdrop-in 180ms ease-in reverse forwards;
+}
+@keyframes drawer-panel-out {
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  button {
+    min-height: 44px;
+  }
+}

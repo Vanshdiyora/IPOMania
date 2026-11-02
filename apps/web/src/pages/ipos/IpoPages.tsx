@@ -1,6 +1,7 @@
+import { toIsoDateTime, toLocalDateTime, formValuesFromRecord } from "../../lib/formValues";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -15,7 +16,12 @@ import type {
 import { ipoCategoryConfigurationSchema, ipoSchema, ipoStatusSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
 import { useAuth } from "../../auth/useAuth";
+import { ConfirmButton } from "../../components/ui/ConfirmButton";
 import { Button } from "../../components/ui/Button";
+import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
+import { FormSection } from "../../components/ui/FormSection";
+import { ConfirmationDialog } from "../../components/ui/ConfirmationDialog";
+import { RouteFormDrawer } from "../../components/ui/FormDrawer";
 import { Card } from "../../components/ui/Card";
 import { ActiveFilterChips } from "../../components/filters/ActiveFilterChips";
 import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
@@ -377,7 +383,6 @@ export function IpoCatalogDetailsPage() {
           <Detail label="Issue size" value={ipo.issue_size ?? "Not set"} />
           <Detail label="Opening date" value={formatDate(ipo.opening_date)} />
           <Detail label="Closing date" value={formatDate(ipo.closing_date)} />
-          <Detail label="Allotment date" value={formatDate(ipo.allotment_date)} />
           <Detail label="Listing date" value={formatDate(ipo.listing_date)} />
           <Detail
             label="Data source"
@@ -449,13 +454,16 @@ export function IpoDetailsPage() {
               <Link className={secondaryLinkClass} to={`/ipos/${ipo.id}/edit`}>
                 Edit IPO
               </Link>
-              <Button
+              <ConfirmButton
                 variant="outline"
                 disabled={archive.isPending}
-                onClick={() => archive.mutate()}
+                title="Archive this record?"
+                description="This record will be removed from the active list."
+                confirmLabel="Archive"
+                onConfirm={() => archive.mutateAsync()}
               >
                 Archive
-              </Button>
+              </ConfirmButton>
             </>
           ) : null}
         </div>
@@ -470,7 +478,6 @@ export function IpoDetailsPage() {
           <Detail label="Issue size" value={ipo.issue_size} />
           <Detail label="Opening date" value={formatDate(ipo.opening_date)} />
           <Detail label="Closing date" value={formatDate(ipo.closing_date)} />
-          <Detail label="Allotment date" value={formatDate(ipo.allotment_date)} />
           <Detail label="Listing date" value={formatDate(ipo.listing_date)} />
           <Detail label="Data source" value={ipo.data_source} />
           <Detail label="Source reference" value={ipo.source_reference ?? "Not provided"} />
@@ -521,6 +528,7 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState("");
   const [verificationTime, setVerificationTime] = useState("");
+  const loadedRecordId = useRef<string | null>(null);
   const queryClient = useQueryClient();
   const existing = useQuery({
     queryKey: ["ipo", ipoId],
@@ -533,9 +541,10 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
   });
 
   useEffect(() => {
-    if (existing.data?.data) {
-      const { last_verified_at, ...values } = existing.data.data;
-      form.reset(values);
+    if (existing.data?.data && loadedRecordId.current !== existing.data.data.id) {
+      loadedRecordId.current = existing.data.data.id;
+      const { last_verified_at } = existing.data.data;
+      form.reset(formValuesFromRecord(blankIpo, existing.data.data));
       setVerificationTime(last_verified_at ? toLocalDateTime(last_verified_at) : "");
     }
   }, [existing.data, form]);
@@ -546,7 +555,7 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
     const payload = {
       ...values,
       source_reference: values.source_reference || null,
-      last_verified_at: verificationTime ? new Date(verificationTime).toISOString() : null,
+      last_verified_at: verificationTime ? toIsoDateTime(verificationTime) : null,
     };
     try {
       const response = await apiRequest<IpoResponse>(
@@ -555,7 +564,9 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
         { method: editing ? "PATCH" : "POST", body: JSON.stringify(payload) },
       );
       await queryClient.invalidateQueries({ queryKey: ["ipos"] });
-      navigate(`/ipos/${response.data.id}`);
+      navigate(`/ipos/${response.data.id}`, {
+        state: { successMessage: editing ? "IPO updated." : "IPO created." },
+      });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "The IPO could not be saved.");
     }
@@ -565,84 +576,91 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
   if (editing && existing.error) return <ErrorNotice error={existing.error} />;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold text-navy">{editing ? "Edit IPO" : "Add IPO"}</h1>
-        <p className="mt-2 text-muted">
-          Enter issue details from a source you can review. Manual values are never marked verified
-          automatically.
-        </p>
-      </header>
+    <RouteFormDrawer
+      title={editing ? "Edit IPO" : "Add IPO"}
+      description="Enter issue details from a source you can review. Manual values are never marked verified automatically."
+      cancelTo={editing ? `/ipos/${ipoId}` : "/ipos?source=personal"}
+      formId="personal-ipo-form"
+      submitLabel={editing ? "Save changes" : "Add IPO"}
+      busy={form.formState.isSubmitting}
+      dirty={
+        form.formState.isDirty ||
+        verificationTime !==
+          (existing.data?.data.last_verified_at
+            ? toLocalDateTime(existing.data.data.last_verified_at)
+            : "")
+      }
+    >
       {errorMessage ? (
-        <p role="alert" className="text-danger">
+        <p role="alert" className="mb-4 text-danger">
           {errorMessage}
         </p>
       ) : null}
-      <Card>
-        <form className="grid gap-4 sm:grid-cols-2" onSubmit={submit}>
-          <TextField form={form} name="company_name" label="Company name" />
-          <TextField form={form} name="symbol" label="Symbol" />
-          <TextField form={form} name="ipo_type" label="IPO type" />
-          <TextField form={form} name="exchange" label="Exchange" />
-          <TextField form={form} name="issue_price_min" label="Issue price minimum" />
-          <TextField form={form} name="issue_price_max" label="Issue price maximum" />
-          <TextField form={form} name="cut_off_price" label="Cut-off price (optional)" />
-          <TextField form={form} name="lot_size" label="Lot size" inputMode="numeric" />
-          <TextField form={form} name="issue_size" label="Issue size" />
-          <SelectField form={form} name="status" label="Status">
-            <option value="" disabled>
-              Choose a status
-            </option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {label(status)}
+      <form id="personal-ipo-form" className="space-y-5" onSubmit={submit} noValidate>
+        <FormSection title="Company details">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField form={form} name="company_name" label="Company name" />
+            <TextField form={form} name="symbol" label="Symbol" />
+            <TextField form={form} name="ipo_type" label="IPO type" />
+            <TextField form={form} name="exchange" label="Exchange" />
+          </div>
+        </FormSection>
+        <FormSection title="Issue and pricing">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField form={form} name="issue_price_min" label="Issue price minimum" />
+            <TextField form={form} name="issue_price_max" label="Issue price maximum" />
+            <TextField form={form} name="cut_off_price" label="Cut-off price (optional)" />
+            <TextField form={form} name="lot_size" label="Lot size" inputMode="numeric" />
+            <TextField form={form} name="issue_size" label="Issue size" />
+            <SelectField form={form} name="status" label="Status">
+              <option value="" disabled>
+                Choose a status
               </option>
-            ))}
-          </SelectField>
-          <TextField form={form} name="opening_date" label="Opening date" type="date" />
-          <TextField form={form} name="closing_date" label="Closing date" type="date" />
-          <TextField
-            form={form}
-            name="allotment_date"
-            label="Allotment date (optional)"
-            type="date"
-          />
-          <TextField form={form} name="listing_date" label="Listing date (optional)" type="date" />
-          <SelectField form={form} name="data_source" label="Data source">
-            <option value="MANUAL">Manual entry</option>
-            <option value="PUBLISHED_SOURCE">Published source, entered manually</option>
-          </SelectField>
-          <label className="block text-sm font-semibold text-ink sm:col-span-2">
-            Source reference (optional)
-            <input
-              className={inputClass}
+              {statuses.map((status) => (
+                <option key={status} value={status}>
+                  {label(status)}
+                </option>
+              ))}
+            </SelectField>
+          </div>
+        </FormSection>
+        <FormSection title="Key dates">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField form={form} name="opening_date" label="Opening date" type="date" />
+            <TextField form={form} name="closing_date" label="Closing date" type="date" />
+            <TextField
+              form={form}
+              name="listing_date"
+              label="Listing date (optional)"
+              type="date"
+            />
+          </div>
+        </FormSection>
+        <FormSection title="Source and verification">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <SelectField form={form} name="data_source" label="Data source">
+              <option value="MANUAL">Manual entry</option>
+              <option value="PUBLISHED_SOURCE">Published source, entered manually</option>
+            </SelectField>
+            <FormTextarea
+              label="Source reference (optional)"
+              fieldClassName="sm:col-span-2"
+              error={form.formState.errors.source_reference?.message}
               {...form.register("source_reference")}
               placeholder="Official document URL or publication reference"
             />
-          </label>
-          <label className="block text-sm font-semibold text-ink sm:col-span-2">
-            Last verified at (optional)
-            <input
-              className={inputClass}
+            <FormInput
+              label="Last verified at (optional)"
+              fieldClassName="sm:col-span-2"
               type="datetime-local"
               value={verificationTime}
               onChange={(event) => setVerificationTime(event.target.value)}
+              hint="Leave blank unless you personally checked the referenced source."
             />
-            <span className="mt-1 block font-normal text-muted">
-              Leave blank unless you personally checked the referenced source.
-            </span>
-          </label>
-          <div className="flex gap-3 sm:col-span-2">
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Saving…" : editing ? "Save changes" : "Add IPO"}
-            </Button>
-            <Link className={secondaryLinkClass} to={editing ? `/ipos/${ipoId}` : "/ipos"}>
-              Cancel
-            </Link>
           </div>
-        </form>
-      </Card>
-    </div>
+        </FormSection>
+      </form>
+    </RouteFormDrawer>
   );
 }
 
@@ -650,6 +668,10 @@ export function IpoCategoryConfigurationPage() {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  const [pendingCategory, setPendingCategory] = useState<IpoCategoryCode | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [categoryDirty, setCategoryDirty] = useState(false);
+  const [categoryError, setCategoryError] = useState(false);
   const [category, setCategory] = useState<IpoCategoryCode>("RETAIL");
   const [conditionId, setConditionId] = useState("");
   const [conditionDescription, setConditionDescription] = useState("");
@@ -672,20 +694,25 @@ export function IpoCategoryConfigurationPage() {
         body: JSON.stringify(configuration),
       }),
     onSuccess: async () => {
+      setCategoryDirty(false);
+      setCategoryError(false);
       setMessage("A new rule version was saved. Earlier versions remain unchanged.");
       await queryClient.invalidateQueries({ queryKey: ["ipo-categories", ipoId] });
     },
-    onError: (error) =>
-      setMessage(error instanceof Error ? error.message : "Rules were not saved."),
+    onError: (error) => {
+      setCategoryError(true);
+      setMessage(error instanceof Error ? error.message : "Rules were not saved.");
+    },
   });
   const configurations = rulesQuery.data?.data.configurations ?? [];
   const latest = latestByCategory(configurations);
   const existing = latest.get(category);
 
   useEffect(() => {
+    if (categoryDirty) return;
     if (existing) setForm(toRuleForm(existing));
     else setForm(emptyRuleForm());
-  }, [category, existing]);
+  }, [category, existing, categoryDirty]);
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -708,14 +735,19 @@ export function IpoCategoryConfigurationPage() {
       minimum_price_increment: form.minimum_price_increment || null,
       source_reference: form.source_reference || null,
       rule_source: form.rule_source,
-      last_verified_at: form.last_verified_at
-        ? new Date(form.last_verified_at).toISOString()
-        : null,
+      last_verified_at: form.last_verified_at ? toIsoDateTime(form.last_verified_at) : null,
     });
     if (!parsed.success) {
+      setCategoryError(true);
+      setFieldErrors(
+        Object.fromEntries(
+          parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message]),
+        ),
+      );
       setMessage(parsed.error.issues[0]?.message ?? "The category rule configuration is invalid.");
       return;
     }
+    setFieldErrors({});
     createRule.mutate(parsed.data);
   };
 
@@ -725,33 +757,39 @@ export function IpoCategoryConfigurationPage() {
   const ipo = ipoQuery.data.data;
 
   return (
-    <div className="space-y-6">
-      <header>
-        <Link className="text-action underline" to={`/ipos/${ipo.id}`}>
-          Back to IPO
-        </Link>
-        <h1 className="mt-2 text-3xl font-bold text-navy">Category configuration</h1>
-        <p className="mt-2 text-muted">
-          {ipo.company_name} · {ipo.symbol}
-        </p>
-        <p className="mt-2 rounded-lg border border-[#F1D9B3] bg-[#FFF9EF] p-3 text-sm text-ink">
-          Enter the issue-specific values you have sourced. Unknown limits stay unconfigured; they
-          are never treated as unlimited. A new submission creates a new immutable rule version.
-        </p>
-      </header>
+    <RouteFormDrawer
+      title="Category configuration"
+      description={`${ipo.company_name} · ${ipo.symbol}`}
+      cancelTo={`/ipos/${ipo.id}`}
+      formId="category-rule-form"
+      submitLabel="Save new rule version"
+      busy={createRule.isPending}
+      disabled={rulesQuery.isLoading || Boolean(rulesQuery.error)}
+      dirty={categoryDirty}
+    >
+      <p className="mb-4 rounded-lg border border-[#F1D9B3] bg-[#FFF9EF] p-3 text-sm text-ink">
+        Enter issue-specific values you have sourced. Unknown limits stay unconfigured; they are
+        never treated as unlimited. Saving creates a new immutable rule version.
+      </p>
       <Card>
-        <label className="block max-w-sm text-sm font-semibold text-ink">
-          Category
-          <select
-            className={inputClass}
-            value={category}
-            onChange={(event) => setCategory(event.target.value as IpoCategoryCode)}
-          >
-            {categories.map((value) => (
-              <option key={value}>{value}</option>
-            ))}
-          </select>
-        </label>
+        <FormSelect
+          label="Category"
+          fieldClassName="max-w-sm"
+          value={category}
+          onChange={(event) => {
+            const next = event.target.value as IpoCategoryCode;
+            if (categoryDirty) setPendingCategory(next);
+            else {
+              setCategory(next);
+              setFieldErrors({});
+              setMessage("");
+            }
+          }}
+        >
+          {categories.map((value) => (
+            <option key={value}>{value}</option>
+          ))}
+        </FormSelect>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {categories.map((value) => (
             <li key={value} className="rounded-lg border border-border p-3 text-sm">
@@ -766,12 +804,18 @@ export function IpoCategoryConfigurationPage() {
         </ul>
       </Card>
       {message ? (
-        <p role="status" className="text-sm text-ink">
+        <p role={categoryError ? "alert" : "status"} className="my-4 text-sm text-ink">
           {message}
         </p>
       ) : null}
       <Card>
-        <form className="grid gap-4 sm:grid-cols-2" onSubmit={submit}>
+        <form
+          id="category-rule-form"
+          className="grid gap-4 sm:grid-cols-2"
+          onSubmit={submit}
+          noValidate
+          onChangeCapture={() => setCategoryDirty(true)}
+        >
           <SelectRuleField
             label="Lot limits"
             value={form.lot_limit_status}
@@ -784,9 +828,27 @@ export function IpoCategoryConfigurationPage() {
               }))
             }
           />
-          <TextRuleField form={form} setForm={setForm} name="lot_increment" label="Lot increment" />
-          <TextRuleField form={form} setForm={setForm} name="minimum_lots" label="Minimum lots" />
-          <TextRuleField form={form} setForm={setForm} name="maximum_lots" label="Maximum lots" />
+          <TextRuleField
+            errors={fieldErrors}
+            form={form}
+            setForm={setForm}
+            name="lot_increment"
+            label="Lot increment"
+          />
+          <TextRuleField
+            errors={fieldErrors}
+            form={form}
+            setForm={setForm}
+            name="minimum_lots"
+            label="Minimum lots"
+          />
+          <TextRuleField
+            errors={fieldErrors}
+            form={form}
+            setForm={setForm}
+            name="maximum_lots"
+            label="Maximum lots"
+          />
           <SelectRuleField
             label="Investment limits"
             value={form.investment_limit_status}
@@ -802,30 +864,35 @@ export function IpoCategoryConfigurationPage() {
             }
           />
           <TextRuleField
+            errors={fieldErrors}
             form={form}
             setForm={setForm}
             name="minimum_investment"
             label="Minimum investment"
           />
           <TextRuleField
+            errors={fieldErrors}
             form={form}
             setForm={setForm}
             name="maximum_investment"
             label="Maximum investment"
           />
           <TextRuleField
+            errors={fieldErrors}
             form={form}
             setForm={setForm}
             name="reserved_shares"
             label="Reserved shares (optional)"
           />
           <TextRuleField
+            errors={fieldErrors}
             form={form}
             setForm={setForm}
             name="reserved_percentage"
             label="Reserved percentage (optional)"
           />
           <TextRuleField
+            errors={fieldErrors}
             form={form}
             setForm={setForm}
             name="shareholder_record_date"
@@ -833,6 +900,7 @@ export function IpoCategoryConfigurationPage() {
             type="date"
           />
           <TextRuleField
+            errors={fieldErrors}
             form={form}
             setForm={setForm}
             name="minimum_shareholding"
@@ -861,6 +929,7 @@ export function IpoCategoryConfigurationPage() {
             </div>
           </fieldset>
           <TextRuleField
+            errors={fieldErrors}
             form={form}
             setForm={setForm}
             name="minimum_price_increment"
@@ -873,12 +942,14 @@ export function IpoCategoryConfigurationPage() {
             onChange={(value) => updateRuleForm(setForm, "rule_source", value)}
           />
           <TextRuleField
+            errors={fieldErrors}
             form={form}
             setForm={setForm}
             name="source_reference"
             label="Source reference"
           />
           <TextRuleField
+            errors={fieldErrors}
             form={form}
             setForm={setForm}
             name="last_verified_at"
@@ -944,14 +1015,15 @@ export function IpoCategoryConfigurationPage() {
                   </span>
                   <Button
                     variant="outline"
-                    onClick={() =>
+                    onClick={() => {
+                      setCategoryDirty(true);
                       setForm((current) => ({
                         ...current,
                         eligibility_conditions: current.eligibility_conditions.filter(
                           ({ id }) => id !== condition.id,
                         ),
-                      }))
-                    }
+                      }));
+                    }}
                   >
                     Remove
                   </Button>
@@ -965,7 +1037,23 @@ export function IpoCategoryConfigurationPage() {
         </form>
       </Card>
       {rulesQuery.error ? <ErrorNotice error={rulesQuery.error} /> : null}
-    </div>
+      <ConfirmationDialog
+        open={pendingCategory !== null}
+        title="Discard category changes?"
+        description="Switching categories will discard your unsaved edits."
+        confirmLabel="Switch category"
+        cancelLabel="Keep editing"
+        danger
+        onCancel={() => setPendingCategory(null)}
+        onConfirm={() => {
+          if (pendingCategory) setCategory(pendingCategory);
+          setPendingCategory(null);
+          setCategoryDirty(false);
+          setFieldErrors({});
+          setMessage("");
+        }}
+      />
+    </RouteFormDrawer>
   );
 }
 
@@ -1083,7 +1171,7 @@ export function QuotaCalculatorPage() {
       <p className="rounded-lg border border-[#F1D9B3] bg-[#FFF9EF] p-4 text-sm text-ink">
         IPO data and category rules are user-entered and may be unverified. Shareholder information
         and condition answers are your inputs, not verified holdings. This calculator does not
-        confirm allotment or eligibility with an exchange.
+        verify eligibility with an exchange.
       </p>
       {requestError ? (
         <p role="alert" className="text-danger">
@@ -1364,25 +1452,23 @@ function TextRuleField({
   name,
   label,
   type = "text",
+  errors,
 }: {
   form: RuleForm;
   setForm: React.Dispatch<React.SetStateAction<RuleForm>>;
-  name: keyof RuleForm;
+  name: Exclude<keyof RuleForm, "eligibility_conditions" | "allowed_price_types">;
   label: string;
-  type?: string;
+  type?: React.HTMLInputTypeAttribute;
+  errors?: Record<string, string>;
 }) {
-  const value = typeof form[name] === "string" ? (form[name] as string) : "";
   return (
-    <label className="block text-sm font-semibold text-ink">
-      {label}
-      <input
-        className={inputClass}
-        type={type}
-        inputMode={type === "text" ? "decimal" : undefined}
-        value={value}
-        onChange={(event) => updateRuleForm(setForm, name, event.target.value)}
-      />
-    </label>
+    <FormInput
+      label={label}
+      type={type}
+      value={form[name]}
+      error={errors?.[name]}
+      onChange={(event) => updateRuleForm(setForm, name, event.target.value)}
+    />
   );
 }
 
@@ -1398,20 +1484,13 @@ function SelectRuleField({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="block text-sm font-semibold text-ink">
-      {label}
-      <select
-        className={inputClass}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {label.replace(" limits", "") === "Rule source" ? option : labelValue(option)}
-          </option>
-        ))}
-      </select>
-    </label>
+    <FormSelect label={label} value={value} onChange={(event) => onChange(event.target.value)}>
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {labelValue(option)}
+        </option>
+      ))}
+    </FormSelect>
   );
 }
 
@@ -1433,7 +1512,7 @@ function TextField({
   form: ReturnType<typeof useForm<IpoValues, unknown, IpoOutput>>;
   name: keyof IpoValues;
   label: string;
-  type?: string;
+  type?: React.HTMLInputTypeAttribute;
   inputMode?: "numeric" | "decimal";
 }) {
   const nullableField = ["cut_off_price", "allotment_date", "listing_date"].includes(name);
@@ -1443,21 +1522,20 @@ function TextField({
       : nullableField
         ? form.register(name, { setValueAs: (value: string) => (value === "" ? null : value) })
         : form.register(name);
+  const decimal = ["issue_price_min", "issue_price_max", "cut_off_price", "issue_size"].includes(
+    name,
+  );
   return (
-    <label className="block text-sm font-semibold text-ink">
-      {label}
-      <input
-        className={inputClass}
-        type={name === "lot_size" ? "number" : type}
-        inputMode={inputMode}
-        {...registration}
-      />
-      {form.formState.errors[name]?.message ? (
-        <span className="mt-1 block font-normal text-danger">
-          {String(form.formState.errors[name]?.message)}
-        </span>
-      ) : null}
-    </label>
+    <FormInput
+      label={label}
+      type={name === "lot_size" ? "number" : type}
+      min={name === "lot_size" ? 1 : undefined}
+      step={name === "lot_size" ? 1 : undefined}
+      inputMode={decimal ? "decimal" : inputMode}
+      required={!nullableField}
+      error={form.formState.errors[name]?.message}
+      {...registration}
+    />
   );
 }
 
@@ -1473,12 +1551,14 @@ function SelectField({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block text-sm font-semibold text-ink">
-      {label}
-      <select className={inputClass} {...form.register(name)}>
-        {children}
-      </select>
-    </label>
+    <FormSelect
+      label={label}
+      required
+      error={form.formState.errors[name]?.message}
+      {...form.register(name)}
+    >
+      {children}
+    </FormSelect>
   );
 }
 
@@ -1530,12 +1610,6 @@ function formatDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function toLocalDateTime(value: string) {
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
 function label(value: IpoStatus | string) {

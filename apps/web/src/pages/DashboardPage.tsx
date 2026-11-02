@@ -20,25 +20,16 @@ import {
   BriefcaseBusiness,
   Building2,
   CalendarDays,
-  CheckCircle2,
   ChevronRight,
   ClipboardList,
   Clock,
-  CreditCard,
   Download,
   FileSpreadsheet,
   Filter,
-  Percent,
-  RotateCcw,
   TrendingUp,
   X,
 } from "lucide-react";
-import type {
-  CapitalSummary,
-  DashboardAnalytics,
-  DematAccount,
-  IpoRecord,
-} from "@ipo-mania/shared";
+import type { DashboardAnalytics, DematAccount, IpoRecord } from "@ipo-mania/shared";
 import { useAuth } from "../auth/useAuth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -49,7 +40,6 @@ import { ApiRequestError, apiRequest, downloadApiFile } from "../lib/api";
 import { WelcomePage } from "./WelcomePage";
 
 type AnalyticsResponse = { data: DashboardAnalytics };
-type CapitalSummaryResponse = { data: { summaries: CapitalSummary[] } };
 type IpoOptionsResponse = {
   data: { ipos: IpoRecord[]; pagination?: { page: number; total_pages: number } };
 };
@@ -109,16 +99,6 @@ export function DashboardPage() {
         session!,
       ),
   });
-  const capitalQuery = useQuery({
-    queryKey: ["capital", "dashboard-summary", queryString],
-    enabled: Boolean(session),
-    staleTime: 30_000,
-    queryFn: () =>
-      apiRequest<CapitalSummaryResponse>(
-        `/api/capital/summary${queryString ? `?${queryString}` : ""}`,
-        session!,
-      ),
-  });
   const ipoOptionsQuery = useInfiniteQuery({
     queryKey: ["analytics", "ipo-options"],
     enabled: Boolean(session),
@@ -154,11 +134,7 @@ export function DashboardPage() {
       setExportError(error instanceof Error ? error.message : "The report could not be exported."),
   });
 
-  const queryError =
-    analyticsQuery.error ??
-    capitalQuery.error ??
-    ipoOptionsQuery.error ??
-    accountOptionsQuery.error;
+  const queryError = analyticsQuery.error ?? ipoOptionsQuery.error ?? accountOptionsQuery.error;
   useEffect(() => {
     if (queryError instanceof ApiRequestError && queryError.status === 401) {
       markSessionExpired();
@@ -169,19 +145,8 @@ export function DashboardPage() {
   const ipoOptions = ipoOptionsQuery.data?.pages.flatMap((page) => page.data.ipos) ?? [];
   const accountOptions =
     accountOptionsQuery.data?.pages.flatMap((page) => page.data.accounts) ?? [];
-  const capitalSummaries = capitalQuery.data?.data.summaries ?? [];
-  const capitalEvents = analytics?.capital_event_totals ?? [];
-  const currencies = [
-    ...new Set([
-      ...capitalSummaries.map((summary) => summary.currency),
-      ...capitalEvents.map((entry) => entry.currency),
-    ]),
-  ].sort();
   const loading =
-    analyticsQuery.isLoading ||
-    capitalQuery.isLoading ||
-    ipoOptionsQuery.isLoading ||
-    accountOptionsQuery.isLoading;
+    analyticsQuery.isLoading || ipoOptionsQuery.isLoading || accountOptionsQuery.isLoading;
   const optionsError = ipoOptionsQuery.error ?? accountOptionsQuery.error;
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
@@ -209,7 +174,7 @@ export function DashboardPage() {
             Dashboard &amp; Analytics
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Unified view of applications, demat inventory, capital blocking, and allotments.
+            Unified view of applications, demat accounts, and tracked IPOs.
           </p>
         </div>
 
@@ -354,8 +319,8 @@ export function DashboardPage() {
             </div>
           </div>
           <p className="mt-3 text-xs text-muted">
-            Date filters scope application submissions and capital movements. Current inventory is
-            shown for accounts &amp; IPOs.
+            Date filters scope application submissions. Current inventory is shown for accounts
+            &amp; IPOs.
           </p>
         </div>
       </Card>
@@ -374,15 +339,12 @@ export function DashboardPage() {
 
       {/* ─── Core KPI Metric Grid ────────────────────────────────────────── */}
       <section
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         aria-label="Dashboard totals"
         aria-busy={loading}
       >
         {loading ? (
           <>
-            <SkeletonStatCard />
-            <SkeletonStatCard />
-            <SkeletonStatCard />
             <SkeletonStatCard />
             <SkeletonStatCard />
             <SkeletonStatCard />
@@ -407,214 +369,8 @@ export function DashboardPage() {
               detail="Available in catalog"
               icon={<TrendingUp size={18} className="text-action" />}
             />
-            <MetricCard
-              label="Allotments Logged"
-              value={analyticsCount(analytics?.allotment_performance.total)}
-              detail="Recorded outcomes"
-              icon={<CheckCircle2 size={18} className="text-action-emerald" />}
-            />
-            <MetricCard
-              label="Allotment Rate"
-              value={
-                loading
-                  ? "Loading…"
-                  : analytics?.allotment_performance.success_rate_percent === null ||
-                      analytics?.allotment_performance.success_rate_percent === undefined
-                    ? "Unavailable"
-                    : `${analytics.allotment_performance.success_rate_percent}%`
-              }
-              detail={
-                analytics?.allotment_performance.total
-                  ? `${analytics.allotment_performance.successful} successful bids`
-                  : "No recorded results"
-              }
-              icon={<Percent size={18} className="text-action-amber" />}
-            />
-            <MetricCard
-              label="Pending Refunds"
-              value={analyticsCount(analytics?.refund_performance.pending)}
-              detail="Awaiting bank unblock"
-              icon={<RotateCcw size={18} className="text-action" />}
-            />
           </>
         )}
-      </section>
-
-      {/* ─── Capital Summary & Allotment Performance ─────────────────────── */}
-      <section className="grid gap-6 xl:grid-cols-2" aria-label="Capital summary">
-        {currencies.length ? (
-          currencies.map((currency) => {
-            const summary = capitalSummaries.find((item) => item.currency === currency);
-            const ledger = capitalEvents.find((item) => item.currency === currency);
-            const listingEvents =
-              (ledger?.listing_sales ?? 0) + (ledger?.listing_price_updates ?? 0);
-            return (
-              <Card key={currency} hoverable className="border-border/80">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <CreditCard size={18} className="text-action" />
-                        <span>Capital Ledger · {currency}</span>
-                      </CardTitle>
-                      <CardDescription>
-                        Real-time fund blocks, debits, and refund lifecycle status.
-                      </CardDescription>
-                    </div>
-                    <Badge variant="primary">{currency}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <dl className="grid gap-3 sm:grid-cols-2">
-                    <MoneyMetric
-                      label="Currently Blocked"
-                      value={summary?.currently_blocked_capital}
-                      currency={currency}
-                      unavailable={!summary || !ledger?.capital_block_events}
-                      accent="blocked"
-                    />
-                    <MoneyMetric
-                      label="Actual Outflow (Debited)"
-                      value={ledger?.actual_debit}
-                      currency={currency}
-                      unavailable={!ledger?.actual_debit_events}
-                      accent="debit"
-                    />
-                    <MoneyMetric
-                      label="Outstanding Refunds"
-                      value={summary?.outstanding_refunds}
-                      currency={currency}
-                      unavailable={!summary || !analytics?.refund_performance.total}
-                      accent="pending"
-                    />
-                    <MoneyMetric
-                      label="Refunds Received"
-                      value={summary?.refunds_received}
-                      currency={currency}
-                      unavailable={!summary || !analytics?.refund_performance.total}
-                      accent="received"
-                    />
-                    <MoneyMetric
-                      label="Realized Listing P&amp;L"
-                      value={summary?.realized_pnl}
-                      currency={currency}
-                      unavailable={!summary || listingEvents === 0}
-                    />
-                    <MoneyMetric
-                      label="Unrealized Listing P&amp;L"
-                      value={summary?.unrealized_pnl}
-                      currency={currency}
-                      unavailable={
-                        !summary || summary.unrealized_pnl === null || listingEvents === 0
-                      }
-                    />
-                  </dl>
-                  <div className="mt-4 rounded-lg bg-surface-subtle p-3 text-xs text-muted">
-                    Blocked capital is held via UPI ASBA. Debits reflect successful allotment
-                    settlement.
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
-        ) : (
-          <Card className="border-border/80">
-            <CardHeader>
-              <CardTitle>Capital Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted">
-                {capitalQuery.isLoading
-                  ? "Loading capital summary…"
-                  : capitalQuery.error
-                    ? sectionErrorMessage(capitalQuery.error, "Capital summary unavailable")
-                    : "No capital records logged yet."}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card hoverable className="border-border/80">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 size={18} className="text-action-emerald" />
-              <span>Allotment &amp; Refund Outcomes</span>
-            </CardTitle>
-            <CardDescription>
-              Historical breakdown of positive allotments vs. full refunds.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {analytics?.allotment_performance.total ? (
-              <div className="space-y-4">
-                <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <OutcomeTile
-                    label="Full Allotment"
-                    value={analytics.allotment_performance.full}
-                    variant="success"
-                  />
-                  <OutcomeTile
-                    label="Partial"
-                    value={analytics.allotment_performance.partial}
-                    variant="info"
-                  />
-                  <OutcomeTile
-                    label="No Allotment"
-                    value={analytics.allotment_performance.none}
-                    variant="muted"
-                  />
-                  <OutcomeTile
-                    label="Refunds Done"
-                    value={analytics.refund_performance.completed}
-                    variant="action"
-                  />
-                </dl>
-
-                {/* Progress bar visualizer */}
-                <div className="rounded-lg bg-surface-subtle p-4">
-                  <div className="flex items-center justify-between text-xs font-semibold mb-2">
-                    <span className="text-ink">Allotment Distribution</span>
-                    <span className="text-muted tabular">
-                      {analytics.allotment_performance.total} Total Bids
-                    </span>
-                  </div>
-                  <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div
-                      className="bg-action-emerald transition-all duration-300"
-                      style={{
-                        width: `${((analytics.allotment_performance.full + analytics.allotment_performance.partial) / analytics.allotment_performance.total) * 100}%`,
-                      }}
-                      title="Allotted"
-                    />
-                    <div
-                      className="bg-slate-400 transition-all duration-300"
-                      style={{
-                        width: `${(analytics.allotment_performance.none / analytics.allotment_performance.total) * 100}%`,
-                      }}
-                      title="No Allotment"
-                    />
-                  </div>
-                  <div className="mt-2.5 flex items-center justify-between text-[11px] text-muted">
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-action-emerald" />
-                      Allotted ({analytics.allotment_performance.successful})
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-slate-400" />
-                      Unallotted ({analytics.allotment_performance.none})
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <AnalyticsStateMessage
-                label="No allotment results are available for the selected filters."
-                loading={analyticsQuery.isLoading}
-                error={analyticsQuery.error}
-              />
-            )}
-          </CardContent>
-        </Card>
       </section>
 
       {/* ─── Visual Analytics Charts ──────────────────────────────────────── */}
@@ -789,81 +545,7 @@ export function DashboardPage() {
         </ChartCard>
       </section>
 
-      {/* ─── Capital Utilization & Demat Account Analytics ───────────────── */}
-      <section className="grid gap-6 xl:grid-cols-2" aria-label="Capital utilization charts">
-        {(analytics?.capital_utilization_trends ?? []).length ? (
-          groupCapitalTrends(analytics!.capital_utilization_trends).map(([currency, rows]) => (
-            <ChartCard
-              key={currency}
-              title={`Capital Utilization · ${currency}`}
-              subtitle="Blocked, released, debited, and refunded ledger totals"
-            >
-              <div role="img" aria-label={`Capital movements in ${currency}`} className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={rows.map(chartCapitalValues)}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "var(--color-surface)",
-                        borderRadius: "10px",
-                        borderColor: "var(--color-border)",
-                      }}
-                      formatter={(value) => [value, "Amount"]}
-                    />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="capital_blocked"
-                      name="Blocked"
-                      stroke="#D97706"
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="capital_released"
-                      name="Released"
-                      stroke="#64748B"
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="actual_debit"
-                      name="Actual Debit"
-                      stroke="#2563EB"
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="refund_received"
-                      name="Refund Received"
-                      stroke="#059669"
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <p className="mt-3 text-xs text-muted">
-                Blocked funds are tracked via ASBA hold events. Debits are executed upon allotment.
-              </p>
-            </ChartCard>
-          ))
-        ) : (
-          <Card className="border-border/80">
-            <CardHeader>
-              <CardTitle>Capital Utilization Trend</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AnalyticsStateMessage
-                label="No capital ledger movements found for this filter."
-                loading={analyticsQuery.isLoading}
-                error={analyticsQuery.error}
-              />
-            </CardContent>
-          </Card>
-        )}
-
+      <section className="grid gap-6" aria-label="Demat account analytics">
         <ChartCard
           title="Applications by Demat Account"
           subtitle="Bid distribution across demat accounts"
@@ -1122,64 +804,6 @@ function MetricCard({
   );
 }
 
-function MoneyMetric({
-  label,
-  value,
-  currency,
-  unavailable = false,
-  accent,
-}: {
-  label: string;
-  value: string | null | undefined;
-  currency: string;
-  unavailable?: boolean;
-  accent?: "blocked" | "debit" | "pending" | "received";
-}) {
-  const accentBorder = accent
-    ? {
-        blocked: "border-l-4 border-l-action-amber",
-        debit: "border-l-4 border-l-action",
-        pending: "border-l-4 border-l-danger",
-        received: "border-l-4 border-l-action-emerald",
-      }[accent]
-    : "";
-
-  return (
-    <div className={`rounded-xl border border-border/70 bg-canvas/40 p-3.5 ${accentBorder}`}>
-      <dt className="text-xs font-semibold text-muted">{label}</dt>
-      <dd className="mt-1 text-lg font-bold tabular text-navy">
-        {unavailable || value === null || value === undefined
-          ? "Unavailable"
-          : exactMoney(value, currency)}
-      </dd>
-    </div>
-  );
-}
-
-function OutcomeTile({
-  label,
-  value,
-  variant,
-}: {
-  label: string;
-  value: number;
-  variant: "success" | "info" | "muted" | "action";
-}) {
-  const borderVariants = {
-    success: "border-action-emerald/30 bg-action-emerald/5 text-action-emerald",
-    info: "border-sky-500/30 bg-sky-50 text-sky-700",
-    muted: "border-slate-300 bg-canvas text-slate-600",
-    action: "border-action/30 bg-action/5 text-action",
-  };
-
-  return (
-    <div className={`rounded-xl border p-3 ${borderVariants[variant]}`}>
-      <dt className="text-[11px] font-semibold uppercase tracking-wider opacity-90">{label}</dt>
-      <dd className="mt-1 text-2xl font-bold tabular text-ink">{value}</dd>
-    </div>
-  );
-}
-
 function ChartCard({
   title,
   subtitle,
@@ -1238,13 +862,6 @@ function ErrorNotice({ error }: { error: unknown }) {
   );
 }
 
-function exactMoney(value: string, currency: string): string {
-  if (!/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) return "Unavailable";
-  const [whole, fraction] = value.split(".");
-  const groupedWhole = BigInt(whole!).toLocaleString("en-IN");
-  return `${currency} ${groupedWhole}${fraction ? `.${fraction}` : ""}`;
-}
-
 function categoryLabel(category: string): string {
   return category === "SHAREHOLDER" ? "Shareholder" : category;
 }
@@ -1268,26 +885,4 @@ function formatDateTime(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function groupCapitalTrends(
-  rows: DashboardAnalytics["capital_utilization_trends"],
-): Array<[string, DashboardAnalytics["capital_utilization_trends"]]> {
-  const byCurrency = new Map<string, DashboardAnalytics["capital_utilization_trends"]>();
-  for (const row of rows) {
-    const currencyRows = byCurrency.get(row.currency) ?? [];
-    currencyRows.push(row);
-    byCurrency.set(row.currency, currencyRows);
-  }
-  return [...byCurrency.entries()];
-}
-
-function chartCapitalValues(row: DashboardAnalytics["capital_utilization_trends"][number]) {
-  return {
-    ...row,
-    capital_blocked: Number(row.capital_blocked),
-    capital_released: Number(row.capital_released),
-    actual_debit: Number(row.actual_debit),
-    refund_received: Number(row.refund_received),
-  };
 }

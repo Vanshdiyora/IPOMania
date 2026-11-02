@@ -1,4 +1,4 @@
-import { useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "../../lib/utils";
@@ -26,24 +26,37 @@ export function SideDrawer({
   className,
   busy = false,
 }: SideDrawerProps) {
+  const [present, setPresent] = useState(open);
+  useEffect(() => {
+    if (open) {
+      setPresent(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setPresent(false), 180);
+    return () => window.clearTimeout(timer);
+  }, [open]);
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = description ? `${titleId}-description` : undefined;
-  const requestClose = () => { if (!busy) onClose(); };
-  useModalLayer(open, panelRef, requestClose);
+  const requestClose = () => {
+    if (open && !busy) onClose();
+  };
+  useModalLayer(open || present, panelRef, requestClose);
 
-  if (!open) return null;
+  if (!open && !present) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end" role="presentation">
       <button
         type="button"
-        className="absolute inset-0 cursor-default bg-slate-950/40"
+        data-state={open ? "open" : "closed"}
+        className="drawer-backdrop absolute inset-0 cursor-default bg-slate-950/40"
         aria-label="Close drawer"
         disabled={busy}
         onClick={requestClose}
       />
       <div
+        data-state={open ? "open" : "closed"}
         ref={panelRef}
         tabIndex={-1}
         role="dialog"
@@ -67,13 +80,26 @@ export function SideDrawer({
               </p>
             )}
           </div>
-          <Button size="icon" variant="ghost" onClick={requestClose} aria-label="Close drawer"
-        disabled={busy}>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={requestClose}
+            aria-label="Close drawer"
+            disabled={busy}
+          >
             <X className="h-5 w-5" />
           </Button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">{children}</div>
-        {footer && <footer className="shrink-0 border-t bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">{footer}</footer>}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
+          <fieldset disabled={busy} className="min-w-0">
+            {children}
+          </fieldset>
+        </div>
+        {footer && (
+          <footer className="shrink-0 border-t bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
+            {footer}
+          </footer>
+        )}
       </div>
     </div>,
     document.body,

@@ -1,3 +1,4 @@
+import { toIsoDateTime, toLocalDateTime } from "../../lib/formValues";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -12,6 +13,17 @@ import type {
 } from "@ipo-mania/shared";
 import { useAuth } from "../../auth/useAuth";
 import { Button } from "../../components/ui/Button";
+import { FormDrawer, RouteFormDrawer } from "../../components/ui/FormDrawer";
+import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
+import { FormSection } from "../../components/ui/FormSection";
+import { useFormValidation } from "../../components/ui/useFormValidation";
+import {
+  mandateSchema,
+  mandateUpdateSchema,
+  allotmentSchema,
+  allotmentUpdateSchema,
+  capitalLedgerEntrySchema,
+} from "@ipo-mania/validation";
 import { Card } from "../../components/ui/Card";
 import { ApiRequestError, apiRequest } from "../../lib/api";
 
@@ -80,6 +92,9 @@ export function MandateDetailsPage() {
   const { mandateId = "" } = useParams();
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const validation = useFormValidation();
   const [status, setStatus] = useState("");
   const [reference, setReference] = useState("");
   const [amount, setAmount] = useState("");
@@ -103,14 +118,18 @@ export function MandateDetailsPage() {
     mutationFn: () =>
       apiRequest<MandateResponse>(`/api/mandates/${mandateId}`, session!, {
         method: "PATCH",
-        body: JSON.stringify({
-          mandate_status: status,
-          mandate_reference: reference,
-          mandate_amount: amount,
-          notes: notes || null,
-        }),
+        body: JSON.stringify(
+          validation.validate(mandateUpdateSchema, {
+            mandate_status: status,
+            mandate_reference: reference,
+            mandate_amount: amount,
+            notes: notes || null,
+          }),
+        ),
       }),
     onSuccess: async () => {
+      setDirty(false);
+      setEditorOpen(false);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["mandate", mandateId] }),
         queryClient.invalidateQueries({ queryKey: ["mandates"] }),
@@ -139,13 +158,51 @@ export function MandateDetailsPage() {
               <Value label="Updated" value={formatDateTime(mandate.updated_at)} />
             </dl>
           </Card>
-          <Card>
-            <h2 className="text-xl font-bold text-ink">Manual update</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-semibold text-ink">
-                Status
-                <select
-                  className={inputClass}
+          <Button
+            variant="outline"
+            onClick={() => {
+              setStatus(String(mandate.mandate_status ?? ""));
+              setReference(String(mandate.mandate_reference ?? ""));
+              setAmount(String(mandate.mandate_amount ?? ""));
+              setNotes(String(mandate.notes ?? ""));
+              setDirty(false);
+              setEditorOpen(true);
+            }}
+          >
+            Edit mandate
+          </Button>
+          <FormDrawer
+            open={editorOpen}
+            title="Edit mandate"
+            description="Update the existing manually recorded details."
+            dirty={dirty}
+            busy={update.isPending}
+            onClose={() => setEditorOpen(false)}
+            footer={(requestClose) => (
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" disabled={update.isPending} onClick={requestClose}>
+                  Cancel
+                </Button>
+                <Button type="submit" form="edit-mandate-form" disabled={update.isPending}>
+                  {update.isPending ? "Saving…" : "Save changes"}
+                </Button>
+              </div>
+            )}
+          >
+            <form
+              id="edit-mandate-form"
+              className="space-y-4"
+              noValidate
+              onChangeCapture={() => setDirty(true)}
+              onSubmit={(event) => {
+                event.preventDefault();
+                update.mutate();
+              }}
+            >
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <FormSelect
+                  label="Status"
+                  error={validation.errors.mandate_status}
                   value={status}
                   onChange={(event) => setStatus(event.target.value)}
                 >
@@ -154,40 +211,32 @@ export function MandateDetailsPage() {
                       {humanize(value)}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label className="text-sm font-semibold text-ink">
-                Mandate reference
-                <input
-                  className={inputClass}
+                </FormSelect>
+                <FormInput
+                  label="Mandate reference"
+                  error={validation.errors.mandate_reference}
                   value={reference}
                   onChange={(event) => setReference(event.target.value)}
                 />
-              </label>
-              <label className="text-sm font-semibold text-ink">
-                Mandate amount
-                <input
-                  className={inputClass}
+                <FormInput
+                  label="Mandate amount"
+                  error={validation.errors.mandate_amount}
                   inputMode="decimal"
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
                 />
-              </label>
-              <label className="text-sm font-semibold text-ink sm:col-span-2">
-                Notes
-                <textarea
-                  className={inputClass}
+                <FormTextarea
+                  label="Notes"
+                  error={validation.errors.notes}
+                  fieldClassName="sm:col-span-2"
                   rows={3}
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                 />
-              </label>
-            </div>
-            {update.error ? <ErrorNotice error={update.error} /> : null}
-            <Button className="mt-4" disabled={update.isPending} onClick={() => update.mutate()}>
-              Save mandate update
-            </Button>
-          </Card>
+              </div>
+              {update.error ? <ErrorNotice error={update.error} /> : null}
+            </form>
+          </FormDrawer>
         </>
       ) : null}
       <Link className={linkClass} to="/mandates">
@@ -205,6 +254,9 @@ export function AllotmentDetailsPage() {
   const { allotmentId = "" } = useParams();
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const validation = useFormValidation();
   const [status, setStatus] = useState("");
   const [lots, setLots] = useState("");
   const [shares, setShares] = useState("");
@@ -232,16 +284,20 @@ export function AllotmentDetailsPage() {
     mutationFn: () =>
       apiRequest<AllotmentResponse>(`/api/allotments/${allotmentId}`, session!, {
         method: "PATCH",
-        body: JSON.stringify({
-          allotment_status: status,
-          allotted_lots: Number(lots),
-          allotted_shares: Number(shares),
-          allotment_price: price || null,
-          refund_amount: refund,
-          allotment_date: date || null,
-        }),
+        body: JSON.stringify(
+          validation.validate(allotmentUpdateSchema, {
+            allotment_status: status,
+            allotted_lots: Number(lots),
+            allotted_shares: Number(shares),
+            allotment_price: price || null,
+            refund_amount: refund,
+            allotment_date: date || null,
+          }),
+        ),
       }),
     onSuccess: async () => {
+      setDirty(false);
+      setEditorOpen(false);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["allotment", allotmentId] }),
         queryClient.invalidateQueries({ queryKey: ["allotments"] }),
@@ -270,13 +326,53 @@ export function AllotmentDetailsPage() {
               <Value label="Allotment date" value={formatDate(allotment.allotment_date)} />
             </dl>
           </Card>
-          <Card>
-            <h2 className="text-xl font-bold text-ink">Update allotment record</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-semibold text-ink">
-                Status
-                <select
-                  className={inputClass}
+          <Button
+            variant="outline"
+            onClick={() => {
+              setStatus(String(allotment.allotment_status ?? ""));
+              setLots(String(allotment.allotted_lots ?? ""));
+              setShares(String(allotment.allotted_shares ?? ""));
+              setPrice(String(allotment.allotment_price ?? ""));
+              setRefund(String(allotment.refund_amount ?? ""));
+              setDate(String(allotment.allotment_date ?? ""));
+              setDirty(false);
+              setEditorOpen(true);
+            }}
+          >
+            Edit allotment
+          </Button>
+          <FormDrawer
+            open={editorOpen}
+            title="Edit allotment"
+            description="Update the existing manually recorded details."
+            dirty={dirty}
+            busy={update.isPending}
+            onClose={() => setEditorOpen(false)}
+            footer={(requestClose) => (
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" disabled={update.isPending} onClick={requestClose}>
+                  Cancel
+                </Button>
+                <Button type="submit" form="edit-allotment-form" disabled={update.isPending}>
+                  {update.isPending ? "Saving…" : "Save changes"}
+                </Button>
+              </div>
+            )}
+          >
+            <form
+              id="edit-allotment-form"
+              className="space-y-4"
+              noValidate
+              onChangeCapture={() => setDirty(true)}
+              onSubmit={(event) => {
+                event.preventDefault();
+                update.mutate();
+              }}
+            >
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <FormSelect
+                  label="Status"
+                  error={validation.errors.allotment_status}
                   value={status}
                   onChange={(event) => setStatus(event.target.value)}
                 >
@@ -285,65 +381,52 @@ export function AllotmentDetailsPage() {
                       {humanize(value)}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label className="text-sm font-semibold text-ink">
-                Allotment date
-                <input
-                  className={inputClass}
+                </FormSelect>
+                <FormInput
+                  label="Allotment date"
+                  error={validation.errors.allotment_date}
                   type="date"
                   value={date}
                   onChange={(event) => setDate(event.target.value)}
                 />
-              </label>
-              <label className="text-sm font-semibold text-ink">
-                Allotted lots
-                <input
-                  className={inputClass}
+                <FormInput
+                  label="Allotted lots"
+                  error={validation.errors.allotted_lots}
                   type="number"
                   min="0"
                   value={lots}
                   onChange={(event) => setLots(event.target.value)}
                 />
-              </label>
-              <label className="text-sm font-semibold text-ink">
-                Allotted shares
-                <input
-                  className={inputClass}
+                <FormInput
+                  label="Allotted shares"
+                  error={validation.errors.allotted_shares}
                   type="number"
                   min="0"
                   value={shares}
                   onChange={(event) => setShares(event.target.value)}
                 />
-              </label>
-              <label className="text-sm font-semibold text-ink">
-                Allotment price
-                <input
-                  className={inputClass}
+                <FormInput
+                  label="Allotment price"
+                  error={validation.errors.allotment_price}
                   inputMode="decimal"
                   value={price}
                   onChange={(event) => setPrice(event.target.value)}
                 />
-              </label>
-              <label className="text-sm font-semibold text-ink">
-                Expected refund
-                <input
-                  className={inputClass}
+                <FormInput
+                  label="Expected refund"
+                  error={validation.errors.refund_amount}
                   inputMode="decimal"
                   value={refund}
                   onChange={(event) => setRefund(event.target.value)}
                 />
-              </label>
-            </div>
-            <p className="mt-3 text-sm text-muted">
-              Refund status is derived from the recorded refund amount and actual refund ledger
-              entries.
-            </p>
-            {update.error ? <ErrorNotice error={update.error} /> : null}
-            <Button className="mt-4" disabled={update.isPending} onClick={() => update.mutate()}>
-              Save allotment update
-            </Button>
-          </Card>
+              </div>
+              <p className="mt-3 text-sm text-muted">
+                Refund status is derived from the recorded refund amount and actual refund ledger
+                entries.
+              </p>
+              {update.error ? <ErrorNotice error={update.error} /> : null}
+            </form>
+          </FormDrawer>
         </>
       ) : null}
       <Link className={linkClass} to="/allotments">
@@ -355,6 +438,8 @@ export function AllotmentDetailsPage() {
 
 export function CreateMandatePage() {
   const { session } = useAuth();
+  const [dirty, setDirty] = useState(false);
+  const validation = useFormValidation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [applicationId, setApplicationId] = useState("");
@@ -366,31 +451,47 @@ export function CreateMandatePage() {
     mutationFn: () =>
       apiRequest<MandateResponse>("/api/mandates", session!, {
         method: "POST",
-        body: JSON.stringify({
-          application_id: applicationId,
-          mandate_reference: reference,
-          mandate_amount: amount,
-          notes: notes || null,
-        }),
+        body: JSON.stringify(
+          validation.validate(mandateSchema, {
+            application_id: applicationId,
+            mandate_reference: reference,
+            mandate_amount: amount,
+            notes: notes || null,
+          }),
+        ),
       }),
     onSuccess: async ({ data }) => {
       await queryClient.invalidateQueries({ queryKey: ["mandates"] });
-      navigate(`/mandates/${data.id}`);
+      navigate(`/mandates/${data.id}`, { state: { successMessage: "Mandate recorded." } });
     },
   });
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader
-        title="Add UPI mandate"
-        description="Record an existing mandate manually. This does not initiate a payment or approve the mandate."
-      />
-      <Card>
-        <div className="space-y-4">
-          <label className="block text-sm font-semibold text-ink">
-            Application
-            <select
-              className={inputClass}
+    <RouteFormDrawer
+      title="Add UPI mandate"
+      description="Record an existing mandate manually. This does not initiate a payment or approve the mandate."
+      cancelTo="/mandates"
+      formId="mandate-form"
+      submitLabel="Record pending mandate"
+      busy={create.isPending}
+      dirty={dirty}
+      disabled={!applicationId || Boolean(applications.error)}
+    >
+      <form
+        id="mandate-form"
+        className="space-y-5"
+        noValidate
+        onChangeCapture={() => setDirty(true)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          create.mutate();
+        }}
+      >
+        <FormSection title="Mandate details">
+          <div className="space-y-4">
+            <FormSelect
+              label="Application"
+              error={validation.errors.application_id}
               value={applicationId}
               onChange={(event) => setApplicationId(event.target.value)}
             >
@@ -401,54 +502,40 @@ export function CreateMandatePage() {
                   {money(application.application_amount, application.currency)}
                 </option>
               ))}
-            </select>
-          </label>
-          <label className="block text-sm font-semibold text-ink">
-            UPI mandate reference
-            <input
-              className={inputClass}
+            </FormSelect>
+            <FormInput
+              label="UPI mandate reference"
+              error={validation.errors.mandate_reference}
               value={reference}
               onChange={(event) => setReference(event.target.value)}
             />
-          </label>
-          <label className="block text-sm font-semibold text-ink">
-            Mandate amount
-            <input
-              className={inputClass}
+            <FormInput
+              label="Mandate amount"
+              error={validation.errors.mandate_amount}
               inputMode="decimal"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
             />
-          </label>
-          <label className="block text-sm font-semibold text-ink">
-            Notes
-            <textarea
-              className={inputClass}
+            <FormTextarea
+              label="Notes"
+              error={validation.errors.notes}
               rows={3}
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
             />
-          </label>
-        </div>
+          </div>
+        </FormSection>
         {applications.error ? <ErrorNotice error={applications.error} /> : null}
         {create.error ? <ErrorNotice error={create.error} /> : null}
-        <Button
-          className="mt-5"
-          disabled={!applicationId || create.isPending}
-          onClick={() => create.mutate()}
-        >
-          Record pending mandate
-        </Button>
-      </Card>
-      <Link className={linkClass} to="/mandates">
-        Cancel
-      </Link>
-    </div>
+      </form>
+    </RouteFormDrawer>
   );
 }
 
 export function CreateAllotmentPage() {
   const { session } = useAuth();
+  const [dirty, setDirty] = useState(false);
+  const validation = useFormValidation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [applicationId, setApplicationId] = useState("");
@@ -463,34 +550,51 @@ export function CreateAllotmentPage() {
     mutationFn: () =>
       apiRequest<AllotmentResponse>("/api/allotments", session!, {
         method: "POST",
-        body: JSON.stringify({
-          application_id: applicationId,
-          allotment_status: status,
-          allotted_lots: Number(lots),
-          allotted_shares: Number(shares),
-          allotment_price: price || null,
-          refund_amount: refund,
-          allotment_date: date || null,
-        }),
+        body: JSON.stringify(
+          validation.validate(allotmentSchema, {
+            application_id: applicationId,
+            allotment_status: status,
+            allotted_lots: Number(lots),
+            allotted_shares: Number(shares),
+            allotment_price: price || null,
+            refund_amount: refund,
+            allotment_date: date || null,
+          }),
+        ),
       }),
     onSuccess: async ({ data }) => {
       await queryClient.invalidateQueries({ queryKey: ["allotments"] });
-      navigate(`/allotments/${data.id}`);
+      navigate(`/allotments/${data.id}`, { state: { successMessage: "Allotment recorded." } });
     },
   });
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader
-        title="Record allotment"
-        description="Enter the received allotment details. Values are checked against the saved application and issue rules."
-      />
-      <Card>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="text-sm font-semibold text-ink sm:col-span-2">
-            Application
-            <select
-              className={inputClass}
+    <RouteFormDrawer
+      title="Record allotment"
+      description="Enter received allotment details against the saved application and issue rules."
+      cancelTo="/allotments"
+      formId="allotment-form"
+      submitLabel="Save allotment"
+      busy={create.isPending}
+      dirty={dirty}
+      disabled={!applicationId || Boolean(applications.error)}
+    >
+      <form
+        id="allotment-form"
+        className="space-y-5"
+        noValidate
+        onChangeCapture={() => setDirty(true)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          create.mutate();
+        }}
+      >
+        <FormSection title="Allotment details">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormSelect
+              label="Application"
+              error={validation.errors.application_id}
+              fieldClassName="sm:col-span-2"
               value={applicationId}
               onChange={(event) => setApplicationId(event.target.value)}
             >
@@ -500,12 +604,10 @@ export function CreateAllotmentPage() {
                   {applicationTitle(application)} · {application.shares} shares requested
                 </option>
               ))}
-            </select>
-          </label>
-          <label className="text-sm font-semibold text-ink">
-            Allotment status
-            <select
-              className={inputClass}
+            </FormSelect>
+            <FormSelect
+              label="Allotment status"
+              error={validation.errors.allotment_status}
               value={status}
               onChange={(event) => {
                 const next = event.target.value;
@@ -525,70 +627,50 @@ export function CreateAllotmentPage() {
                   {humanize(value)}
                 </option>
               ))}
-            </select>
-          </label>
-          <label className="text-sm font-semibold text-ink">
-            Allotment date
-            <input
-              className={inputClass}
+            </FormSelect>
+            <FormInput
+              label="Allotment date"
+              error={validation.errors.allotment_date}
               type="date"
               value={date}
               onChange={(event) => setDate(event.target.value)}
             />
-          </label>
-          <label className="text-sm font-semibold text-ink">
-            Allotted lots
-            <input
-              className={inputClass}
+            <FormInput
+              label="Allotted lots"
+              error={validation.errors.allotted_lots}
               type="number"
               min="0"
               value={lots}
               onChange={(event) => setLots(event.target.value)}
             />
-          </label>
-          <label className="text-sm font-semibold text-ink">
-            Allotted shares
-            <input
-              className={inputClass}
+            <FormInput
+              label="Allotted shares"
+              error={validation.errors.allotted_shares}
               type="number"
               min="0"
               value={shares}
               onChange={(event) => setShares(event.target.value)}
             />
-          </label>
-          <label className="text-sm font-semibold text-ink">
-            Allotment price
-            <input
-              className={inputClass}
+            <FormInput
+              label="Allotment price"
+              error={validation.errors.allotment_price}
               inputMode="decimal"
               value={price}
               onChange={(event) => setPrice(event.target.value)}
             />
-          </label>
-          <label className="text-sm font-semibold text-ink">
-            Expected refund
-            <input
-              className={inputClass}
+            <FormInput
+              label="Expected refund"
+              error={validation.errors.refund_amount}
               inputMode="decimal"
               value={refund}
               onChange={(event) => setRefund(event.target.value)}
             />
-          </label>
-        </div>
+          </div>
+        </FormSection>
         {applications.error ? <ErrorNotice error={applications.error} /> : null}
         {create.error ? <ErrorNotice error={create.error} /> : null}
-        <Button
-          className="mt-5"
-          disabled={!applicationId || create.isPending}
-          onClick={() => create.mutate()}
-        >
-          Save allotment
-        </Button>
-      </Card>
-      <Link className={linkClass} to="/allotments">
-        Cancel
-      </Link>
-    </div>
+      </form>
+    </RouteFormDrawer>
   );
 }
 
@@ -993,6 +1075,9 @@ function AllotmentList({ showAll }: { showAll: boolean }) {
 
 function LedgerEventForm() {
   const { session } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const validation = useFormValidation();
   const queryClient = useQueryClient();
   const applications = useApplications(session);
   const [applicationId, setApplicationId] = useState("");
@@ -1001,7 +1086,7 @@ function LedgerEventForm() {
   const [quantity, setQuantity] = useState("");
   const [unitPrice, setUnitPrice] = useState("");
   const [direction, setDirection] = useState("DEBIT");
-  const [effectiveAt, setEffectiveAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [effectiveAt, setEffectiveAt] = useState(() => toLocalDateTime(new Date().toISOString()));
   const [auditReference, setAuditReference] = useState("");
   const create = useMutation({
     mutationFn: async () => {
@@ -1015,7 +1100,7 @@ function LedgerEventForm() {
         transaction_type: type,
         amount: finalAmount,
         currency: "INR",
-        effective_at: new Date(effectiveAt).toISOString(),
+        effective_at: toIsoDateTime(effectiveAt),
         audit_reference: auditReference,
         idempotency_key: window.crypto.randomUUID(),
         ...(listing ? { quantity: Number(quantity), unit_price: unitPrice } : {}),
@@ -1023,10 +1108,12 @@ function LedgerEventForm() {
       };
       return apiRequest<{ data: CapitalLedgerEntry }>("/api/capital/ledger", session!, {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: JSON.stringify(validation.validate(capitalLedgerEntrySchema, payload)),
       });
     },
     onSuccess: async () => {
+      setDirty(false);
+      setOpen(false);
       setAmount("");
       setAuditReference("");
       await Promise.all([
@@ -1036,128 +1123,141 @@ function LedgerEventForm() {
     },
   });
   return (
-    <Card>
-      <h2 className="text-xl font-bold text-ink">Record financial event</h2>
-      <p className="mt-1 text-sm text-muted">
-        Manual entry only. A mandate approval is informational and does not create an actual debit.
-      </p>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <label className="text-sm font-semibold text-ink sm:col-span-2">
-          Application (not needed for general adjustment)
-          <select
-            className={inputClass}
-            value={applicationId}
-            onChange={(event) => setApplicationId(event.target.value)}
-          >
-            <option value="">Choose application</option>
-            {(applications.data?.data.applications ?? []).map((application) => (
-              <option key={application.id} value={application.id}>
-                {applicationTitle(application)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm font-semibold text-ink">
-          Transaction type
-          <select
-            className={inputClass}
-            value={type}
-            onChange={(event) => setType(event.target.value)}
-          >
-            {transactionTypes.map((value) => (
-              <option key={value} value={value}>
-                {humanize(value)}
-              </option>
-            ))}
-          </select>
-        </label>
-        {type === "ADJUSTMENT" ? (
-          <label className="text-sm font-semibold text-ink">
-            Adjustment direction
-            <select
-              className={inputClass}
-              value={direction}
-              onChange={(event) => setDirection(event.target.value)}
-            >
-              <option value="DEBIT">Debit</option>
-              <option value="CREDIT">Credit</option>
-            </select>
-          </label>
-        ) : null}
-        {type === "LISTING_SALE" || type === "LISTING_PRICE_UPDATE" ? (
-          <>
-            <label className="text-sm font-semibold text-ink">
-              Quantity
-              <input
-                className={inputClass}
-                type="number"
-                min="1"
-                step="1"
-                value={quantity}
-                onChange={(event) => setQuantity(event.target.value)}
-              />
-            </label>
-            <label className="text-sm font-semibold text-ink">
-              Price per share
-              <input
-                className={inputClass}
-                inputMode="decimal"
-                value={unitPrice}
-                onChange={(event) => setUnitPrice(event.target.value)}
-              />
-            </label>
-            <p className="text-sm text-muted sm:col-span-2">
-              Event amount:{" "}
-              {quantity && unitPrice
-                ? multiplyDecimalString(unitPrice, Number(quantity))
-                : "Enter quantity and price"}
-            </p>
-          </>
-        ) : (
-          <label className="text-sm font-semibold text-ink">
-            Amount
-            <input
-              className={inputClass}
-              inputMode="decimal"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-            />
-          </label>
-        )}
-        <label className="text-sm font-semibold text-ink">
-          Effective date and time
-          <input
-            className={inputClass}
-            type="datetime-local"
-            value={effectiveAt}
-            onChange={(event) => setEffectiveAt(event.target.value)}
-          />
-        </label>
-        <label className="text-sm font-semibold text-ink">
-          Audit reference
-          <input
-            className={inputClass}
-            value={auditReference}
-            onChange={(event) => setAuditReference(event.target.value)}
-          />
-        </label>
-      </div>
-      {create.error ? <ErrorNotice error={create.error} /> : null}
+    <>
       <Button
-        className="mt-4"
-        disabled={
-          create.isPending ||
-          !auditReference ||
-          (!applicationId && type !== "ADJUSTMENT") ||
-          (type === "LISTING_SALE" || type === "LISTING_PRICE_UPDATE"
-            ? !quantity || !unitPrice
-            : !amount)
-        }
-        onClick={() => create.mutate()}
+        onClick={() => {
+          setApplicationId("");
+          setType("CAPITAL_BLOCKED");
+          setAmount("");
+          setQuantity("");
+          setUnitPrice("");
+          setDirection("DEBIT");
+          setEffectiveAt(toLocalDateTime(new Date().toISOString()));
+          setAuditReference("");
+          setDirty(false);
+          setOpen(true);
+        }}
       >
-        Record event
+        Record financial event
       </Button>
-    </Card>
+      <FormDrawer
+        open={open}
+        title="Record financial event"
+        description="Manually record a financial event. Mandate approval does not create an actual debit."
+        dirty={dirty}
+        busy={create.isPending}
+        onClose={() => setOpen(false)}
+        footer={(requestClose) => (
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" disabled={create.isPending} onClick={requestClose}>
+              Cancel
+            </Button>
+            <Button type="submit" form="ledger-event-form" disabled={create.isPending}>
+              {create.isPending ? "Saving…" : "Record event"}
+            </Button>
+          </div>
+        )}
+      >
+        <form
+          id="ledger-event-form"
+          className="space-y-4"
+          noValidate
+          onChangeCapture={() => setDirty(true)}
+          onSubmit={(event) => {
+            event.preventDefault();
+            create.mutate();
+          }}
+        >
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <FormSelect
+              label="Application (not needed for general adjustment)"
+              error={validation.errors.application_id}
+              fieldClassName="sm:col-span-2"
+              value={applicationId}
+              onChange={(event) => setApplicationId(event.target.value)}
+            >
+              <option value="">Choose application</option>
+              {(applications.data?.data.applications ?? []).map((application) => (
+                <option key={application.id} value={application.id}>
+                  {applicationTitle(application)}
+                </option>
+              ))}
+            </FormSelect>
+            <FormSelect
+              label="Transaction type"
+              error={validation.errors.transaction_type}
+              value={type}
+              onChange={(event) => setType(event.target.value)}
+            >
+              {transactionTypes.map((value) => (
+                <option key={value} value={value}>
+                  {humanize(value)}
+                </option>
+              ))}
+            </FormSelect>
+            {type === "ADJUSTMENT" ? (
+              <FormSelect
+                label="Adjustment direction"
+                error={validation.errors.adjustment_direction}
+                value={direction}
+                onChange={(event) => setDirection(event.target.value)}
+              >
+                <option value="DEBIT">Debit</option>
+                <option value="CREDIT">Credit</option>
+              </FormSelect>
+            ) : null}
+            {type === "LISTING_SALE" || type === "LISTING_PRICE_UPDATE" ? (
+              <>
+                <FormInput
+                  label="Quantity"
+                  error={validation.errors.quantity}
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={quantity}
+                  onChange={(event) => setQuantity(event.target.value)}
+                />
+                <FormInput
+                  label="Price per share"
+                  error={validation.errors.unit_price}
+                  inputMode="decimal"
+                  value={unitPrice}
+                  onChange={(event) => setUnitPrice(event.target.value)}
+                />
+                <p className="text-sm text-muted sm:col-span-2">
+                  Event amount:{" "}
+                  {quantity && unitPrice
+                    ? multiplyDecimalString(unitPrice, Number(quantity))
+                    : "Enter quantity and price"}
+                </p>
+              </>
+            ) : (
+              <FormInput
+                label="Amount"
+                error={validation.errors.amount}
+                inputMode="decimal"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+              />
+            )}
+            <FormInput
+              label="Effective date and time"
+              error={validation.errors.effective_at}
+              type="datetime-local"
+              value={effectiveAt}
+              onChange={(event) => setEffectiveAt(event.target.value)}
+            />
+            <FormInput
+              label="Audit reference"
+              error={validation.errors.audit_reference}
+              value={auditReference}
+              onChange={(event) => setAuditReference(event.target.value)}
+            />
+          </div>
+          {create.error ? <ErrorNotice error={create.error} /> : null}
+        </form>
+      </FormDrawer>
+    </>
   );
 }
 

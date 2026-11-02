@@ -57,8 +57,7 @@ export function AuthPage({
               Your complete IPO intelligence platform.
             </p>
             <p className="text-base text-white/60 leading-relaxed">
-              Track applications, demat accounts, allotments, and capital activity — all in one
-              private, secure dashboard.
+              Track applications and demat accounts in one private, secure dashboard.
             </p>
           </blockquote>
 
@@ -67,8 +66,8 @@ export function AuthPage({
             {[
               "Private demat account management",
               "IPO application tracking",
-              "Capital & refund analytics",
-              "Allotment performance insights",
+              "Issue-specific quota calculator",
+              "Application activity insights",
             ].map((feature) => (
               <li key={feature} className="flex items-center gap-3 text-sm text-white/70">
                 <div className="h-1.5 w-1.5 rounded-full bg-action flex-shrink-0" />

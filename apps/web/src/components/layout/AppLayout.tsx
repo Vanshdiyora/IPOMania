@@ -1,24 +1,33 @@
 import { useEffect, useRef, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useOutlet, Link } from "react-router-dom";
 import { useAuth } from "../../auth/useAuth";
 import { Header } from "./Header";
+import { SuccessNotice } from "../ui/States";
 import { Sidebar } from "./Sidebar";
 
 export function AppLayout() {
   const { user } = useAuth();
-  const { pathname } = useLocation();
+  const { pathname, state } = useLocation();
+  const successMessage = (state as { successMessage?: unknown } | null)?.successMessage;
+  const outlet = useOutlet();
+  const drawerRoute =
+    /^\/(accounts|ipos|applications)\/(new|[^/]+\/edit)$/.test(pathname) ||
+    /^\/ipos\/[^/]+\/categories$/.test(pathname);
+  const backgroundRef = useRef(drawerRoute ? null : outlet);
+  if (!drawerRoute) backgroundRef.current = outlet;
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuWasOpen = useRef(false);
   const pageContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
     if (mobileMenuOpen) {
       pageContentRef.current?.setAttribute("inert", "");
       document.body.style.overflow = "hidden";
     } else {
       pageContentRef.current?.removeAttribute("inert");
-      document.body.style.overflow = "";
     }
 
     if (!mobileMenuOpen) {
@@ -36,7 +45,7 @@ export function AppLayout() {
     window.addEventListener("keydown", closeOnEscape);
     return () => {
       window.removeEventListener("keydown", closeOnEscape);
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
     };
   }, [mobileMenuOpen]);
 
@@ -78,7 +87,22 @@ export function AppLayout() {
           id="main-content"
           className="mx-auto w-full max-w-7xl min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8 animate-fade-in"
         >
-          <Outlet />
+          {!drawerRoute && typeof successMessage === "string" && (
+            <SuccessNotice className="mb-5" message={successMessage} />
+          )}
+          <div aria-hidden={drawerRoute || undefined}>
+            {drawerRoute
+              ? (backgroundRef.current ?? (
+                  <section className="rounded-xl border border-border bg-white p-6">
+                    <h1 className="text-2xl font-bold">Manage your records</h1>
+                    <Link className="text-action underline" to="/dashboard">
+                      Back to dashboard
+                    </Link>
+                  </section>
+                ))
+              : outlet}
+          </div>
+          {drawerRoute && <div key={pathname}>{outlet}</div>}
         </main>
       </div>
     </div>

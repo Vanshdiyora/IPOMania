@@ -6,6 +6,9 @@ user-specific IPO records with an issue-configured decimal quota calculator, and
 application, UPI mandate, allotment, refund, and capital tracking. It does not submit IPO
 applications, initiate payments, approve mandates automatically, or fetch market data.
 
+The web UI currently shows IPOs, demat accounts, applications, and the quota calculator. Mandate,
+allotment, refund, and capital screens are temporarily hidden; their API endpoints remain available.
+
 ## Requirements
 
 - Node.js 22.12 or newer and npm 10 or newer

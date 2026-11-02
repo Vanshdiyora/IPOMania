@@ -34,9 +34,8 @@ deleted; corrections are new, audited adjustments.
 
 ## Interfaces
 
-- `/capital` displays per-currency financial summaries.
-- `/capital/transactions` shows ledger history and provides manual event entry.
-- `/capital/refunds` shows expected versus received refunds.
+- Capital and refund pages are temporarily hidden from the web UI. Their API endpoints remain
+  available.
 - `GET /api/capital/summary` calculates summaries from owner-scoped applications, mandates,
   allotments, and ledger rows.
 - `GET /api/capital/ledger` lists immutable events with IPO, account, broker, category, and date

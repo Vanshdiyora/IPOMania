@@ -4,7 +4,7 @@ import { cn } from "../../lib/utils";
 
 // ─── Base input class ─────────────────────────────────────────────────────────
 const inputBase = [
-  "w-full rounded-lg border border-border bg-surface",
+  "min-w-0 max-w-full w-full rounded-lg border border-border bg-surface",
   "px-3 py-2 text-base text-ink placeholder:text-subtle",
   "transition-colors duration-150",
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-border-focus focus-visible:border-border-focus",
@@ -37,9 +37,13 @@ type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
   inputSize?: keyof typeof inputSizeClass;
 };
 
-export function Select({ className, inputSize = "md", ...props }: SelectProps) {
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
+  { className, inputSize = "md", ...props },
+  ref,
+) {
   return (
     <select
+      ref={ref}
       className={cn(
         inputBase,
         inputSizeClass[inputSize],
@@ -49,14 +53,23 @@ export function Select({ className, inputSize = "md", ...props }: SelectProps) {
       {...props}
     />
   );
-}
+});
 
 // ─── Textarea ─────────────────────────────────────────────────────────────────
 type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
 
-export function Textarea({ className, ...props }: TextareaProps) {
-  return <textarea className={cn(inputBase, "min-h-24 resize-y py-2.5", className)} {...props} />;
-}
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
+  { className, ...props },
+  ref,
+) {
+  return (
+    <textarea
+      ref={ref}
+      className={cn(inputBase, "min-h-24 resize-y py-2.5", className)}
+      {...props}
+    />
+  );
+});
 
 // ─── FormField wrapper ────────────────────────────────────────────────────────
 interface FormFieldProps {
@@ -89,7 +102,11 @@ export function FormField({
         )}
       </label>
       {children}
-      {hint && !error && <p className="text-xs text-muted">{hint}</p>}
+      {hint && !error && (
+        <p id={`${htmlFor}-hint`} className="text-xs text-muted">
+          {hint}
+        </p>
+      )}
       {error && (
         <p id={`${htmlFor}-error`} role="alert" className="text-xs font-medium text-danger">
           {error}
@@ -117,13 +134,13 @@ export function SearchInput({ className, onClear, value, ...props }: SearchInput
       <input
         type="search"
         value={value}
-        className={cn(inputBase, inputSizeClass.md, "pl-9", value && onClear ? "pr-9" : "")}
+        className={cn(inputBase, inputSizeClass.md, "pl-9", value && onClear ? "pr-12" : "")}
         {...props}
       />
       {value && onClear && (
         <button
           type="button"
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus"
+          className="absolute right-0 top-1/2 inline-flex min-h-touch min-w-touch -translate-y-1/2 items-center justify-center rounded text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus"
           onClick={onClear}
           aria-label="Clear search"
         >
