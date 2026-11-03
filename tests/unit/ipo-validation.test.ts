@@ -64,6 +64,14 @@ describe("IPO boundary validation", () => {
         search: " Company ",
       }),
     ).toEqual({ page: 2, page_size: 100, status: "OPEN", search: "Company", sort: "date_desc" });
+    expect(ipoCatalogListQuerySchema.parse({ status: ["OPEN", "CLOSED"] }).status).toEqual([
+      "OPEN",
+      "CLOSED",
+    ]);
+    expect(ipoListQuerySchema.parse({ status: ["UPCOMING", "LISTED"] }).status).toEqual([
+      "UPCOMING",
+      "LISTED",
+    ]);
     for (const sort of [
       "date_desc",
       "date_asc",
@@ -79,6 +87,8 @@ describe("IPO boundary validation", () => {
       { page: "0" },
       { page_size: "101" },
       { status: "WITHDRAWN" },
+      { status: ["OPEN", "OPEN"] },
+      { status: ["OPEN", "WITHDRAWN"] },
       { search: "a".repeat(161) },
       { include_archived: "true" },
       { user_id: "untrusted-owner" },

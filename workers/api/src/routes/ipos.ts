@@ -33,6 +33,12 @@ const catalogCategoryColumns =
 const catalogColumns =
   "id,provider_id,company_name,symbol,issue_type,exchange,price_band_min,price_band_max,issue_price,lot_size,issue_size,bidding_start_date,bidding_end_date,allotment_date,listing_date,ipo_status,data_source,last_synced_at,created_at,updated_at,archived_at";
 
+function queryWithStatuses(context: IpoRouteContext) {
+  const query = context.req.query();
+  const statuses = new URL(context.req.url).searchParams.getAll("status");
+  return statuses.length > 1 ? { ...query, status: statuses } : query;
+}
+
 type IpoCatalogDatabaseRow = {
   id: string;
   provider_id: string | null;
@@ -96,7 +102,7 @@ export const iposRoutes = new Hono<IpoContext>();
 iposRoutes.use("*", authenticate);
 
 iposRoutes.get("/catalog", async (context) => {
-  const parsed = ipoCatalogListQuerySchema.safeParse(context.req.query());
+  const parsed = ipoCatalogListQuerySchema.safeParse(queryWithStatuses(context));
   if (!parsed.success) return validationError(context);
   const query = parsed.data;
   const sortColumn =
@@ -114,7 +120,19 @@ iposRoutes.get("/catalog", async (context) => {
     .order(sortColumn, { ascending: sortAscending, nullsFirst: false });
   if (sortColumn !== "company_name") request = request.order("company_name", { ascending: true });
   request = request.order("id", { ascending: true });
-  if (query.status) request = request.eq("ipo_status", query.status.toLowerCase());
+  const selectedStatuses = Array.isArray(query.status)
+    ? query.status
+    : query.status
+      ? [query.status]
+      : [];
+  if (selectedStatuses.length === 1) {
+    request = request.eq("ipo_status", selectedStatuses[0]!.toLowerCase());
+  } else if (selectedStatuses.length > 1) {
+    request = request.in(
+      "ipo_status",
+      selectedStatuses.map((status) => status.toLowerCase()),
+    );
+  }
   if (query.search) {
     // Quote PostgREST values so punctuation cannot introduce extra filter expressions.
     const term = escapeLike(query.search).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -288,7 +306,7 @@ iposRoutes.post("/catalog/:ipoId/import", async (context) => {
 });
 
 iposRoutes.get("/", async (context) => {
-  const parsed = ipoListQuerySchema.safeParse(context.req.query());
+  const parsed = ipoListQuerySchema.safeParse(queryWithStatuses(context));
   if (!parsed.success) return validationError(context);
 
   const query = parsed.data;
@@ -310,7 +328,16 @@ iposRoutes.get("/", async (context) => {
 
   if (query.include_archived === "false") request = request.is("archived_at", null);
   if (query.include_archived === "true") request = request.not("archived_at", "is", null);
-  if (query.status) request = request.eq("status", query.status);
+  const selectedStatuses = Array.isArray(query.status)
+    ? query.status
+    : query.status
+      ? [query.status]
+      : [];
+  if (selectedStatuses.length === 1) {
+    request = request.eq("status", selectedStatuses[0]!);
+  } else if (selectedStatuses.length > 1) {
+    request = request.in("status", selectedStatuses);
+  }
   if (query.exchange) request = request.ilike("exchange", query.exchange);
   if (query.opening_from) request = request.gte("opening_date", query.opening_from);
   if (query.opening_to) request = request.lte("opening_date", query.opening_to);

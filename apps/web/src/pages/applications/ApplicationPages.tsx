@@ -1253,6 +1253,7 @@ export function BulkApplicationPage() {
               type="number"
               min="1"
               value={lots}
+              placeholder="Enter number of lots"
               onChange={(event) => {
                 setLots(event.target.value);
                 setPreview(null);
@@ -1279,6 +1280,7 @@ export function BulkApplicationPage() {
               className={fieldClass}
               inputMode="decimal"
               value={price || (priceType === "CUT_OFF" ? (ipo?.cut_off_price ?? "") : "")}
+              placeholder="Enter price per share"
               onChange={(event) => {
                 setPrice(event.target.value);
                 setPreview(null);
@@ -1304,6 +1306,7 @@ export function BulkApplicationPage() {
                   type="number"
                   min="0"
                   value={holdings[id] ?? ""}
+                  placeholder="Enter shares held"
                   onChange={(event) => {
                     setHoldings((current) => ({ ...current, [id]: event.target.value }));
                     setPreview(null);
