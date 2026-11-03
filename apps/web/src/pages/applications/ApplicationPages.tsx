@@ -710,6 +710,7 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
 
 export function ApplicationFormPage({ editing = false }: { editing?: boolean }) {
   const { applicationId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { session } = useAuth();
   const lists = useOwnedLists();
@@ -732,6 +733,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     fingerprint: string;
     data: CalculationResponse["data"];
   } | null>(null);
+  const preselectedAccountId = searchParams.get("demat_account_id");
   const ipo = lists.ipos.find((item) => item.id === ipoId);
   const categoriesQuery = useQuery({
     queryKey: ["ipo-categories", ipoId],
@@ -745,6 +747,13 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       setPrice(ipo.cut_off_price);
     }
   }, [editing, ipo, price, priceType]);
+  useEffect(() => {
+    if (editing || dirty || accountId || !preselectedAccountId) return;
+    const account = lists.accounts.find((item) => item.id === preselectedAccountId);
+    if (account?.account_status === "active" && !account.archived_at) {
+      setAccountId(account.id);
+    }
+  }, [accountId, dirty, editing, lists.accounts, preselectedAccountId]);
   const applicationPayload = {
     ipo_id: ipoId,
     demat_account_id: accountId,
@@ -832,7 +841,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   return (
     <RouteFormDrawer
       title={editing ? "Edit application" : "Add application"}
-      description="Choose an issue, an account, and a configured category. Existing manual records keep their calculation and rule version."
+      description="Choose an issue, an account, and a configured category. This records an application for tracking; it does not submit an IPO application to a broker or exchange."
       cancelTo="/applications"
       formId="application-form"
       submitLabel="Save application"

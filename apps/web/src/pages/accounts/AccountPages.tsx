@@ -1,9 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { z } from "@ipo-mania/validation";
@@ -23,6 +22,7 @@ import { DataTable } from "../../components/ui/DataTable";
 import { ListToolbar } from "../../components/filters/ListToolbar";
 import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
 import { ApiRequestError, apiRequest } from "../../lib/api";
+import { applicationDrawerPath } from "../../lib/applicationDrawer";
 import {
   SkeletonCard,
   SkeletonDetailsPage,
@@ -124,7 +124,35 @@ const accountColumns: ColumnDef<DematAccount>[] = [
     header: "Created",
     cell: ({ row }) => formatDate(row.original.created_at),
   },
+  {
+    id: "actions",
+    header: "Action",
+    cell: ({ row }) => <AccountApplicationAction account={row.original} />,
+  },
 ];
+
+function AccountApplicationAction({ account }: { account: DematAccount }) {
+  const canRecordApplication = account.account_status === "active" && !account.archived_at;
+
+  if (!canRecordApplication) {
+    return (
+      <Button size="sm" variant="outline" disabled aria-label="IPO application unavailable">
+        Unavailable
+      </Button>
+    );
+  }
+
+  return (
+    <Button asChild size="sm" variant="secondary">
+      <DrawerRouteLink
+        aria-label={`Record an IPO application for ${account.holder_name}`}
+        to={applicationDrawerPath(account.id)}
+      >
+        Record IPO application
+      </DrawerRouteLink>
+    </Button>
+  );
+}
 
 function AccountDetailLink({
   account,
@@ -277,14 +305,6 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
     rowCount: data?.data.pagination.total ?? 0,
     state: { pagination: { pageIndex: page - 1, pageSize: 50 } },
   });
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const virtualizer = useVirtualizer({
-    count: table.getRowModel().rows.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 64,
-    overscan: 8,
-  });
-  const virtualRows = virtualizer.getVirtualItems();
   const totalPages = data?.data.pagination.totalPages ?? 0;
 
   function resetFilters() {
@@ -461,16 +481,17 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
       {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       <Card className="p-3 sm:p-5">
         <div className="hidden overflow-hidden md:block" aria-busy={isLoading}>
-          <div ref={scrollRef} className="max-h-[36rem] overflow-auto">
-            <DataTable minWidth="850px" className="table-fixed text-base">
+          <div className="max-h-[36rem] overflow-auto">
+            <DataTable minWidth="1080px" className="table-fixed text-base">
               <colgroup>
                 {[
-                  ["holder_name", "20%"],
-                  ["broker_name", "17%"],
-                  ["depository_type", "16%"],
-                  ["masked_demat_identifier", "17%"],
-                  ["account_status", "15%"],
-                  ["created_at", "15%"],
+                  ["holder_name", "16%"],
+                  ["broker_name", "14%"],
+                  ["depository_type", "12%"],
+                  ["masked_demat_identifier", "15%"],
+                  ["account_status", "10%"],
+                  ["created_at", "12%"],
+                  ["actions", "21%"],
                 ].map(([id, width]) => (
                   <col key={id} style={{ width }} />
                 ))}
@@ -481,7 +502,7 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
                     {group.headers.map((header) => (
                       <th
                         key={header.id}
-                        className={`border-b border-border px-3 py-4 font-bold ${["depository_type", "account_status", "created_at"].includes(header.column.id) ? "text-center" : "text-left"}`}
+                        className={`border-b border-border px-3 py-4 font-bold ${header.column.id === "actions" ? "text-right" : ["depository_type", "account_status", "created_at"].includes(header.column.id) ? "text-center" : "text-left"}`}
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                       </th>
@@ -489,33 +510,17 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
                   </tr>
                 ))}
               </thead>
-              <tbody
-                style={
-                  isLoading
-                    ? undefined
-                    : { height: `${virtualizer.getTotalSize()}px`, position: "relative" }
-                }
-              >
+              <tbody className="divide-y divide-border">
                 {isLoading ? (
                   <SkeletonTableRows rows={6} cols={accountColumns.length} />
                 ) : (
-                  virtualRows.map((virtualRow) => {
-                    const row = table.getRowModel().rows[virtualRow.index];
+                  table.getRowModel().rows.map((row) => {
                     return (
-                      <tr
-                        key={row.id}
-                        className="absolute left-0 top-0 w-full border-b border-border bg-white"
-                        style={{
-                          height: `${virtualRow.size}px`,
-                          transform: `translateY(${virtualRow.start}px)`,
-                          display: "table",
-                          tableLayout: "fixed",
-                        }}
-                      >
+                      <tr key={row.id} className="bg-white">
                         {row.getVisibleCells().map((cell) => (
                           <td
                             key={cell.id}
-                            className={`truncate px-3 py-4 ${["depository_type", "account_status", "created_at"].includes(cell.column.id) ? "text-center tabular-nums" : "text-left"}`}
+                            className={`px-3 py-4 ${cell.column.id === "actions" ? "text-right" : ["depository_type", "account_status", "created_at"].includes(cell.column.id) ? "truncate text-center tabular-nums" : "truncate text-left"}`}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </td>
@@ -558,6 +563,9 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
                   <dt className="font-semibold">Created</dt>
                   <dd>{formatDate(account.created_at)}</dd>
                 </dl>
+                <div className="mt-4 flex justify-end">
+                  <AccountApplicationAction account={account} />
+                </div>
               </article>
             ))
           )}

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { Menu } from "lucide-react";
 import { Outlet, useLocation, useOutlet, Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/useAuth";
 import { Sidebar } from "./Sidebar";
-import { Header } from "./Header";
 import { useToast } from "../ui/ToastContext";
 import { LoadingState } from "../LoadingState";
 import { DrawerRouteHost } from "./DrawerRouteHost";
@@ -28,6 +28,10 @@ export function AppLayout() {
   const menuWasOpen = useRef(false);
   const pageContentRef = useRef<HTMLDivElement>(null);
   const [localDrawerPath, setLocalDrawerPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.title = `${getPageTitle(pathname)} | IPO Mania`;
+  }, [pathname]);
 
   useEffect(() => {
     setLocalDrawerPath(null);
@@ -107,15 +111,22 @@ export function AppLayout() {
 
         {/* Main content */}
         <div ref={pageContentRef} className="flex min-w-0 flex-1 flex-col md:ml-64">
-          <Header
-            mobileMenuOpen={mobileMenuOpen}
-            menuButtonRef={menuButtonRef}
-            onMenuToggle={() => setMobileMenuOpen((current) => !current)}
-          />
           <main
             id="main-content"
             className="relative w-full min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8 animate-fade-in"
           >
+            <button
+              ref={menuButtonRef}
+              type="button"
+              className="fixed left-4 top-4 z-30 inline-flex min-h-touch min-w-touch items-center justify-center rounded-xl border border-border bg-surface/95 text-muted shadow-card backdrop-blur transition-colors hover:bg-surface-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus md:hidden"
+              aria-label="Open navigation"
+              aria-expanded={mobileMenuOpen}
+              aria-controls="main-navigation"
+              tabIndex={mobileMenuOpen ? -1 : undefined}
+              onClick={() => setMobileMenuOpen((current) => !current)}
+            >
+              <Menu aria-hidden="true" size={20} />
+            </button>
             <div aria-hidden={drawerRoute || undefined}>
               {drawerRoute
                 ? (backgroundRef.current ?? (
@@ -138,4 +149,36 @@ export function AppLayout() {
       </div>
     </DrawerRouteProvider>
   );
+}
+
+function getPageTitle(pathname: string) {
+  if (pathname === "/" || pathname === "/dashboard") return "Dashboard";
+  if (pathname === "/accounts") return "Demat Accounts";
+  if (pathname.startsWith("/accounts/import-history")) return "Account import history";
+  if (pathname === "/accounts/import") return "Import accounts";
+  if (/^\/accounts\/[^/]+\/edit$/.test(pathname)) return "Edit account";
+  if (/^\/accounts\/[^/]+$/.test(pathname)) return "Account details";
+  if (pathname === "/accounts/new") return "Add account";
+  if (pathname === "/applications") return "Applications";
+  if (pathname === "/applications/bulk") return "Bulk applications";
+  if (pathname === "/applications/import") return "Import applications";
+  if (pathname.startsWith("/applications/import-history")) return "Application import history";
+  if (/^\/applications\/[^/]+\/edit$/.test(pathname)) return "Edit application";
+  if (/^\/applications\/[^/]+$/.test(pathname)) return "Application details";
+  if (pathname === "/applications/new") return "Add application";
+  if (pathname === "/ipos") return "IPOs";
+  if (pathname === "/ipo-calendar") return "IPO calendar";
+  if (pathname === "/quota-calculator") return "Quota calculator";
+  if (/^\/ipos\/[^/]+\/categories$/.test(pathname)) return "IPO categories";
+  if (/^\/ipos\/[^/]+\/edit$/.test(pathname)) return "Edit IPO";
+  if (/^\/ipos\/catalog/.test(pathname)) return "IPO catalog";
+  if (/^\/ipos\/[^/]+$/.test(pathname)) return "IPO details";
+  if (pathname === "/ipos/new") return "Add IPO";
+  if (pathname === "/admin") return "Admin overview";
+  if (pathname === "/admin/ipos") return "IPO catalog";
+  if (pathname === "/admin/sync") return "IPO synchronization";
+  if (pathname === "/admin/ipo-sync-history") return "Synchronization history";
+  if (pathname === "/admin/settings") return "Admin settings";
+  if (pathname === "/profile") return "Profile";
+  return "IPO Mania";
 }

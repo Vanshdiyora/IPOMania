@@ -55,27 +55,55 @@ export function Toast({
   }, [duration, id, onDismiss]);
 
   const Icon = tone === "success" ? CheckCircle2 : tone === "error" ? CircleAlert : Info;
+  const toneStyles = {
+    success: {
+      accent: "bg-success",
+      icon: "border-success-border bg-success-bg text-success",
+      progress: "bg-success",
+    },
+    error: {
+      accent: "bg-danger",
+      icon: "border-danger-border bg-danger-bg text-danger",
+      progress: "bg-danger",
+    },
+    info: {
+      accent: "bg-info",
+      icon: "border-info-border bg-info-bg text-info",
+      progress: "bg-info",
+    },
+  }[tone];
+
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
-      className="pointer-events-auto flex w-full max-w-sm gap-3 rounded-xl border border-border bg-surface p-4 shadow-dropdown"
+      className="pointer-events-auto relative isolate w-full overflow-hidden rounded-2xl border border-border bg-surface p-4 pr-3 shadow-[0_18px_42px_-20px_rgba(15,23,42,0.35)] animate-fade-in"
     >
-      <Icon
-        className={`mt-0.5 h-5 w-5 shrink-0 ${tone === "success" ? "text-success" : tone === "error" ? "text-danger" : "text-info"}`}
-        aria-hidden="true"
-      />
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold text-ink">{title}</p>
-        {description && <div className="mt-1 text-sm text-muted">{description}</div>}
+      <span className={`absolute inset-y-0 left-0 w-1 ${toneStyles.accent}`} aria-hidden="true" />
+      <div className="flex gap-3 pl-1">
+        <span
+          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${toneStyles.icon}`}
+        >
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1 py-0.5">
+          <p className="text-[15px] font-semibold leading-5 text-ink">{title}</p>
+          {description && <div className="mt-1 text-sm leading-5 text-muted">{description}</div>}
+        </div>
+        <button
+          type="button"
+          onClick={() => onDismiss(id)}
+          className="-mt-1 flex min-h-touch min-w-touch shrink-0 items-center justify-center rounded-xl text-subtle transition-colors hover:bg-surface-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus"
+          aria-label="Dismiss notification"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={() => onDismiss(id)}
-        className="min-h-touch min-w-touch shrink-0 rounded-lg text-muted hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus"
-        aria-label="Dismiss notification"
-      >
-        <X className="mx-auto h-4 w-4" />
-      </button>
+      <span className="absolute inset-x-0 bottom-0 h-0.5 bg-surface-subtle" aria-hidden="true">
+        <span
+          className={`block h-full origin-left ${toneStyles.progress} animate-toast-timer motion-reduce:animate-none`}
+          style={{ animationDuration: `${duration}ms` }}
+        />
+      </span>
     </div>
   );
 }
@@ -84,7 +112,7 @@ export function ToastViewport({ children }: { children: ReactNode }) {
   if (typeof document === "undefined") return null;
   return createPortal(
     <div
-      className="pointer-events-none fixed right-4 top-4 z-[70] flex w-[calc(100%-2rem)] max-w-sm flex-col gap-3"
+      className="pointer-events-none fixed inset-x-4 top-4 z-[70] flex flex-col gap-3 sm:left-auto sm:right-5 sm:w-full sm:max-w-[25rem]"
       aria-live="polite"
     >
       {children}

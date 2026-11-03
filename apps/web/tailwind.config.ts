@@ -124,6 +124,10 @@ const config: Config = {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        "toast-timer": {
+          from: { transform: "scaleX(1)" },
+          to: { transform: "scaleX(0)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.2s cubic-bezier(0.4, 0, 0.2, 1) both",
@@ -131,6 +135,7 @@ const config: Config = {
         "slide-in-left": "slide-in-left 0.22s cubic-bezier(0.4, 0, 0.2, 1) both",
         "scale-in": "scale-in 0.18s cubic-bezier(0.4, 0, 0.2, 1) both",
         shimmer: "shimmer 2s linear infinite",
+        "toast-timer": "toast-timer 5s linear forwards",
       },
     },
   },
