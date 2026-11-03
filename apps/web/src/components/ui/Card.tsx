@@ -21,7 +21,7 @@ export function Card({
     <section
       className={cn(
         "rounded-2xl border border-border bg-surface shadow-card",
-        !noPadding && "p-6",
+        !noPadding && "p-4 sm:p-6",
         nested && "border-border bg-canvas shadow-none",
         hoverable && [
           "cursor-pointer transition-all duration-200 ease-smooth",

@@ -113,7 +113,7 @@ export function AppLayout() {
         <div ref={pageContentRef} className="flex min-w-0 flex-1 flex-col md:ml-64">
           <main
             id="main-content"
-            className="relative w-full min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8 animate-fade-in"
+            className="relative w-full min-w-0 flex-1 overflow-x-hidden p-4 pt-20 sm:p-6 sm:pt-6 lg:p-8 animate-fade-in"
           >
             <button
               ref={menuButtonRef}

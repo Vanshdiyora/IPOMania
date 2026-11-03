@@ -143,7 +143,7 @@ export const ipoStatusSchema = z.enum([
   "LISTED",
   "WITHDRAWN",
 ]);
-export const ipoCategorySchema = z.enum(["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"]);
+export const ipoCategorySchema = z.enum(["RETAIL", "SHNI", "BHNI", "SHAREHOLDER", "EMPLOYER"]);
 
 const priceDecimalSchema = z
   .string()

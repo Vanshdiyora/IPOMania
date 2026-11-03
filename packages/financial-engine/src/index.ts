@@ -7,7 +7,7 @@ const ExactDecimal = DecimalJs.clone({
 });
 type Decimal = InstanceType<typeof ExactDecimal>;
 
-export type IpoCategory = "RETAIL" | "SHNI" | "BHNI" | "SHAREHOLDER";
+export type IpoCategory = "RETAIL" | "SHNI" | "BHNI" | "SHAREHOLDER" | "EMPLOYER";
 export type IpoPriceType = "BID" | "CUT_OFF";
 
 export interface IpoPricingInput {
@@ -404,7 +404,7 @@ function makeResult(
 }
 
 function isIpoCategory(value: string): value is IpoCategory {
-  return ["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"].includes(value);
+  return ["RETAIL", "SHNI", "BHNI", "SHAREHOLDER", "EMPLOYER"].includes(value);
 }
 
 function parsePositiveDecimal(value: string): Decimal {

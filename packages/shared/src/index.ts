@@ -54,7 +54,7 @@ export type IpoStatus =
   | "LISTED"
   | "WITHDRAWN";
 
-export type IpoCategoryCode = "RETAIL" | "SHNI" | "BHNI" | "SHAREHOLDER";
+export type IpoCategoryCode = "RETAIL" | "SHNI" | "BHNI" | "SHAREHOLDER" | "EMPLOYER";
 
 export interface IpoRecord {
   id: string;
