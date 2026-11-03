@@ -36,6 +36,11 @@ its owner. Composite foreign keys bind category versions and calculation snapsho
 owner as their IPO and demat account. Authenticated users can archive IPOs but cannot mutate
 historical rule versions or calculation results. See [IPO_SCHEMA.md](./IPO_SCHEMA.md).
 
+The admin catalog migration adds `ipo_catalog_categories` with forced RLS: signed-in users can read
+rules only for active shared IPOs, while admin-authorized requests can insert immutable versions.
+The application import route copies selected rules into the user's existing owner-scoped IPO and
+category tables using the caller's JWT.
+
 The `20261031160000_capital_management.sql` migration adds owner-scoped application records,
 mandates, allotments, allotment change history, and an append-only capital ledger. Applications
 reference only the same owner's saved eligible calculation, IPO, account, and issue-rule version.

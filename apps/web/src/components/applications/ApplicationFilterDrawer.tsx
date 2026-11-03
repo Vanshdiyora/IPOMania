@@ -3,13 +3,11 @@ import { DateRangePicker } from "../filters/DateRangePicker";
 import { SearchableSelect, type SearchableSelectOption } from "../filters/SearchableSelect";
 
 export type ApplicationFilters = {
-  ipoIds: string[];
   dematAccountId: string;
   broker: string;
   archiveStatus: "active" | "archived" | "all";
   reference: string;
   categoryId: string;
-  applicationStatus: string;
   submissionFrom: string;
   submissionTo: string;
 };
@@ -18,13 +16,10 @@ type ApplicationFilterDrawerProps = {
   open: boolean;
   filters: ApplicationFilters;
   activeCount: number;
-  ipoOptions: SearchableSelectOption[];
   accountOptions: SearchableSelectOption[];
   brokerOptions: SearchableSelectOption[];
   categoryOptions: SearchableSelectOption[];
-  statusOptions: SearchableSelectOption[];
   loading?: {
-    ipos?: boolean;
     accounts?: boolean;
     brokers?: boolean;
     categories?: boolean;
@@ -42,11 +37,9 @@ export function ApplicationFilterDrawer({
   open,
   filters,
   activeCount,
-  ipoOptions,
   accountOptions,
   brokerOptions,
   categoryOptions,
-  statusOptions,
   loading = {},
   onChange,
   onClose,
@@ -67,19 +60,6 @@ export function ApplicationFilterDrawer({
       applyDisabled={invalidDateRange}
     >
       <div className="space-y-5">
-        <FilterSection title="IPO selection">
-          <SearchableSelect
-            label="Select IPOs"
-            placeholder="Select IPOs"
-            searchPlaceholder="Search IPOs..."
-            options={ipoOptions}
-            value={filters.ipoIds}
-            onChange={(value) => onChange("ipoIds", value as string[])}
-            loading={loading.ipos}
-            multiple
-            emptyLabel="No IPOs match your search."
-          />
-        </FilterSection>
         <FilterSection title="Demat account">
           <SearchableSelect
             label="Account"
@@ -136,15 +116,6 @@ export function ApplicationFilterDrawer({
             value={filters.categoryId}
             onChange={(value) => onChange("categoryId", value as string)}
             loading={loading.categories}
-          />
-        </FilterSection>
-        <FilterSection title="Application status">
-          <SearchableSelect
-            label="Status"
-            placeholder="All statuses"
-            options={statusOptions}
-            value={filters.applicationStatus}
-            onChange={(value) => onChange("applicationStatus", value as string)}
           />
         </FilterSection>
         <FilterSection title="Submission date range">

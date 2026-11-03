@@ -3,12 +3,13 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ApiModule from "../../apps/web/src/lib/api";
 import { ToastProvider } from "../../apps/web/src/components/ui/Toast";
 import {
   IpoCatalogDetailsPage,
+  IpoCategoryConfigurationPage,
   IpoDetailsPage,
   IpoListPage,
 } from "../../apps/web/src/pages/ipos/IpoPages";
@@ -16,6 +17,17 @@ import {
 const { apiRequestMock } = vi.hoisted(() => ({ apiRequestMock: vi.fn() }));
 vi.mock("../../apps/web/src/auth/useAuth", () => ({
   useAuth: () => ({ session: { access_token: "regular-user-token" } }),
+}));
+vi.mock("../../apps/web/src/components/ui/FormDrawer", () => ({
+  RouteFormDrawer: ({ children, title }: { children: React.ReactNode; title: string }) => (
+    <section>
+      <h2>{title}</h2>
+      {children}
+    </section>
+  ),
+  DrawerRouteLink: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
 }));
 vi.mock("../../apps/web/src/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof ApiModule>()),
@@ -60,9 +72,14 @@ function renderPage(path = "/ipos") {
         <MemoryRouter initialEntries={[path]}>
           <Routes>
             <Route path="/ipos" element={<IpoListPage />} />
-            <Route path="/ipo-calendar" element={<IpoListPage calendar />} />
+            <Route path="/ipo-calendar" element={<Navigate to="/ipos" replace />} />
             <Route path="/ipos/:ipoId" element={<IpoDetailsPage />} />
             <Route path="/ipos/catalog/:ipoId" element={<IpoCatalogDetailsPage />} />
+            <Route
+              path="/admin/ipos/:ipoId/categories"
+              element={<IpoCategoryConfigurationPage sharedCatalog />}
+            />
+            <Route path="/applications/new" element={<p>Application form</p>} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>
@@ -112,10 +129,7 @@ describe("user IPO catalog", () => {
       `/ipos/${catalogIpo.id}`,
     );
     expect(screen.getByText("Manual entry · unverified")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "IPO calendar" })).toHaveAttribute(
-      "href",
-      "/ipo-calendar?source=personal",
-    );
+    expect(screen.queryByRole("link", { name: /calendar/i })).not.toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/api/ipos?page=1&page_size=25&sort=date_desc",
       expect.anything(),
@@ -178,30 +192,68 @@ describe("user IPO catalog", () => {
     expect(screen.getByRole("textbox")).toHaveValue("");
   });
 
-  it("loads the same shared catalog in the IPO calendar", async () => {
+  it("keeps the catalog page focused without calendar navigation", async () => {
     apiRequestMock.mockResolvedValue(listResponse());
-    renderPage("/ipo-calendar");
-    expect(await screen.findByRole("link", { name: catalogIpo.company_name })).toBeInTheDocument();
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "IPOs" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /calendar/i })).not.toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
-      "/api/ipos/catalog?page=1&page_size=25&sort=opening_asc",
+      "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",
       expect.anything(),
     );
   });
 
-  it("shows catalog details without personal edit, archive, or category actions", async () => {
-    apiRequestMock.mockResolvedValue({ data: catalogIpo });
+  it("shows shared category rules and prepares the IPO for application tracking", async () => {
+    const personalIpoId = "99999999-9999-4999-8999-999999999999";
+    apiRequestMock.mockImplementation(async (path: string, _session, init?: RequestInit) => {
+      if (path === `/api/ipos/catalog/${catalogIpo.id}`) return { data: catalogIpo };
+      if (path === `/api/ipos/catalog/${catalogIpo.id}/categories`) {
+        return {
+          data: {
+            configurations: [{ id: "shared-retail-rule", category: "RETAIL", rule_version: 2 }],
+          },
+        };
+      }
+      if (path === `/api/ipos/catalog/${catalogIpo.id}/import` && init?.method === "POST") {
+        return { data: { ...catalogIpo, id: personalIpoId } };
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
     renderPage(`/ipos/catalog/${catalogIpo.id}`);
     expect(
       await screen.findByRole("heading", { name: catalogIpo.company_name }),
     ).toBeInTheDocument();
     expect(screen.getByText("Admin-managed", { exact: true })).toBeInTheDocument();
+    expect(await screen.findByText("Retail (rules v2)")).toBeInTheDocument();
     expect(screen.queryByText("IPO Guru", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit IPO" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Configure categories" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
-    expect(apiRequestMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(await screen.findByRole("button", { name: "Use for application" }));
+    expect(await screen.findByText("Application form")).toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
-      `/api/ipos/catalog/${catalogIpo.id}`,
+      `/api/ipos/catalog/${catalogIpo.id}/import`,
+      expect.anything(),
+      { method: "POST" },
+    );
+  });
+
+  it("loads the admin editor for shared catalog category rules", async () => {
+    apiRequestMock.mockImplementation(async (path: string) => {
+      if (path === `/api/ipos/catalog/${catalogIpo.id}`) return { data: catalogIpo };
+      if (path === `/api/admin/ipos/catalog/${catalogIpo.id}/categories`) {
+        return { data: { configurations: [] } };
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    renderPage(`/admin/ipos/${catalogIpo.id}/categories`);
+
+    expect(await screen.findByText("Category configuration")).toBeInTheDocument();
+    expect(screen.getAllByText("RETAIL").length).toBeGreaterThan(0);
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      `/api/admin/ipos/catalog/${catalogIpo.id}/categories`,
       expect.anything(),
     );
   });

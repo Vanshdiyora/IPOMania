@@ -836,6 +836,12 @@ export const applicationListQuerySchema = z
     { message: "submission_from must not be after submission_to.", path: ["submission_from"] },
   );
 
+export const applicationSummaryQuerySchema = z
+  .object({
+    ipo_id: z.uuid().optional(),
+  })
+  .strict();
+
 const dashboardFilterFields = {
   date_from: z.iso.date().optional(),
   date_to: z.iso.date().optional(),

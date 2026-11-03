@@ -3,7 +3,7 @@ import { backDestination } from "../../apps/web/src/lib/navigation";
 
 describe("backDestination", () => {
   const fallback = "/ipos?source=personal";
-  const allowed = /^\/(ipos|ipo-calendar)$/;
+  const allowed = /^\/ipos$/;
 
   it("retains the originating list query and page", () => {
     expect(

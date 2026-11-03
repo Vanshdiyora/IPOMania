@@ -4,6 +4,7 @@ import {
   applicationBulkStatusSchema,
   applicationCreateSchema,
   applicationListQuerySchema,
+  applicationSummaryQuerySchema,
   ipoCategorySchema,
 } from "@ipo-mania/validation";
 
@@ -85,5 +86,16 @@ describe("application boundary validation", () => {
     expect(parsed.ipo_search).toBe("Example company");
     expect(parsed.include_archived).toBe("all");
     expect(applicationListQuerySchema.safeParse({ ipo_ids: "not-a-uuid" }).success).toBe(false);
+  });
+
+  it("only accepts a verified IPO identifier when scoping application category totals", () => {
+    expect(applicationSummaryQuerySchema.parse({ ipo_id: validApplication.ipo_id })).toEqual({
+      ipo_id: validApplication.ipo_id,
+    });
+    expect(applicationSummaryQuerySchema.parse({})).toEqual({});
+    expect(applicationSummaryQuerySchema.safeParse({ ipo_id: "not-a-uuid" }).success).toBe(false);
+    expect(
+      applicationSummaryQuerySchema.safeParse({ user_id: validApplication.ipo_id }).success,
+    ).toBe(false);
   });
 });

@@ -40,7 +40,6 @@ timestamp automatically. Status is selected by the user and is not inferred from
 - **Archive:** soft-archive the record; calculations retain their historical snapshots.
 - **Category configuration:** add a new immutable version for each category instead of changing an
   existing version.
-- **IPO calendar:** show records in opening-date order.
 - **Quota calculator:** select an owned IPO and demat account, enter category, lot count, price,
   shareholder inputs, and explicit answers to published conditions.
 - **Application tracking:** record an eligible saved calculation for private mandate, allotment, and

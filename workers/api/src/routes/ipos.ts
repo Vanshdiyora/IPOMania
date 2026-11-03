@@ -1,6 +1,11 @@
 import { Hono, type Context } from "hono";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import type { IpoCategoryConfiguration, IpoRecord } from "@ipo-mania/shared";
+import type {
+  IpoCatalogCategoryConfiguration,
+  IpoCategoryConfiguration,
+  IpoCatalogRecord,
+  IpoRecord,
+} from "@ipo-mania/shared";
 import {
   ipoCatalogListQuerySchema,
   ipoCategoryConfigurationSchema,
@@ -20,16 +25,60 @@ type IpoContext = {
 type IpoRouteContext = Context<IpoContext>;
 
 const ipoColumns =
-  "id, company_name, symbol, ipo_type, exchange, issue_price_min, issue_price_max, cut_off_price, lot_size, issue_size, opening_date, closing_date, allotment_date, listing_date, status, data_source, source_reference, last_verified_at, created_at, updated_at, archived_at";
+  "id, company_name, symbol, ipo_type, exchange, issue_price_min, issue_price_max, cut_off_price, lot_size, issue_size, opening_date, closing_date, allotment_date, listing_date, status, data_source, source_reference, last_verified_at, source_catalog_id, created_at, updated_at, archived_at";
 const categoryColumns =
-  "id, ipo_id, category, rule_version, lot_limit_status, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, reserved_shares, reserved_percentage, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment, source_reference, rule_source, last_verified_at, created_at";
+  "id, ipo_id, category, rule_version, lot_limit_status, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, reserved_shares, reserved_percentage, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment, source_reference, source_catalog_rule_id, rule_source, last_verified_at, created_at";
+const catalogCategoryColumns =
+  "id, ipo_catalog_id, category, rule_version, lot_limit_status, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, reserved_shares, reserved_percentage, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment, source_reference, rule_source, last_verified_at, created_at";
 const catalogColumns =
   "id,provider_id,company_name,symbol,issue_type,exchange,price_band_min,price_band_max,issue_price,lot_size,issue_size,bidding_start_date,bidding_end_date,allotment_date,listing_date,ipo_status,data_source,last_synced_at,created_at,updated_at,archived_at";
 
-function catalogRecord(row: Record<string, unknown>) {
+type IpoCatalogDatabaseRow = {
+  id: string;
+  provider_id: string | null;
+  company_name: string;
+  symbol: string | null;
+  issue_type: string;
+  exchange: string | null;
+  price_band_min: number | string | null;
+  price_band_max: number | string | null;
+  issue_price: number | string | null;
+  lot_size: number | null;
+  issue_size: number | string | null;
+  bidding_start_date: string | null;
+  bidding_end_date: string | null;
+  allotment_date: string | null;
+  listing_date: string | null;
+  ipo_status: string;
+  data_source: string;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+};
+
+function catalogRecord(row: IpoCatalogDatabaseRow): IpoCatalogRecord {
   const decimal = (value: unknown) => (value == null ? null : String(value));
+  const statuses: Record<string, IpoCatalogRecord["status"]> = {
+    upcoming: "UPCOMING",
+    open: "OPEN",
+    closed: "CLOSED",
+    listed: "LISTED",
+  };
+  const status = statuses[row.ipo_status];
+  if (!status) throw new Error("The shared IPO status is invalid.");
   return {
-    ...row,
+    id: row.id,
+    company_name: row.company_name,
+    symbol: row.symbol,
+    exchange: row.exchange,
+    lot_size: row.lot_size,
+    data_source: row.data_source,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    archived_at: row.archived_at,
+    allotment_date: row.allotment_date,
+    listing_date: row.listing_date,
     ipo_type: row.issue_type === "SME" ? "SME" : "MAINBOARD",
     issue_price_min: decimal(row.price_band_min ?? row.issue_price),
     issue_price_max: decimal(row.price_band_max ?? row.issue_price),
@@ -37,7 +86,7 @@ function catalogRecord(row: Record<string, unknown>) {
     issue_size: decimal(row.issue_size),
     opening_date: row.bidding_start_date,
     closing_date: row.bidding_end_date,
-    status: String(row.ipo_status).toUpperCase(),
+    status,
     source_reference: row.provider_id ?? null,
     last_verified_at: row.last_synced_at,
   };
@@ -103,6 +152,139 @@ iposRoutes.get("/catalog/:ipoId", async (context) => {
   if (error) throw error;
   if (!data) return ipoNotFound(context);
   return context.json({ data: catalogRecord(data) });
+});
+
+iposRoutes.get("/catalog/:ipoId/categories", async (context) => {
+  const parsed = z.uuid().safeParse(context.req.param("ipoId"));
+  if (!parsed.success) return ipoNotFound(context);
+  const { data, error } = await context
+    .get("rlsSupabase")
+    .from("ipo_catalog_categories")
+    .select(catalogCategoryColumns)
+    .eq("ipo_catalog_id", parsed.data)
+    .order("category", { ascending: true })
+    .order("rule_version", { ascending: false });
+  if (error) throw error;
+  return context.json({
+    data: { configurations: (data ?? []) as IpoCatalogCategoryConfiguration[] },
+  });
+});
+
+iposRoutes.post("/catalog/:ipoId/import", async (context) => {
+  const parsed = z.uuid().safeParse(context.req.param("ipoId"));
+  if (!parsed.success) return ipoNotFound(context);
+  const supabase = context.get("rlsSupabase");
+  const userId = context.get("authenticatedUser").id;
+  const catalogIpoId = parsed.data;
+  const { data: existingOwnedIpo, error } = await supabase
+    .from("ipos")
+    .select(ipoColumns)
+    .eq("user_id", userId)
+    .eq("source_catalog_id", catalogIpoId)
+    .maybeSingle();
+  if (error) throw error;
+  let ownedIpo = existingOwnedIpo;
+
+  if (!ownedIpo) {
+    const catalogResult = await supabase
+      .from("ipo_catalog")
+      .select(catalogColumns)
+      .eq("id", catalogIpoId)
+      .is("archived_at", null)
+      .maybeSingle();
+    if (catalogResult.error) throw catalogResult.error;
+    if (!catalogResult.data) return ipoNotFound(context);
+    const row = catalogResult.data;
+    const issue = catalogRecord(row);
+    if (
+      !issue.symbol ||
+      !issue.exchange ||
+      !issue.issue_price_min ||
+      !issue.issue_price_max ||
+      !issue.lot_size ||
+      !issue.issue_size ||
+      !issue.opening_date ||
+      !issue.closing_date ||
+      Number(issue.issue_price_min) <= 0 ||
+      Number(issue.issue_price_max) < Number(issue.issue_price_min) ||
+      !Number.isSafeInteger(issue.lot_size) ||
+      issue.lot_size <= 0 ||
+      Number(issue.issue_size) <= 0
+    ) {
+      return context.json(
+        {
+          error: {
+            code: "IPO_DATA_INCOMPLETE",
+            message: "This shared IPO is missing issue data required for application calculations.",
+          },
+        },
+        422,
+      );
+    }
+
+    const { data, error: insertError } = await supabase
+      .from("ipos")
+      .insert({
+        user_id: userId,
+        source_catalog_id: catalogIpoId,
+        company_name: issue.company_name.trim(),
+        symbol: issue.symbol.trim().toUpperCase(),
+        ipo_type: issue.ipo_type,
+        exchange: issue.exchange.trim(),
+        issue_price_min: issue.issue_price_min,
+        issue_price_max: issue.issue_price_max,
+        cut_off_price:
+          issue.cut_off_price &&
+          Number(issue.cut_off_price) >= Number(issue.issue_price_min) &&
+          Number(issue.cut_off_price) <= Number(issue.issue_price_max)
+            ? issue.cut_off_price
+            : null,
+        lot_size: issue.lot_size,
+        issue_size: issue.issue_size,
+        opening_date: issue.opening_date,
+        closing_date: issue.closing_date,
+        allotment_date: issue.allotment_date,
+        listing_date: issue.listing_date,
+        status: issue.status,
+        data_source: row.data_source === "MANUAL" ? "MANUAL" : "PUBLISHED_SOURCE",
+        source_reference: row.provider_id,
+        last_verified_at: row.last_synced_at,
+      })
+      .select(ipoColumns)
+      .single();
+    if (insertError?.code === "23505") {
+      const existing = await supabase
+        .from("ipos")
+        .select(ipoColumns)
+        .eq("user_id", userId)
+        .eq("source_catalog_id", catalogIpoId)
+        .maybeSingle();
+      if (existing.error) throw existing.error;
+      ownedIpo = existing.data;
+      if (!ownedIpo) return ipoDatabaseError(context, insertError);
+    } else if (insertError) {
+      return ipoDatabaseError(context, insertError);
+    } else {
+      ownedIpo = data;
+    }
+    if (!ownedIpo) return ipoNotFound(context);
+  }
+
+  if (ownedIpo.archived_at) {
+    return context.json(
+      {
+        error: {
+          code: "IPO_ARCHIVED",
+          message: "This IPO is archived in My IPOs. Restore it before recording an application.",
+        },
+      },
+      409,
+    );
+  }
+
+  const copyError = await copyLatestCatalogRules(supabase, userId, ownedIpo.id, catalogIpoId);
+  if (copyError) throw copyError;
+  return context.json({ data: ownedIpo });
 });
 
 iposRoutes.get("/", async (context) => {
@@ -272,6 +454,82 @@ async function getOwnedIpo(context: IpoRouteContext, ipoId: string): Promise<Ipo
     .maybeSingle();
   if (error) throw error;
   return data as IpoRecord | null;
+}
+
+async function copyLatestCatalogRules(
+  supabase: SupabaseClient,
+  userId: string,
+  ipoId: string,
+  catalogIpoId: string,
+) {
+  const { data: catalogRules, error: catalogError } = await supabase
+    .from("ipo_catalog_categories")
+    .select(catalogCategoryColumns)
+    .eq("ipo_catalog_id", catalogIpoId)
+    .order("category", { ascending: true })
+    .order("rule_version", { ascending: false });
+  if (catalogError) return catalogError;
+
+  const latest = new Map<string, Record<string, unknown>>();
+  for (const rule of catalogRules ?? []) {
+    if (!latest.has(String(rule.category))) latest.set(String(rule.category), rule);
+  }
+  if (latest.size === 0) return null;
+
+  const { data: existingRules, error: existingError } = await supabase
+    .from("ipo_categories")
+    .select("category, rule_version, source_catalog_rule_id")
+    .eq("user_id", userId)
+    .eq("ipo_id", ipoId);
+  if (existingError) return existingError;
+  const currentByCategory = new Map<
+    string,
+    { rule_version: number; source_catalog_rule_id: string | null }
+  >();
+  for (const existing of existingRules ?? []) {
+    const current = currentByCategory.get(existing.category);
+    if (!current || existing.rule_version > current.rule_version) {
+      currentByCategory.set(existing.category, {
+        rule_version: existing.rule_version,
+        source_catalog_rule_id: existing.source_catalog_rule_id,
+      });
+    }
+  }
+  const missingRules = Array.from(latest.values()).filter((rule) => {
+    const current = currentByCategory.get(String(rule.category));
+    return (
+      !current ||
+      (current.source_catalog_rule_id !== null && current.source_catalog_rule_id !== rule.id)
+    );
+  });
+  if (missingRules.length === 0) return null;
+
+  const { error } = await supabase.from("ipo_categories").insert(
+    missingRules.map((rule) => ({
+      user_id: userId,
+      ipo_id: ipoId,
+      source_catalog_rule_id: rule.id,
+      category: rule.category,
+      lot_limit_status: rule.lot_limit_status,
+      minimum_lots: rule.minimum_lots,
+      maximum_lots: rule.maximum_lots,
+      lot_increment: rule.lot_increment,
+      investment_limit_status: rule.investment_limit_status,
+      minimum_investment: rule.minimum_investment,
+      maximum_investment: rule.maximum_investment,
+      reserved_shares: rule.reserved_shares,
+      reserved_percentage: rule.reserved_percentage,
+      shareholder_record_date: rule.shareholder_record_date,
+      minimum_shareholding: rule.minimum_shareholding,
+      eligibility_conditions: rule.eligibility_conditions,
+      allowed_price_types: rule.allowed_price_types,
+      minimum_price_increment: rule.minimum_price_increment,
+      source_reference: rule.source_reference,
+      rule_source: rule.rule_source,
+      last_verified_at: rule.last_verified_at,
+    })),
+  );
+  return error;
 }
 
 function validationError(context: IpoRouteContext) {

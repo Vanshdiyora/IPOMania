@@ -772,8 +772,8 @@ export function DashboardPage() {
                 <CardTitle>Upcoming IPO Closing Dates</CardTitle>
               </div>
               <Button asChild variant="ghost" size="sm" className="gap-1 text-xs">
-                <Link to="/ipo-calendar">
-                  <span>Calendar</span>
+                <Link to="/ipos">
+                  <span>Browse IPOs</span>
                   <ChevronRight size={13} />
                 </Link>
               </Button>

@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate, redirect } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
 import { ListTabRedirect } from "../components/layout/ListTabRedirect";
 import { NotFoundPage } from "../pages/NotFoundPage";
@@ -14,7 +14,6 @@ import {
   AccountDashboardPage,
   AccountDetailsPage,
   AccountFormPage,
-  AccountImportPage,
   ImportHistoryPage,
 } from "../pages/accounts/AccountPages";
 import {
@@ -63,6 +62,10 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <AdminOverviewPage /> },
       { path: "ipos", element: <AdminIposPage /> },
+      {
+        path: "ipos/:ipoId/categories",
+        element: <IpoCategoryConfigurationPage sharedCatalog />,
+      },
       { path: "sync", element: <AdminSyncPage /> },
       { path: "ipo-sync-history", element: <AdminHistoryPage /> },
       { path: "settings", element: <AdminSettingsPage /> },
@@ -78,7 +81,10 @@ export const router = createBrowserRouter([
       { path: "accounts", element: protectedPage(<AccountDashboardPage />) },
       { path: "accounts/list", element: <ListTabRedirect path="/accounts" /> },
       { path: "accounts/new", element: protectedPage(<AccountFormPage />) },
-      { path: "accounts/import", element: protectedPage(<AccountImportPage />) },
+      {
+        path: "accounts/import",
+        element: <Navigate replace to="/accounts?accountImport=true" />,
+      },
       { path: "accounts/import-history", element: protectedPage(<ImportHistoryPage />) },
       {
         path: "accounts/import-history/:importId",
@@ -87,7 +93,10 @@ export const router = createBrowserRouter([
       { path: "accounts/:accountId/edit", element: protectedPage(<AccountFormPage editing />) },
       { path: "accounts/:accountId", element: protectedPage(<AccountDetailsPage />) },
       { path: "ipos", element: protectedPage(<IpoListPage />) },
-      { path: "ipo-calendar", element: protectedPage(<IpoListPage calendar />) },
+      {
+        path: "ipo-calendar",
+        loader: ({ request }) => redirect(`/ipos${new URL(request.url).search}`),
+      },
       { path: "ipos/new", element: protectedPage(<IpoFormPage />) },
       { path: "ipos/catalog/:ipoId", element: protectedPage(<IpoCatalogDetailsPage />) },
       { path: "ipos/:ipoId/edit", element: protectedPage(<IpoFormPage editing />) },

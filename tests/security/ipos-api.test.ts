@@ -94,6 +94,7 @@ afterEach(() => vi.unstubAllGlobals());
 function installSupabaseMock(
   handleRest: (request: Request) => Response | Promise<Response> = () =>
     new Response(JSON.stringify(ipoRow), { headers: { "Content-Type": "application/json" } }),
+  authenticatedUser = user,
 ) {
   const requests: Request[] = [];
   vi.stubGlobal(
@@ -101,7 +102,7 @@ function installSupabaseMock(
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
       if (new URL(request.url).pathname.endsWith("/auth/v1/user")) {
-        return new Response(JSON.stringify(user), {
+        return new Response(JSON.stringify(authenticatedUser), {
           headers: { "Content-Type": "application/json" },
         });
       }
@@ -175,6 +176,291 @@ describe("IPO management API", () => {
     expect(new URL(requests[0]!.url).searchParams.get("or")).toBe(
       '(company_name.ilike."%Test\\\\_\\\\%,\\"(Company)%",symbol.ilike."Test\\\\_\\\\%,\\"(Company)")',
     );
+  });
+
+  it("returns shared IPO category rules to signed-in users", async () => {
+    const sharedRule = {
+      ...categoryRow,
+      ipo_catalog_id: ipoId,
+      source_reference: "https://issuer.example/rules",
+      rule_source: "PUBLISHED_SOURCE",
+      last_verified_at: "2026-11-02T12:00:00.000Z",
+    };
+    const requests = installSupabaseMock(
+      () =>
+        new Response(JSON.stringify([sharedRule]), {
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    const response = await createApp().request(
+      `/api/ipos/catalog/${ipoId}/categories`,
+      { headers: authHeaders() },
+      bindings,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { configurations: [{ id: categoryId, category: "RETAIL", rule_version: 2 }] },
+    });
+    const request = requests[0]!;
+    expect(new URL(request.url).pathname).toBe("/rest/v1/ipo_catalog_categories");
+    expect(new URL(request.url).searchParams.get("ipo_catalog_id")).toBe(`eq.${ipoId}`);
+    expect(new URL(request.url).searchParams.get("user_id")).toBeNull();
+    expect(request.headers.get("authorization")).toBe(authHeaders().Authorization);
+  });
+
+  it("allows only verified admins to create shared category rules", async () => {
+    let insertedRule: Record<string, unknown> | undefined;
+    const adminUser = { ...user, email: "admin@gmail.com" };
+    const requests = installSupabaseMock(async (request) => {
+      const url = new URL(request.url);
+      const table = url.pathname.split("/").pop();
+      if (table === "profiles")
+        return new Response(JSON.stringify({ role: "ADMIN" }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      if (table === "ipo_catalog")
+        return new Response(JSON.stringify({ id: ipoId }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      if (table === "ipo_catalog_categories" && request.method === "POST") {
+        insertedRule = (await request.json()) as Record<string, unknown>;
+        return new Response(JSON.stringify({ ...insertedRule, id: categoryId, rule_version: 1 }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    }, adminUser);
+    const configuration = {
+      category: "RETAIL",
+      lot_limit_status: "UNCONFIGURED",
+      minimum_lots: null,
+      maximum_lots: null,
+      lot_increment: 1,
+      investment_limit_status: "UNCONFIGURED",
+      minimum_investment: null,
+      maximum_investment: null,
+      reserved_shares: null,
+      reserved_percentage: null,
+      shareholder_record_date: null,
+      minimum_shareholding: null,
+      eligibility_conditions: [],
+      allowed_price_types: ["BID"],
+      minimum_price_increment: null,
+      source_reference: "https://issuer.example/rules",
+      rule_source: "PUBLISHED_SOURCE",
+      last_verified_at: "2026-11-02T12:00:00.000Z",
+    };
+    const response = await createApp().request(
+      `/api/admin/ipos/catalog/${ipoId}/categories`,
+      {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(configuration),
+      },
+      bindings,
+    );
+
+    expect(response.status).toBe(201);
+    expect(insertedRule).toMatchObject({
+      ipo_catalog_id: ipoId,
+      category: "RETAIL",
+      source_reference: "https://issuer.example/rules",
+    });
+    expect(insertedRule).not.toHaveProperty("rule_version");
+    expect(
+      requests.some(
+        (request) =>
+          new URL(request.url).pathname === "/rest/v1/ipo_catalog_categories" &&
+          request.headers.get("authorization") === authHeaders().Authorization,
+      ),
+    ).toBe(true);
+
+    const nonAdminRequests = installSupabaseMock();
+    const denied = await createApp().request(
+      `/api/admin/ipos/catalog/${ipoId}/categories`,
+      {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(configuration),
+      },
+      bindings,
+    );
+    expect(denied.status).toBe(403);
+    expect(nonAdminRequests).toHaveLength(0);
+  });
+
+  it("copies shared IPO data and latest category rules into the user's IPO record", async () => {
+    const completeCatalogRow = {
+      ...catalogRow,
+      symbol: "CATALOG",
+      exchange: "NSE",
+      issue_size: 100000,
+      bidding_start_date: "2026-11-01",
+      bidding_end_date: "2026-11-03",
+      last_synced_at: "2026-11-02T12:00:00.000Z",
+    };
+    const sharedRule = {
+      ...categoryRow,
+      ipo_catalog_id: ipoId,
+      source_reference: "https://issuer.example/rules",
+      rule_source: "PUBLISHED_SOURCE",
+      last_verified_at: "2026-11-02T12:00:00.000Z",
+    };
+    let insertedIpo: Record<string, unknown> | undefined;
+    let insertedCategories: Array<Record<string, unknown>> = [];
+    const requests = installSupabaseMock(async (request) => {
+      const url = new URL(request.url);
+      const table = url.pathname.split("/").pop();
+      if (table === "ipos" && request.method === "GET") {
+        if (url.searchParams.has("source_catalog_id")) return new Response("null");
+        return new Response(JSON.stringify(ipoRow), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (table === "ipo_catalog") {
+        return new Response(JSON.stringify(completeCatalogRow), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (table === "ipos" && request.method === "POST") {
+        insertedIpo = (await request.json()) as Record<string, unknown>;
+        return new Response(
+          JSON.stringify({
+            ...ipoRow,
+            ...insertedIpo,
+            id: "99999999-9999-4999-8999-999999999999",
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (table === "ipo_catalog_categories") {
+        return new Response(JSON.stringify([sharedRule]), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (table === "ipo_categories" && request.method === "GET") return new Response("[]");
+      if (table === "ipo_categories" && request.method === "POST") {
+        const body = await request.json();
+        insertedCategories = Array.isArray(body) ? body : [body];
+        return new Response(null, { status: 201 });
+      }
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+
+    const response = await createApp().request(
+      `/api/ipos/catalog/${ipoId}/import`,
+      { method: "POST", headers: authHeaders() },
+      bindings,
+    );
+
+    expect(response.status).toBe(200);
+    expect(insertedIpo).toMatchObject({
+      user_id: userId,
+      source_catalog_id: ipoId,
+      symbol: "CATALOG",
+      data_source: "PUBLISHED_SOURCE",
+    });
+    expect(insertedCategories).toHaveLength(1);
+    expect(insertedCategories[0]).toMatchObject({
+      user_id: userId,
+      ipo_id: "99999999-9999-4999-8999-999999999999",
+      source_catalog_rule_id: categoryId,
+      category: "RETAIL",
+      source_reference: "https://issuer.example/rules",
+    });
+    expect(
+      requests.some(
+        (request) =>
+          new URL(request.url).pathname === "/rest/v1/ipo_categories" && request.method === "POST",
+      ),
+    ).toBe(true);
+  });
+
+  it("does not fabricate missing issue values when importing a shared IPO", async () => {
+    const requests = installSupabaseMock(async (request) => {
+      const url = new URL(request.url);
+      const table = url.pathname.split("/").pop();
+      if (table === "ipos") return new Response("null");
+      if (table === "ipo_catalog")
+        return new Response(JSON.stringify(catalogRow), {
+          headers: { "Content-Type": "application/json" },
+        });
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+
+    const response = await createApp().request(
+      `/api/ipos/catalog/${ipoId}/import`,
+      { method: "POST", headers: authHeaders() },
+      bindings,
+    );
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({
+      error: { code: "IPO_DATA_INCOMPLETE" },
+    });
+    expect(requests.some((request) => request.method === "POST")).toBe(false);
+  });
+
+  it("does not reuse an archived personal copy for an application", async () => {
+    const requests = installSupabaseMock(
+      () =>
+        new Response(
+          JSON.stringify({
+            ...ipoRow,
+            source_catalog_id: ipoId,
+            archived_at: "2026-11-02T12:00:00.000Z",
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        ),
+    );
+
+    const response = await createApp().request(
+      `/api/ipos/catalog/${ipoId}/import`,
+      { method: "POST", headers: authHeaders() },
+      bindings,
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: { code: "IPO_ARCHIVED" },
+    });
+    expect(requests).toHaveLength(1);
+  });
+
+  it("returns a duplicate IPO conflict when the user already has an unlinked matching symbol", async () => {
+    const completeCatalogRow = {
+      ...catalogRow,
+      symbol: "CATALOG",
+      exchange: "NSE",
+      issue_size: 100000,
+      bidding_start_date: "2026-11-01",
+      bidding_end_date: "2026-11-03",
+    };
+    const requests = installSupabaseMock(async (request) => {
+      const url = new URL(request.url);
+      const table = url.pathname.split("/").pop();
+      if (table === "ipos" && request.method === "GET") return new Response("null");
+      if (table === "ipo_catalog")
+        return new Response(JSON.stringify(completeCatalogRow), {
+          headers: { "Content-Type": "application/json" },
+        });
+      if (table === "ipos" && request.method === "POST")
+        return new Response(JSON.stringify({ code: "23505" }), { status: 409 });
+      throw new Error(`Unexpected request: ${request.method} ${url.pathname}`);
+    });
+
+    const response = await createApp().request(
+      `/api/ipos/catalog/${ipoId}/import`,
+      { method: "POST", headers: authHeaders() },
+      bindings,
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: { code: "DUPLICATE_IPO" },
+    });
+    expect(requests.filter((request) => request.method === "POST")).toHaveLength(1);
   });
 
   it("rejects invalid catalog filters without querying the database", async () => {

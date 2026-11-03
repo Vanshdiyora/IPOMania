@@ -2,10 +2,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Archive, Building2, CheckCircle2, Plus, Upload, WalletCards } from "lucide-react";
+import { Archive, Building2, CheckCircle2, Plus, Upload, WalletCards, X } from "lucide-react";
 import type { z } from "@ipo-mania/validation";
 import { dematAccountSchema } from "@ipo-mania/validation";
 import type { AccountImportPreviewRow, DematAccount } from "@ipo-mania/shared";
@@ -21,6 +22,7 @@ import { Card } from "../../components/ui/Card";
 import { StatusBadge } from "../../components/ui/Badge";
 import { BackLink } from "../../components/ui/BackLink";
 import { DataTable } from "../../components/ui/DataTable";
+import { useModalLayer } from "../../components/ui/useModalLayer";
 import { ListToolbar } from "../../components/filters/ListToolbar";
 import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
 import { ApiRequestError, apiRequest } from "../../lib/api";
@@ -217,7 +219,10 @@ export function AccountDashboardPage() {
             <Plus className="size-4" aria-hidden="true" />
             Add account
           </DrawerRouteLink>
-          <Link className={`${secondaryLinkClass} gap-2 rounded-xl`} to="/accounts/import">
+          <Link
+            className={`${secondaryLinkClass} gap-2 rounded-xl`}
+            to="/accounts?accountImport=true"
+          >
             <Upload className="size-4" aria-hidden="true" />
             Import accounts
           </Link>
@@ -901,10 +906,13 @@ export function AccountDetailsPage() {
   );
 }
 
-export function AccountImportPage() {
+export function AccountImportDialog({ onClose }: { onClose: () => void }) {
   const { session, markSessionExpired } = useAuth();
   const client = useQueryClient();
   const navigate = useNavigate();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const descriptionId = `${titleId}-description`;
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
   const [sampleRows, setSampleRows] = useState<
@@ -975,169 +983,216 @@ export function AccountImportPage() {
       });
     },
   });
+  const busy = upload.isPending || confirm.isPending;
+  const close = () => {
+    if (!busy) onClose();
+  };
+  useModalLayer(true, panelRef, close, "[data-account-import-file]");
 
-  return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-navy">Bulk account import</h1>
-        <p className="mt-2 max-w-3xl text-base leading-7 text-muted">
-          Upload one CSV or XLSX sheet (up to 5 MB and 500 rows), map its columns, review every row,
-          then confirm. Invalid and duplicate rows remain visible in the report and are not
-          imported.
-        </p>
-      </header>
-      <Card>
-        <label className="block text-base font-semibold text-ink" htmlFor="account-import-file">
-          Choose a CSV or XLSX file
-        </label>
-        <input
-          id="account-import-file"
-          className={`${inputClass} mt-2`}
-          type="file"
-          accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          onChange={(event) => {
-            const selected = event.target.files?.[0] ?? null;
-            setFile(selected);
-            setHeaders([]);
-            setPreview(null);
-          }}
-        />
-        {file ? (
-          <p className="mt-2 text-sm text-muted">
-            {file.name} · {formatBytes(file.size)}
-          </p>
-        ) : null}
-        <Button
-          className="mt-4"
-          disabled={!file || upload.isPending}
-          onClick={() => upload.mutate(false)}
-        >
-          {upload.isPending ? "Reading file…" : "Upload and read columns"}
-        </Button>
-      </Card>
-      {headers.length ? (
-        <Card>
-          <h2 className="text-xl font-bold text-ink">Map spreadsheet columns</h2>
-          <p className="mt-2 text-base text-muted">
-            Required fields must be mapped. Optional fields may be left unmapped.
-          </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            {importFields.map((field) => (
-              <label key={field.key} className="block text-base font-semibold text-ink">
-                {field.label}
-                {field.required ? " (required)" : " (optional)"}
-                <CustomSelect
-                  className={inputClass}
-                  value={mapping[field.key] ?? ""}
-                  onChange={(event) =>
-                    setMapping((current) => ({ ...current, [field.key]: event.target.value }))
-                  }
-                >
-                  <option value="">Do not map</option>
-                  {headers.map((header) => (
-                    <option key={header} value={header}>
-                      {header}
-                    </option>
-                  ))}
-                </CustomSelect>
-              </label>
-            ))}
-          </div>
-          <div className="mt-5 overflow-auto">
-            <DataTable minWidth="720px">
-              <thead>
-                <tr>
-                  {headers.map((header) => (
-                    <th className="px-3 py-2" key={header}>
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sampleRows.map((row) => (
-                  <tr key={row.row_number} className="border-t border-border">
-                    {headers.map((header) => (
-                      <td className="max-w-56 truncate px-3 py-2" key={header}>
-                        {row.values[header]}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </DataTable>
+  return createPortal(
+    <div className="fixed inset-0 z-[60] grid place-items-center p-3 sm:p-6" role="presentation">
+      <button
+        aria-label="Close account import"
+        className="absolute inset-0 cursor-default bg-navy/45 backdrop-blur-sm"
+        disabled={busy}
+        type="button"
+        onClick={close}
+      />
+      <section
+        ref={panelRef}
+        aria-busy={busy}
+        aria-describedby={descriptionId}
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-indigo-100 bg-canvas shadow-2xl sm:max-h-[calc(100dvh-3rem)]"
+        role="dialog"
+        tabIndex={-1}
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-indigo-100 bg-gradient-to-r from-white via-white to-indigo-50 px-5 py-4 sm:px-7 sm:py-5">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-action">
+              Account setup
+            </p>
+            <h2 id={titleId} className="mt-1 text-2xl font-bold tracking-tight text-navy">
+              Bulk account import
+            </h2>
+            <p id={descriptionId} className="mt-1.5 max-w-3xl text-sm leading-6 text-muted">
+              Upload one CSV or XLSX sheet (up to 5 MB and 500 rows), map its columns, review every
+              row, then confirm. Invalid and duplicate rows remain visible in the report.
+            </p>
           </div>
           <Button
-            className="mt-5"
-            disabled={
-              upload.isPending ||
-              importFields.some((field) => field.required && !mapping[field.key])
-            }
-            onClick={() => upload.mutate(true)}
+            aria-label="Close account import"
+            disabled={busy}
+            size="icon"
+            variant="ghost"
+            onClick={close}
           >
-            Validate and preview
+            <X className="size-5" aria-hidden="true" />
           </Button>
-        </Card>
-      ) : null}
-      {preview?.rows ? (
-        <Card>
-          <h2 className="text-xl font-bold text-ink">Import preview</h2>
-          <p className="mt-2 text-base leading-7 text-muted" role="status">
-            {preview.summary?.ready ?? 0} ready · {preview.summary?.duplicate ?? 0} duplicate ·{" "}
-            {preview.summary?.invalid ?? 0} invalid
-          </p>
-          <div className="mt-4 overflow-auto">
-            <DataTable minWidth="720px">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="p-3">Row</th>
-                  <th className="p-3">Holder</th>
-                  <th className="p-3">Broker</th>
-                  <th className="p-3">Depository</th>
-                  <th className="p-3">Masked ID</th>
-                  <th className="p-3">Result</th>
-                  <th className="p-3">Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {preview.rows.map((row) => (
-                  <tr key={row.row_number} className="border-b border-border align-top">
-                    <td className="p-3">{row.row_number}</td>
-                    <td className="p-3">{row.record.holder_name}</td>
-                    <td className="p-3">{row.record.broker_name}</td>
-                    <td className="p-3">{row.record.depository_type}</td>
-                    <td className="p-3">{row.record.masked_demat_identifier}</td>
-                    <td className="p-3 capitalize">{row.row_status}</td>
-                    <td className="p-3 text-danger">
-                      {[...row.errors, ...row.warnings].join(" ") || "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </DataTable>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+          <div className="space-y-5">
+            <Card className="border-indigo-100 bg-white p-4 shadow-sm sm:p-5">
+              <label
+                className="block text-base font-semibold text-ink"
+                htmlFor="account-import-file"
+              >
+                Choose a CSV or XLSX file
+              </label>
+              <input
+                id="account-import-file"
+                data-account-import-file
+                className={`${inputClass} mt-2`}
+                type="file"
+                accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(event) => {
+                  const selected = event.target.files?.[0] ?? null;
+                  setFile(selected);
+                  setHeaders([]);
+                  setPreview(null);
+                }}
+              />
+              {file ? (
+                <p className="mt-2 text-sm text-muted">
+                  {file.name} · {formatBytes(file.size)}
+                </p>
+              ) : null}
+              <Button
+                className="mt-4"
+                disabled={!file || upload.isPending}
+                onClick={() => upload.mutate(false)}
+              >
+                {upload.isPending ? "Reading file…" : "Upload and read columns"}
+              </Button>
+            </Card>
+            {headers.length ? (
+              <Card className="border-indigo-100 bg-white p-4 shadow-sm sm:p-5">
+                <h2 className="text-xl font-bold text-ink">Map spreadsheet columns</h2>
+                <p className="mt-2 text-base text-muted">
+                  Required fields must be mapped. Optional fields may be left unmapped.
+                </p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  {importFields.map((field) => (
+                    <label key={field.key} className="block text-base font-semibold text-ink">
+                      {field.label}
+                      {field.required ? " (required)" : " (optional)"}
+                      <CustomSelect
+                        className={inputClass}
+                        value={mapping[field.key] ?? ""}
+                        onChange={(event) =>
+                          setMapping((current) => ({ ...current, [field.key]: event.target.value }))
+                        }
+                      >
+                        <option value="">Do not map</option>
+                        {headers.map((header) => (
+                          <option key={header} value={header}>
+                            {header}
+                          </option>
+                        ))}
+                      </CustomSelect>
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-5 overflow-auto">
+                  <DataTable minWidth="720px">
+                    <thead>
+                      <tr>
+                        {headers.map((header) => (
+                          <th className="px-3 py-2" key={header}>
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sampleRows.map((row) => (
+                        <tr key={row.row_number} className="border-t border-border">
+                          {headers.map((header) => (
+                            <td className="max-w-56 truncate px-3 py-2" key={header}>
+                              {row.values[header]}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </DataTable>
+                </div>
+                <Button
+                  className="mt-5"
+                  disabled={
+                    upload.isPending ||
+                    importFields.some((field) => field.required && !mapping[field.key])
+                  }
+                  onClick={() => upload.mutate(true)}
+                >
+                  Validate and preview
+                </Button>
+              </Card>
+            ) : null}
+            {preview?.rows ? (
+              <Card className="border-indigo-100 bg-white p-4 shadow-sm sm:p-5">
+                <h2 className="text-xl font-bold text-ink">Import preview</h2>
+                <p className="mt-2 text-base leading-7 text-muted" role="status">
+                  {preview.summary?.ready ?? 0} ready · {preview.summary?.duplicate ?? 0} duplicate
+                  · {preview.summary?.invalid ?? 0} invalid
+                </p>
+                <div className="mt-4 overflow-auto">
+                  <DataTable minWidth="720px">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="p-3">Row</th>
+                        <th className="p-3">Holder</th>
+                        <th className="p-3">Broker</th>
+                        <th className="p-3">Depository</th>
+                        <th className="p-3">Masked ID</th>
+                        <th className="p-3">Result</th>
+                        <th className="p-3">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {preview.rows.map((row) => (
+                        <tr key={row.row_number} className="border-b border-border align-top">
+                          <td className="p-3">{row.row_number}</td>
+                          <td className="p-3">{row.record.holder_name}</td>
+                          <td className="p-3">{row.record.broker_name}</td>
+                          <td className="p-3">{row.record.depository_type}</td>
+                          <td className="p-3">{row.record.masked_demat_identifier}</td>
+                          <td className="p-3 capitalize">{row.row_status}</td>
+                          <td className="p-3 text-danger">
+                            {[...row.errors, ...row.warnings].join(" ") || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </DataTable>
+                </div>
+                {preview.summary?.ready ? (
+                  <p className="mt-4 text-base text-muted">
+                    Confirming will import the ready rows. Duplicate and invalid rows will remain in
+                    the report and will not be imported.
+                  </p>
+                ) : null}
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <Button
+                    disabled={!preview.summary?.ready || confirm.isPending}
+                    onClick={() => confirm.mutate()}
+                  >
+                    {confirm.isPending
+                      ? "Saving rows…"
+                      : `Confirm ${preview.summary?.ready ?? 0} ready rows`}
+                  </Button>
+                  <Link className={secondaryLinkClass} to="/accounts/import-history">
+                    Import history
+                  </Link>
+                </div>
+              </Card>
+            ) : null}
           </div>
-          {preview.summary?.ready ? (
-            <p className="mt-4 text-base text-muted">
-              Confirming will import the ready rows. Duplicate and invalid rows will remain in the
-              report and will not be imported.
-            </p>
-          ) : null}
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Button
-              disabled={!preview.summary?.ready || confirm.isPending}
-              onClick={() => confirm.mutate()}
-            >
-              {confirm.isPending
-                ? "Saving rows…"
-                : `Confirm ${preview.summary?.ready ?? 0} ready rows`}
-            </Button>
-            <Link className={secondaryLinkClass} to="/accounts/import-history">
-              Import history
-            </Link>
-          </div>
-        </Card>
-      ) : null}
-    </div>
+        </div>
+      </section>
+    </div>,
+    document.body,
   );
 }
 
@@ -1211,7 +1266,14 @@ export function ImportHistoryPage() {
             Review imported rows, warnings, and saved reports.
           </p>
         </div>
-        <Link className={secondaryLinkClass} to="/accounts/import">
+        <Link
+          className={secondaryLinkClass}
+          to={
+            importId
+              ? `/accounts/import-history/${importId}?accountImport=true`
+              : "/accounts/import-history?accountImport=true"
+          }
+        >
           Start a new import
         </Link>
       </header>
