@@ -51,7 +51,7 @@ describe("shared form controls", () => {
     const { rerender } = render(
       <Input type="date" aria-label="Opening date" value="" onChange={dateChange} />,
     );
-    await user.click(screen.getByRole("button", { name: "Opening date" }));
+    await user.click(screen.getByRole("combobox", { name: "Opening date" }));
     await user.click(screen.getByRole("button", { name: accessibleDate }));
     expect(dateValues.at(-1)).toBe(dateKey);
 
@@ -63,7 +63,7 @@ describe("shared form controls", () => {
         onChange={datetimeChange}
       />,
     );
-    await user.click(screen.getByRole("button", { name: "Verification time" }));
+    await user.click(screen.getByRole("combobox", { name: "Verification time" }));
     await user.clear(screen.getByLabelText("Time (24-hour)"));
     await user.type(screen.getByLabelText("Time (24-hour)"), "12:30");
     await user.click(screen.getByRole("button", { name: accessibleDate }));

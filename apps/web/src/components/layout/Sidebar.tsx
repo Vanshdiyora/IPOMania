@@ -157,7 +157,7 @@ export function Sidebar({
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-0.5 pr-1"
         onClick={onNavigate}
       >
-        <p className="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-subtle">
+        <p className="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
           Workspace
         </p>
         <NavItem
@@ -194,7 +194,7 @@ export function Sidebar({
 
             <div className="my-3 h-px bg-border" />
 
-            <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-subtle">
+            <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
               Account
             </p>
 

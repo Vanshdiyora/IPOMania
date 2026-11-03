@@ -6,7 +6,7 @@ test("renders the full-width light landing page without app navigation", async (
 
   await expect(
     page.getByRole("heading", {
-      name: /Orchestrate IPO applications across all demat accounts/i,
+      name: /A clearer way to manage your IPO records/i,
     }),
   ).toBeVisible();
   await expect(page.getByRole("banner")).toHaveCount(0);
