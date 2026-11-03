@@ -39,6 +39,11 @@ select is(
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '60606060-6060-4060-8060-606060606060', true);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"60606060-6060-4060-8060-606060606060","email":"admin@gmail.com","role":"authenticated"}',
+  true
+);
 insert into public.ipo_catalog_categories (
   ipo_catalog_id, category, lot_limit_status, lot_increment,
   investment_limit_status, allowed_price_types, source_reference, rule_source
@@ -63,6 +68,11 @@ select is(
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '70707070-7070-4070-8070-707070707070', true);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"70707070-7070-4070-8070-707070707070","email":"catalog-viewer@example.test","role":"authenticated"}',
+  true
+);
 select is(
   (select count(*) from public.ipo_catalog_categories
    where ipo_catalog_id = '80808080-8080-4080-8080-808080808080'),
