@@ -59,6 +59,7 @@ export type IpoCategoryCode = "RETAIL" | "SHNI" | "BHNI" | "SHAREHOLDER" | "EMPL
 export interface IpoRecord {
   id: string;
   company_name: string;
+  source_catalog_id?: string | null;
   symbol: string;
   ipo_type: string;
   exchange: string;
@@ -115,6 +116,7 @@ export interface IpoEligibilityCondition {
 export interface IpoCategoryConfiguration {
   id: string;
   ipo_id: string;
+  source_catalog_rule_id?: string | null;
   category: IpoCategoryCode;
   rule_version: number;
   lot_limit_status: "CONFIGURED" | "NO_PUBLISHED_LIMIT" | "UNCONFIGURED";
@@ -135,6 +137,11 @@ export interface IpoCategoryConfiguration {
   rule_source: "MANUAL" | "PUBLISHED_SOURCE";
   last_verified_at: string | null;
   created_at: string;
+}
+
+export interface IpoCatalogCategoryConfiguration
+  extends Omit<IpoCategoryConfiguration, "ipo_id" | "source_catalog_rule_id"> {
+  ipo_catalog_id: string;
 }
 
 export interface IpoCalculationAudit {

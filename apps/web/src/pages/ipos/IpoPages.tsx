@@ -8,6 +8,7 @@ import type {
   DematAccount,
   IpoApplication,
   IpoCategoryCode,
+  IpoCatalogCategoryConfiguration,
   IpoCategoryConfiguration,
   IpoCatalogRecord,
   IpoRecord,
@@ -48,6 +49,17 @@ type IpoListResponse<T = IpoRecord> = {
 };
 type IpoResponse = { data: IpoRecord };
 type IpoCategoryResponse = { data: { configurations: IpoCategoryConfiguration[] } };
+type IpoCatalogCategoryResponse = {
+  data: { configurations: IpoCatalogCategoryConfiguration[] };
+};
+type IpoCategoryPageResponse = {
+  data: { id: string; company_name: string; symbol: string | null };
+};
+type IpoCategoryPageRulesResponse = {
+  data: {
+    configurations: Array<IpoCategoryConfiguration | IpoCatalogCategoryConfiguration>;
+  };
+};
 type IpoApplicationsResponse = {
   data: {
     applications: Array<
@@ -107,23 +119,27 @@ const ipoSortOptions = [
 ] as const;
 type IpoSort = (typeof ipoSortOptions)[number]["value"];
 const statuses = ipoStatusSchema.options;
+const catalogStatuses = ["UPCOMING", "OPEN", "CLOSED", "LISTED"] as const;
 const secondaryLinkClass =
   "inline-flex min-h-touch items-center justify-center rounded-lg border border-border bg-white px-5 py-2 font-semibold text-ink hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
 
-export function IpoListPage({ calendar = false }: { calendar?: boolean }) {
+export function IpoListPage() {
   const [searchParams] = useSearchParams();
   const personal = searchParams.get("source") === "personal";
-  return <IpoListContent key={`${personal}-${calendar}`} calendar={calendar} personal={personal} />;
+  return <IpoListContent key={String(personal)} personal={personal} />;
 }
 
-function IpoListContent({ calendar, personal }: { calendar: boolean; personal: boolean }) {
+function IpoListContent({ personal }: { personal: boolean }) {
   const { session } = useAuth();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get("search") ?? "";
+  const requestedStatus = searchParams.get("status");
+  const availableStatuses: readonly IpoStatus[] = personal ? statuses : catalogStatuses;
+  const status = availableStatuses.includes(requestedStatus as IpoStatus) ? requestedStatus! : "";
   const requestedSort = searchParams.get("sort");
   const selectedSort = ipoSortOptions.find((option) => option.value === requestedSort)?.value;
-  const sort: IpoSort | "opening_asc" = calendar ? "opening_asc" : (selectedSort ?? "date_desc");
+  const sort: IpoSort = selectedSort ?? "date_desc";
   const requestedPage = Number(searchParams.get("page"));
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const updateListParams = (changes: Record<string, string | null>, replace = false) => {
@@ -144,14 +160,10 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
     page_size: "25",
     sort,
     ...(search ? { search } : {}),
+    ...(status ? { status } : {}),
   });
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: [
-      "ipos",
-      personal ? "personal" : "catalog",
-      calendar ? "calendar" : "list",
-      params.toString(),
-    ],
+    queryKey: ["ipos", personal ? "personal" : "catalog", params.toString()],
     enabled: Boolean(session),
     queryFn: () =>
       apiRequest<IpoListResponse<IpoRecord | IpoCatalogRecord>>(
@@ -164,29 +176,15 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
   return (
     <div className="space-y-6">
       <PageHeader
-        title={calendar ? "IPO calendar" : "IPOs"}
-        description={
-          calendar
-            ? "View IPOs in opening-date order."
-            : "Browse the IPO catalog or manage your personal IPO records."
-        }
+        title="IPOs"
+        description="Browse the IPO catalog or manage your personal IPO records."
         actions={
-          <>
-            <Link
-              className={secondaryLinkClass}
-              to={`${calendar ? "/ipos" : "/ipo-calendar"}${personal ? "?source=personal" : ""}`}
-            >
-              {calendar ? "IPO list" : "IPO calendar"}
-            </Link>
-            {!calendar ? (
-              <DrawerRouteLink
-                className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-5 py-2 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
-                to="/ipos/new"
-              >
-                Add IPO
-              </DrawerRouteLink>
-            ) : null}
-          </>
+          <DrawerRouteLink
+            className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-5 py-2 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+            to="/ipos/new"
+          >
+            Add IPO
+          </DrawerRouteLink>
         }
       />
       <div className="flex flex-wrap gap-3" role="group" aria-label="IPO source">
@@ -248,24 +246,40 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
               }}
             />
           </label>
-          {!calendar ? (
-            <label className="block w-full shrink-0 text-sm font-semibold text-ink sm:w-64">
-              Sort IPOs
-              <CustomSelect
-                aria-label="Sort IPOs"
-                value={sort}
-                onChange={(event) =>
-                  updateListParams({ sort: event.target.value, page: null }, true)
-                }
-              >
-                {ipoSortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </CustomSelect>
-            </label>
-          ) : null}
+          <label className="block w-full shrink-0 text-sm font-semibold text-ink sm:w-52">
+            Filter IPOs
+            <CustomSelect
+              aria-label="Filter IPOs"
+              value={status}
+              searchable={false}
+              onChange={(event) =>
+                updateListParams({ status: event.target.value || null, page: null }, true)
+              }
+            >
+              <option value="">All statuses</option>
+              {availableStatuses.map((option) => (
+                <option key={option} value={option}>
+                  {label(option)}
+                </option>
+              ))}
+            </CustomSelect>
+          </label>
+          <label className="block w-full shrink-0 text-sm font-semibold text-ink sm:w-64">
+            Sort IPOs
+            <CustomSelect
+              aria-label="Sort IPOs"
+              value={sort}
+              searchable={false}
+              clearable={false}
+              onChange={(event) => updateListParams({ sort: event.target.value, page: null }, true)}
+            >
+              {ipoSortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </CustomSelect>
+          </label>
         </div>
       </Card>
       {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
@@ -364,10 +378,30 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
 export function IpoCatalogDetailsPage() {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
+  const navigate = useNavigate();
+  const { notify } = useToast();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["ipo-catalog", ipoId],
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!),
+  });
+  const categoriesQuery = useQuery({
+    queryKey: ["ipo-catalog-categories", ipoId],
+    enabled: Boolean(session && ipoId),
+    queryFn: () =>
+      apiRequest<IpoCatalogCategoryResponse>(`/api/ipos/catalog/${ipoId}/categories`, session!),
+  });
+  const importForApplication = useMutation({
+    mutationFn: () =>
+      apiRequest<IpoResponse>(`/api/ipos/catalog/${ipoId}/import`, session!, { method: "POST" }),
+    onSuccess: (result) =>
+      navigate(`/applications/new?ipo_id=${encodeURIComponent(result.data.id)}`),
+    onError: (cause) =>
+      notify({
+        title: "IPO could not be prepared for an application",
+        description: cause instanceof Error ? cause.message : "The shared IPO could not be copied.",
+        tone: "error",
+      }),
   });
   if (isLoading) return <SkeletonIpoDetails />;
   if (error) return <ErrorNotice error={error} onRetry={() => void refetch()} />;
@@ -377,7 +411,7 @@ export function IpoCatalogDetailsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <BackLink fallback="/ipos" allowedPath={/^\/(ipos|ipo-calendar|admin\/ipos|dashboard)?$/} />
+        <BackLink fallback="/ipos" allowedPath={/^\/(ipos|admin\/ipos|dashboard)?$/} />
         <h1 className="mt-3 text-3xl font-bold text-navy">{ipo.company_name}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-3 text-muted">
           <span>
@@ -387,6 +421,50 @@ export function IpoCatalogDetailsPage() {
         </div>
       </header>
       <IssueSummary ipo={ipo} personal={false} />
+      {categoriesQuery.error ? (
+        <ErrorNotice error={categoriesQuery.error} onRetry={() => void categoriesQuery.refetch()} />
+      ) : (
+        <Card>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-ink">Application categories</h2>
+              <p className="mt-1 text-sm text-muted">
+                Admin-managed, issue-specific rules. The latest saved version for each category is
+                copied into your IPO record when you continue.
+              </p>
+            </div>
+            <Button
+              disabled={importForApplication.isPending || categoriesQuery.isLoading}
+              onClick={() => importForApplication.mutate()}
+            >
+              {importForApplication.isPending ? "Preparing IPO…" : "Use for application"}
+            </Button>
+          </div>
+          {categoriesQuery.isLoading ? (
+            <p className="mt-4 text-sm text-muted" role="status" aria-busy="true">
+              Loading category rules…
+            </p>
+          ) : (
+            <ul className="mt-4 flex flex-wrap gap-2">
+              {Array.from(
+                latestByCategory(categoriesQuery.data?.data.configurations ?? []).values(),
+              ).map((rule) => (
+                <li
+                  key={rule.id}
+                  className="rounded-full border border-border px-3 py-1.5 text-sm font-medium"
+                >
+                  {formatCategory(rule.category)} (rules v{rule.rule_version})
+                </li>
+              ))}
+              {categoriesQuery.data?.data.configurations.length === 0 ? (
+                <li className="text-sm text-muted">
+                  No category rules are configured for this IPO yet.
+                </li>
+              ) : null}
+            </ul>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
@@ -444,10 +522,7 @@ export function IpoDetailsPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <BackLink
-            fallback="/ipos?source=personal"
-            allowedPath={/^\/(ipos|ipo-calendar|dashboard)?$/}
-          />
+          <BackLink fallback="/ipos?source=personal" allowedPath={/^\/(ipos|dashboard)?$/} />
           <p className="text-sm font-semibold uppercase tracking-wide text-muted">{ipo.symbol}</p>
           <h1 className="mt-1 text-3xl font-bold text-navy">{ipo.company_name}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-muted">
@@ -768,7 +843,11 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
   );
 }
 
-export function IpoCategoryConfigurationPage() {
+export function IpoCategoryConfigurationPage({
+  sharedCatalog = false,
+}: {
+  sharedCatalog?: boolean;
+}) {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
   const queryClient = useQueryClient();
@@ -783,21 +862,46 @@ export function IpoCategoryConfigurationPage() {
   const [message, setMessage] = useState("");
   const [form, setForm] = useState<RuleForm>(emptyRuleForm);
   const ipoQuery = useQuery({
-    queryKey: ["ipo", ipoId],
+    queryKey: [sharedCatalog ? "ipo-catalog" : "ipo", ipoId],
     enabled: Boolean(session && ipoId),
-    queryFn: () => apiRequest<IpoResponse>(`/api/ipos/${ipoId}`, session!),
+    queryFn: async (): Promise<IpoCategoryPageResponse> => {
+      const response = sharedCatalog
+        ? await apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!)
+        : await apiRequest<IpoResponse>(`/api/ipos/${ipoId}`, session!);
+      return {
+        data: {
+          id: response.data.id,
+          company_name: response.data.company_name,
+          symbol: response.data.symbol,
+        },
+      };
+    },
   });
   const rulesQuery = useQuery({
-    queryKey: ["ipo-categories", ipoId],
+    queryKey: [sharedCatalog ? "ipo-catalog-categories" : "ipo-categories", ipoId],
     enabled: Boolean(session && ipoId),
-    queryFn: () => apiRequest<IpoCategoryResponse>(`/api/ipos/${ipoId}/categories`, session!),
+    queryFn: async (): Promise<IpoCategoryPageRulesResponse> => {
+      const response = sharedCatalog
+        ? await apiRequest<IpoCatalogCategoryResponse>(
+            `/api/admin/ipos/catalog/${ipoId}/categories`,
+            session!,
+          )
+        : await apiRequest<IpoCategoryResponse>(`/api/ipos/${ipoId}/categories`, session!);
+      return { data: { configurations: response.data.configurations } };
+    },
   });
   const createRule = useMutation({
     mutationFn: (configuration: ReturnType<typeof ipoCategoryConfigurationSchema.parse>) =>
-      apiRequest<{ data: IpoCategoryConfiguration }>(`/api/ipos/${ipoId}/categories`, session!, {
-        method: "POST",
-        body: JSON.stringify(configuration),
-      }),
+      apiRequest<{ data: IpoCategoryConfiguration | IpoCatalogCategoryConfiguration }>(
+        sharedCatalog
+          ? `/api/admin/ipos/catalog/${ipoId}/categories`
+          : `/api/ipos/${ipoId}/categories`,
+        session!,
+        {
+          method: "POST",
+          body: JSON.stringify(configuration),
+        },
+      ),
     onSuccess: async () => {
       setCategoryDirty(false);
       setCategoryError(false);
@@ -807,7 +911,9 @@ export function IpoCategoryConfigurationPage() {
         description: "A new immutable rule version was created.",
         tone: "success",
       });
-      await queryClient.invalidateQueries({ queryKey: ["ipo-categories", ipoId] });
+      await queryClient.invalidateQueries({
+        queryKey: [sharedCatalog ? "ipo-catalog-categories" : "ipo-categories", ipoId],
+      });
     },
     onError: (error) => {
       setCategoryError(false);
@@ -878,12 +984,13 @@ export function IpoCategoryConfigurationPage() {
   }
   if (!ipoQuery.data) return <p role="alert">IPO record not found.</p>;
   const ipo = ipoQuery.data.data;
+  const cancelTo = sharedCatalog ? "/admin/ipos" : `/ipos/${ipoId}`;
 
   return (
     <RouteFormDrawer
       title="Category configuration"
-      description={`${ipo.company_name} · ${ipo.symbol}`}
-      cancelTo={`/ipos/${ipo.id}`}
+      description={`${ipo.company_name} · ${ipo.symbol ?? "Symbol not set"}`}
+      cancelTo={cancelTo}
       formId="category-rule-form"
       submitLabel="Save new rule version"
       busy={createRule.isPending}
@@ -1568,7 +1675,9 @@ function emptyRuleForm(): RuleForm {
   };
 }
 
-function toRuleForm(configuration: IpoCategoryConfiguration): RuleForm {
+function toRuleForm(
+  configuration: IpoCategoryConfiguration | IpoCatalogCategoryConfiguration,
+): RuleForm {
   return {
     lot_limit_status: configuration.lot_limit_status,
     minimum_lots: configuration.minimum_lots?.toString() ?? "",
@@ -1816,8 +1925,10 @@ function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () => void 
   );
 }
 
-function latestByCategory(configurations: IpoCategoryConfiguration[]) {
-  const latest = new Map<IpoCategoryCode, IpoCategoryConfiguration>();
+function latestByCategory<
+  TConfiguration extends Pick<IpoCategoryConfiguration, "category" | "rule_version">,
+>(configurations: TConfiguration[]) {
+  const latest = new Map<IpoCategoryCode, TConfiguration>();
   for (const configuration of configurations) {
     const current = latest.get(configuration.category);
     if (!current || configuration.rule_version > current.rule_version) {
@@ -1825,6 +1936,18 @@ function latestByCategory(configurations: IpoCategoryConfiguration[]) {
     }
   }
   return latest;
+}
+
+function formatCategory(category: IpoCategoryCode) {
+  return (
+    {
+      RETAIL: "Retail",
+      SHNI: "sHNI",
+      BHNI: "bHNI",
+      SHAREHOLDER: "Shareholder",
+      EMPLOYER: "Employer",
+    }[category] ?? category
+  );
 }
 
 function parseOptionalInteger(value: string) {

@@ -17,6 +17,10 @@ errors.
 
 ## Workflow
 
+The import workflow opens in a modal dialog over the current account page. It can be launched from
+the account dashboard or import history; the legacy `/accounts/import` URL redirects to the
+account dashboard with the dialog open.
+
 1. Select and upload a file.
 2. The API parses the header row and returns a sample; no account records are created.
 3. Map columns to holder name, broker, depository, masked demat identifier, and optional fields.

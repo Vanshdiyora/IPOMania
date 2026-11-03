@@ -54,11 +54,16 @@ type ApplicationListResponse = {
   };
 };
 type ApplicationSummaryResponse = {
-  data: { total: number; application_status_counts: Record<string, number> };
+  data: {
+    total: number;
+    distinct_ipo_count: number;
+    category_counts: Record<"RETAIL" | "SHNI" | "BHNI" | "SHAREHOLDER", number>;
+  };
 };
 type IpoListResponse = {
   data: { ipos: IpoRecord[]; pagination?: { page: number; total_pages: number } };
 };
+type IpoResponse = { data: IpoRecord };
 type AccountListResponse = {
   data: { accounts: DematAccount[]; pagination?: { page: number; totalPages: number } };
 };
@@ -125,25 +130,18 @@ const fieldClass =
   "mt-1 min-h-touch w-full rounded-lg border border-border bg-white px-3 py-2 text-base text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
 const linkClass =
   "inline-flex min-h-touch items-center justify-center rounded-lg border border-border bg-white px-4 py-2 font-semibold text-ink hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
-const statuses = ["DRAFT", "SUBMITTED", "UNDER_PROCESSING", "REJECTED", "FAILED", "COMPLETED"];
 const defaultApplicationFilters: ApplicationFilters = {
-  ipoIds: [],
   dematAccountId: "",
   broker: "",
   archiveStatus: "active",
   reference: "",
   categoryId: "",
-  applicationStatus: "",
   submissionFrom: "",
   submissionTo: "",
 };
 
 function filtersFromParams(params: URLSearchParams): ApplicationFilters {
-  const legacyIpoId = params.get("ipo_id");
   return {
-    ipoIds: (params.get("ipo_ids")?.split(",") ?? (legacyIpoId ? [legacyIpoId] : [])).filter(
-      Boolean,
-    ),
     dematAccountId: params.get("demat_account_id") ?? "",
     broker: params.get("broker") ?? "",
     archiveStatus:
@@ -154,7 +152,6 @@ function filtersFromParams(params: URLSearchParams): ApplicationFilters {
           : "active",
     reference: params.get("search") ?? "",
     categoryId: params.get("category_id") ?? "",
-    applicationStatus: params.get("application_status") ?? "",
     submissionFrom: params.get("submission_from") ?? "",
     submissionTo: params.get("submission_to") ?? "",
   };
@@ -162,13 +159,11 @@ function filtersFromParams(params: URLSearchParams): ApplicationFilters {
 
 function filterCount(filters: ApplicationFilters) {
   return [
-    filters.ipoIds.length,
     filters.dematAccountId,
     filters.broker,
     filters.archiveStatus !== "active",
     filters.reference,
     filters.categoryId,
-    filters.applicationStatus,
     filters.submissionFrom || filters.submissionTo,
   ].filter(Boolean).length;
 }
@@ -222,16 +217,22 @@ function useOwnedLists() {
 
 export function ApplicationDashboardPage() {
   const { session } = useAuth();
+  const [listParams] = useSearchParams();
+  const selectedIpoId = listParams.get("ipo_id") ?? "";
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["applications", "dashboard"],
+    queryKey: ["applications", "dashboard", selectedIpoId || "all"],
     enabled: Boolean(session),
-    queryFn: () => apiRequest<ApplicationSummaryResponse>("/api/applications/summary", session!),
+    queryFn: () =>
+      apiRequest<ApplicationSummaryResponse>(
+        `/api/applications/summary${selectedIpoId ? `?ipo_id=${selectedIpoId}` : ""}`,
+        session!,
+      ),
   });
   const totals = [
-    ["Applications", data?.data.total],
-    ["Draft", data?.data.application_status_counts.DRAFT],
-    ["Submitted", data?.data.application_status_counts.SUBMITTED],
-    ["Under processing", data?.data.application_status_counts.UNDER_PROCESSING],
+    ["Retail", data?.data.category_counts.RETAIL],
+    ["sHNI", data?.data.category_counts.SHNI],
+    ["bHNI", data?.data.category_counts.BHNI],
+    ["Shareholder", data?.data.category_counts.SHAREHOLDER],
   ];
   return (
     <div className="space-y-6">
@@ -293,6 +294,7 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
   const [searchInput, setSearchInput] = useState(ipoSearch);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState<ApplicationFilters>(appliedFilters);
+  const selectedIpoId = listParams.get("ipo_id") ?? "";
   const updateListParams = useCallback(
     (changes: Record<string, string | null>, replace = true) => {
       setListParams(
@@ -312,8 +314,6 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
   );
   const applyFilters = (filters: ApplicationFilters) => {
     updateListParams({
-      ipo_id: null,
-      ipo_ids: filters.ipoIds.length ? filters.ipoIds.join(",") : null,
       demat_account_id: filters.dematAccountId || null,
       broker: filters.broker || null,
       include_archived:
@@ -324,7 +324,6 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
             : "all",
       search: filters.reference || null,
       category_id: filters.categoryId || null,
-      application_status: filters.applicationStatus || null,
       submission_from: filters.submissionFrom || null,
       submission_to: filters.submissionTo || null,
     });
@@ -354,26 +353,6 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
       return results.flatMap((result) => result.data.configurations);
     },
   });
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkStatus, setBulkStatus] = useState("");
-  const bulkStatusMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("/api/applications/bulk/status", session!, {
-        method: "PATCH",
-        body: JSON.stringify({ application_ids: selectedIds, application_status: bulkStatus }),
-      }),
-    onSuccess: async () => {
-      setSelectedIds([]);
-      notify({ title: "Selected applications updated", tone: "success" });
-      await queryClient.invalidateQueries({ queryKey: ["applications"] });
-    },
-    onError: (error) =>
-      notify({
-        title: "Applications could not be updated",
-        description: errorMessage(error),
-        tone: "error",
-      }),
-  });
   const params = new URLSearchParams({
     page: String(page),
     page_size: "50",
@@ -383,12 +362,9 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
         : appliedFilters.archiveStatus === "all"
           ? "all"
           : "false",
-    ...(appliedFilters.ipoIds.length ? { ipo_ids: appliedFilters.ipoIds.join(",") } : {}),
+    ...(selectedIpoId ? { ipo_id: selectedIpoId } : {}),
     ...(appliedFilters.dematAccountId ? { demat_account_id: appliedFilters.dematAccountId } : {}),
     ...(appliedFilters.categoryId ? { category_id: appliedFilters.categoryId } : {}),
-    ...(appliedFilters.applicationStatus
-      ? { application_status: appliedFilters.applicationStatus }
-      : {}),
     ...(appliedFilters.broker ? { broker: appliedFilters.broker } : {}),
     ...(appliedFilters.reference ? { search: appliedFilters.reference } : {}),
     ...(ipoSearch ? { ipo_search: ipoSearch } : {}),
@@ -402,6 +378,11 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
   });
   const rows = data?.data.applications ?? [];
   const activeFilterCount = filterCount(appliedFilters);
+  const summary = useQuery({
+    queryKey: ["applications", "summary", "all"],
+    enabled: Boolean(session),
+    queryFn: () => apiRequest<ApplicationSummaryResponse>("/api/applications/summary", session!),
+  });
   const ipoOptions = lists.ipos.map((ipo) => ({
     value: ipo.id,
     label: ipo.company_name,
@@ -420,10 +401,6 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
     label: category.category,
   }));
   const filterChips: ActiveFilterChip[] = [
-    ...appliedFilters.ipoIds.map((id) => ({
-      key: `ipo:${id}`,
-      label: ipoOptions.find((option) => option.value === id)?.label ?? "IPO",
-    })),
     ...(appliedFilters.dematAccountId
       ? [
           {
@@ -458,9 +435,6 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
           },
         ]
       : []),
-    ...(appliedFilters.applicationStatus
-      ? [{ key: "applicationStatus", label: prettyStatus(appliedFilters.applicationStatus) }]
-      : []),
     ...(appliedFilters.submissionFrom || appliedFilters.submissionTo
       ? [
           {
@@ -470,7 +444,6 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
         ]
       : []),
   ];
-  const queryClient = useQueryClient();
   async function exportCsv() {
     const response = await fetch(
       `${import.meta.env.VITE_API_BASE_URL ?? ""}/api/applications/export?${params}`,
@@ -537,8 +510,7 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
         filters={filterChips}
         onRemove={(key) => {
           const next = { ...appliedFilters };
-          if (key.startsWith("ipo:")) next.ipoIds = next.ipoIds.filter((id) => key !== `ipo:${id}`);
-          else if (key === "submissionDate") {
+          if (key === "submissionDate") {
             next.submissionFrom = "";
             next.submissionTo = "";
           } else if (key in next) {
@@ -553,13 +525,10 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
         open={filtersOpen}
         filters={draftFilters}
         activeCount={filterCount(draftFilters)}
-        ipoOptions={ipoOptions}
         accountOptions={accountOptions}
         brokerOptions={brokerOptions}
         categoryOptions={categoryOptions}
-        statusOptions={statuses.map((status) => ({ value: status, label: prettyStatus(status) }))}
         loading={{
-          ipos: lists.optionLoading.ipos,
           accounts: lists.optionLoading.accounts,
           brokers: lists.optionLoading.accounts,
           categories: categoriesQuery.isLoading,
@@ -591,36 +560,27 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
       ) : null}
       <Card>
         <div className="mb-4 flex flex-wrap items-end gap-3">
-          <label className="font-semibold">
-            Set application status for selected
-            <CustomSelect
-              className={fieldClass}
-              value={bulkStatus}
-              onChange={(event) => setBulkStatus(event.target.value)}
-            >
-              <option value="">Choose status</option>
-              {statuses.map((status) => (
-                <option key={status} value={status}>
-                  {prettyStatus(status)}
-                </option>
-              ))}
-            </CustomSelect>
-          </label>
-          <Button
-            variant="outline"
-            disabled={!selectedIds.length || !bulkStatus || bulkStatusMutation.isPending}
-            onClick={() => bulkStatusMutation.mutate()}
-          >
-            Update {selectedIds.length} selected
-          </Button>
+          <div className="min-w-64 flex-1 sm:max-w-md">
+            <SearchableSelect
+              label="View applications for IPO"
+              placeholder="All IPOs"
+              searchPlaceholder="Search IPOs..."
+              options={ipoOptions}
+              value={selectedIpoId}
+              onChange={(value) => updateListParams({ ipo_id: (value as string) || null })}
+              loading={lists.optionLoading.ipos}
+              emptyLabel="No IPOs match your search."
+            />
+          </div>
+          <p className="min-h-touch pt-1 text-sm font-semibold text-muted" aria-live="polite">
+            {summary.data?.data.distinct_ipo_count ?? 0} different IPO
+            {(summary.data?.data.distinct_ipo_count ?? 0) === 1 ? "" : "s"} applied
+          </p>
         </div>
         <div className="overflow-x-auto">
-          <DataTable minWidth="760px">
+          <DataTable minWidth="640px">
             <thead>
               <tr className="border-b border-border text-sm text-muted">
-                <th scope="col" className="p-3 text-center">
-                  Select
-                </th>
                 <th scope="col" className="p-3 text-left">
                   IPO / category
                 </th>
@@ -633,32 +593,14 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
                 <th scope="col" className="p-3 text-left">
                   Submitted
                 </th>
-                <th scope="col" className="p-3 text-center">
-                  Status
-                </th>
               </tr>
             </thead>
             <tbody aria-busy={isLoading}>
               {isLoading ? (
-                <SkeletonTableRows rows={6} cols={6} />
+                <SkeletonTableRows rows={6} cols={4} />
               ) : (
                 rows.map((row) => (
                   <tr key={row.id} className="border-b border-border">
-                    <td className="p-3 text-center">
-                      <input
-                        aria-label={`Select application ${row.id}`}
-                        className="size-5"
-                        type="checkbox"
-                        checked={selectedIds.includes(row.id)}
-                        onChange={(event) =>
-                          setSelectedIds((current) =>
-                            event.target.checked
-                              ? [...current, row.id]
-                              : current.filter((id) => id !== row.id),
-                          )
-                        }
-                      />
-                    </td>
                     <td className="p-3">
                       <Link
                         className="font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
@@ -679,7 +621,6 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
                     <td className="p-3 text-sm tabular-nums whitespace-nowrap">
                       {formatDateTime(row.submission_date ?? row.created_at)}
                     </td>
-                    <td className="p-3 text-center">{prettyStatus(row.application_status)}</td>
                   </tr>
                 ))
               )}
@@ -728,20 +669,39 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const [price, setPrice] = useState("");
   const [applicationNumber, setApplicationNumber] = useState("");
   const [externalReference, setExternalReference] = useState("");
-  const [applicationStatus, setApplicationStatus] = useState("DRAFT");
   const [notes, setNotes] = useState("");
   const [reviewedApplication, setReviewedApplication] = useState<{
     fingerprint: string;
     data: CalculationResponse["data"];
   } | null>(null);
   const preselectedAccountId = searchParams.get("demat_account_id");
+  const preselectedIpoId = searchParams.get("ipo_id");
+  const preselectedIpo = useQuery({
+    queryKey: ["ipo", preselectedIpoId],
+    enabled: Boolean(session && !editing && preselectedIpoId),
+    queryFn: () => apiRequest<IpoResponse>(`/api/ipos/${preselectedIpoId}`, session!),
+  });
   const categoriesQuery = useQuery({
     queryKey: ["ipo-categories", ipoId],
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<CategoryResponse>(`/api/ipos/${ipoId}/categories`, session!),
   });
-  const categories = categoriesQuery.data?.data.configurations ?? [];
+  const categoryConfigurations = categoriesQuery.data?.data.configurations ?? [];
+  // A category can have several immutable rule versions. An application must use the
+  // current version, rather than presenting duplicate category choices to the user.
+  const categories = Array.from(
+    categoryConfigurations.reduce((latest, configuration) => {
+      const current = latest.get(configuration.category);
+      if (!current || configuration.rule_version > current.rule_version)
+        latest.set(configuration.category, configuration);
+      return latest;
+    }, new Map<IpoCategoryConfiguration["category"], IpoCategoryConfiguration>()),
+  ).map(([, configuration]) => configuration);
   const activeCategory = categories.find((category) => category.id === categoryId);
+  useEffect(() => {
+    if (editing || dirty || ipoId || !preselectedIpo.data?.data.id) return;
+    setIpoId(preselectedIpo.data.data.id);
+  }, [dirty, editing, ipoId, preselectedIpo.data]);
   useEffect(() => {
     if (editing || dirty || accountId || !preselectedAccountId) return;
     const account = lists.accounts.find((item) => item.id === preselectedAccountId);
@@ -762,7 +722,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     application_number: null,
     external_reference: null,
     submission_date: null,
-    application_status: applicationStatus,
+    application_status: "DRAFT",
     mandate_status: "UNKNOWN",
     allotment_status: "UNKNOWN",
     notes: notes || null,
@@ -792,7 +752,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
         ? {
             application_number: applicationNumber || null,
             external_reference: externalReference || null,
-            application_status: applicationStatus,
             notes: notes || null,
           }
         : applicationPayload;
@@ -829,7 +788,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     setLots(String(application.lots));
     setApplicationNumber(application.application_number ?? "");
     setExternalReference(application.external_reference ?? "");
-    setApplicationStatus(application.application_status);
     setNotes(application.notes ?? "");
   }, [application, editing, ipoId]);
   return (
@@ -873,6 +831,16 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
         ) : null}
         <div hidden={editing && (detail.isLoading || Boolean(detail.error))}>
           {lists.error ? <ErrorMessage error={lists.error} /> : null}
+          {preselectedIpo.error ? <ErrorMessage error={preselectedIpo.error} /> : null}
+          {preselectedIpo.error ? (
+            <Button
+              className="mb-4 mt-2"
+              variant="outline"
+              onClick={() => void preselectedIpo.refetch()}
+            >
+              Retry shared IPO
+            </Button>
+          ) : null}
           {lists.error ? (
             <Button className="mt-2" variant="outline" onClick={() => void lists.refetch()}>
               Retry issue and account options
@@ -896,6 +864,11 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                     value={ipoId}
                     loading={lists.optionLoading.ipos}
                     disabled={lists.optionLoading.ipos}
+                    emptyLabel={
+                      lists.ipos.length === 0
+                        ? "No personal IPOs are available."
+                        : "No matching options."
+                    }
                     options={lists.ipos.map((item) => ({
                       value: item.id,
                       label: item.company_name,
@@ -909,6 +882,18 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                       setCategoryId("");
                     }}
                   />
+                  {!lists.optionLoading.ipos && lists.ipos.length === 0 ? (
+                    <p className="mt-2 text-sm text-muted">
+                      No personal IPOs are available.{" "}
+                      <Link
+                        className="font-semibold text-action underline underline-offset-2 hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+                        to="/ipos/new"
+                      >
+                        Add an IPO
+                      </Link>{" "}
+                      and configure its category before recording an application.
+                    </p>
+                  ) : null}
                   {validation.errors.ipo_id ? (
                     <p role="alert" className="mt-1 text-sm font-medium text-red-700">
                       {validation.errors.ipo_id}
@@ -955,6 +940,21 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                     </option>
                   ))}
                 </FormSelect>
+                {ipoId &&
+                !categoriesQuery.isLoading &&
+                !categoriesQuery.error &&
+                categories.length === 0 ? (
+                  <p className="text-sm text-muted sm:col-span-2" role="status">
+                    No category rules are configured for this IPO.{" "}
+                    <DrawerRouteLink
+                      className="font-semibold text-action underline underline-offset-2 hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+                      to={`/ipos/${ipoId}/categories`}
+                    >
+                      Configure categories
+                    </DrawerRouteLink>{" "}
+                    to make Retail, HNI, Shareholder, or Employer categories available.
+                  </p>
+                ) : null}
                 <FormInput
                   label="Lots"
                   error={validation.errors.lots}
@@ -1020,12 +1020,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                   value={externalReference}
                   onChange={(event) => setExternalReference(event.target.value)}
                 />
-                <StatusSelect
-                  label="Application status"
-                  value={applicationStatus}
-                  statuses={statuses}
-                  onChange={setApplicationStatus}
-                />
                 <FormTextarea
                   label="Notes"
                   error={validation.errors.notes}
@@ -1087,7 +1081,7 @@ export function ApplicationDetailsPage() {
           </p>
         </div>
         <DrawerRouteLink className={linkClass} to={`/applications/${item.id}/edit`}>
-          Edit status and notes
+          Edit application details
         </DrawerRouteLink>
       </header>
       <Card>
@@ -1106,7 +1100,6 @@ export function ApplicationDetailsPage() {
             ["Total shares", item.total_shares],
             ["Application amount", item.application_amount],
             ["Submitted", formatDateTime(item.submission_date ?? item.created_at)],
-            ["Application status", prettyStatus(item.application_status)],
             ["Rule version", item.rule_version],
           ].map(([label, value]) => (
             <div key={label}>
@@ -1776,36 +1769,6 @@ function ImportReport({ importId }: { importId: string }) {
         </ConfirmButton>
       ) : null}
     </Card>
-  );
-}
-
-function StatusSelect({
-  label,
-  value,
-  statuses: values,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  statuses: string[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="font-semibold">
-      {label}
-      <CustomSelect
-        className={fieldClass}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="">All statuses</option>
-        {values.map((item) => (
-          <option key={item} value={item}>
-            {prettyStatus(item)}
-          </option>
-        ))}
-      </CustomSelect>
-    </label>
   );
 }
 

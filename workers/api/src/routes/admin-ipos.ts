@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { adminIpoSchema as manualIpoSchema } from "@ipo-mania/validation";
+import {
+  adminIpoSchema as manualIpoSchema,
+  ipoCategoryConfigurationSchema,
+  z,
+} from "@ipo-mania/validation";
 import type { EnvironmentBindings } from "../env";
 import { authenticate } from "../middleware/authenticate";
 import { authorizeAdmin } from "../middleware/authorize-admin";
@@ -255,11 +259,15 @@ export async function runIpoSync(
         failed++;
         continue;
       }
-      const { data: existing } = await supabase
+      const { data: existing, error: lookupError } = await supabase
         .from("ipo_catalog")
         .select("id, manual_override_fields")
         .eq("provider_id", normalized.provider_id)
         .maybeSingle();
+      if (lookupError) {
+        failed++;
+        continue;
+      }
       if (!existing) {
         const { error } = await supabase.from("ipo_catalog").insert(normalized);
         if (error) failed++;
@@ -369,6 +377,74 @@ export function adminIpoRoutes() {
         500,
       );
     return context.json({ data: data ?? [] });
+  });
+
+  app.get("/catalog/:id/categories", async (context) => {
+    const parsedId = z.uuid().safeParse(context.req.param("id"));
+    if (!parsedId.success)
+      return context.json(
+        { error: { code: "IPO_NOT_FOUND", message: "The IPO record was not found." } },
+        404,
+      );
+    const supabase = context.get("rlsSupabase");
+    const { data: ipo, error: ipoError } = await supabase
+      .from("ipo_catalog")
+      .select("id")
+      .eq("id", parsedId.data)
+      .maybeSingle();
+    if (ipoError) throw ipoError;
+    if (!ipo)
+      return context.json(
+        { error: { code: "IPO_NOT_FOUND", message: "The IPO record was not found." } },
+        404,
+      );
+    const { data, error } = await supabase
+      .from("ipo_catalog_categories")
+      .select("*")
+      .eq("ipo_catalog_id", parsedId.data)
+      .order("category", { ascending: true })
+      .order("rule_version", { ascending: false });
+    if (error) throw error;
+    return context.json({ data: { configurations: data ?? [] } });
+  });
+
+  app.post("/catalog/:id/categories", async (context) => {
+    const parsedId = z.uuid().safeParse(context.req.param("id"));
+    if (!parsedId.success)
+      return context.json(
+        { error: { code: "IPO_NOT_FOUND", message: "The IPO record was not found." } },
+        404,
+      );
+    const body = await context.req.json().catch(() => null);
+    const parsed = ipoCategoryConfigurationSchema.safeParse(body);
+    if (!parsed.success)
+      return context.json(
+        { error: { code: "VALIDATION_ERROR", message: "The category rule is invalid." } },
+        400,
+      );
+    const supabase = context.get("rlsSupabase");
+    const { data: ipo, error: ipoError } = await supabase
+      .from("ipo_catalog")
+      .select("id")
+      .eq("id", parsedId.data)
+      .maybeSingle();
+    if (ipoError) throw ipoError;
+    if (!ipo)
+      return context.json(
+        { error: { code: "IPO_NOT_FOUND", message: "The IPO record was not found." } },
+        404,
+      );
+    const { data, error } = await supabase
+      .from("ipo_catalog_categories")
+      .insert({ ...parsed.data, ipo_catalog_id: parsedId.data })
+      .select("*")
+      .single();
+    if (error)
+      return context.json(
+        { error: { code: "DATABASE_ERROR", message: "The category rule could not be saved." } },
+        400,
+      );
+    return context.json({ data }, 201);
   });
 
   app.post("/catalog", async (context) => {

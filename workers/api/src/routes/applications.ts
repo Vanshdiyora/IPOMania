@@ -6,6 +6,7 @@ import {
   applicationBulkStatusSchema,
   applicationCreateSchema,
   applicationListQuerySchema,
+  applicationSummaryQuerySchema,
   applicationUpdateSchema,
 } from "@ipo-mania/validation";
 import {
@@ -94,39 +95,46 @@ export const applicationsRoutes = new Hono<ApplicationContext>();
 applicationsRoutes.use("*", authenticate);
 
 applicationsRoutes.get("/summary", async (context) => {
+  const parsed = applicationSummaryQuerySchema.safeParse(context.req.query());
+  if (!parsed.success) return validationError(context, "Application summary filters are invalid.");
   const supabase = context.get("rlsSupabase");
   const userId = context.get("authenticatedUser").id;
-  const applicationStatuses = [
-    "DRAFT",
-    "SUBMITTED",
-    "UNDER_PROCESSING",
-    "REJECTED",
-    "FAILED",
-    "COMPLETED",
-  ] as const;
-  const [totalResult, ...statusResults] = await Promise.all([
-    supabase
+  const applications: Array<{ ipo_id: string; ipo_categories: unknown }> = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    let query = supabase
       .from("applications")
-      .select("id", { count: "exact", head: true })
+      .select(`ipo_id, ${applicationCategoryEmbed}`)
       .eq("user_id", userId)
-      .is("archived_at", null),
-    ...applicationStatuses.map((status) =>
-      supabase
-        .from("applications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("application_status", status)
-        .is("archived_at", null),
-    ),
-  ]);
-  if (totalResult.error) throw totalResult.error;
-  for (const result of statusResults) if (result.error) throw result.error;
+      .is("archived_at", null);
+    if (parsed.data.ipo_id) query = query.eq("ipo_id", parsed.data.ipo_id);
+    const { data, error } = await query.range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data ?? []) as Array<{ ipo_id: string; ipo_categories: unknown }>;
+    applications.push(...page);
+    if (page.length < pageSize) break;
+  }
+  const categoryCounts: Record<string, number> = {
+    RETAIL: 0,
+    SHNI: 0,
+    BHNI: 0,
+    SHAREHOLDER: 0,
+  };
+  applications.forEach((application) => {
+    const categoryRow = Array.isArray(application.ipo_categories)
+      ? application.ipo_categories[0]
+      : application.ipo_categories;
+    const category =
+      categoryRow && typeof categoryRow === "object" && "category" in categoryRow
+        ? categoryRow.category
+        : null;
+    if (typeof category === "string" && category in categoryCounts) categoryCounts[category] += 1;
+  });
   return context.json({
     data: {
-      total: totalResult.count ?? 0,
-      application_status_counts: Object.fromEntries(
-        applicationStatuses.map((status, index) => [status, statusResults[index]?.count ?? 0]),
-      ),
+      total: applications.length,
+      distinct_ipo_count: new Set(applications.map((application) => application.ipo_id)).size,
+      category_counts: categoryCounts,
     },
   });
 });

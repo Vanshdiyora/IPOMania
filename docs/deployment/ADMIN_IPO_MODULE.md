@@ -39,10 +39,14 @@ The API URL defaults to `https://www.ipoguru.in/api/v2/ipos`; requests use the k
 Only configure IPO Guru when the API plan permits the intended production usage. Data provenance must still be displayed in the catalog.
 
 Active records saved or synchronized in `/admin/ipos` appear for signed-in users by default on
-`/ipos` and `/ipo-calendar`, through the caller-authenticated shared catalog API. Users can search,
-filter, paginate, and open read-only issue details at `/ipos/catalog/:ipoId`. Missing source values
-remain explicitly unset. Archived records are excluded. The **My IPOs** view preserves personal
-issue records and their existing editing, category configuration, and quota workflows.
+`/ipos`, through the caller-authenticated shared catalog API. Users can search, filter, paginate,
+and open read-only issue details at `/ipos/catalog/:ipoId`. Administrators manage issue-specific
+category rules from **Categories** in `/admin/ipos`; each save creates an immutable, database-
+versioned rule with source and verification metadata. Signed-in users can read those rules. From
+catalog details, **Use for application** copies complete shared issue data and the latest rules
+into the user's own IPO record; missing issue inputs are never fabricated. Archived records are
+excluded. The **My IPOs** view preserves personal issue records and their existing editing,
+category configuration, and quota workflows.
 
 ## Scheduling
 
@@ -66,4 +70,4 @@ At most one manual run is allowed in a local IST day in addition to the schedule
 
 ## Provider configuration
 
-IPO Guru API calls use `X-API-KEY`. Confirm the provider endpoint and plan scope in IPO Guru's documentation, and rotate keys using Cloudflare secrets. Provider failures preserve existing catalog rows and are recorded in synchronization logs; omitted records are never converted to deleted rows. A `429` response from IPO Guru means the provider is rate-limited or the API quota is exhausted; synchronization will wait for the displayed cooldown rather than retrying immediately.
+IPO Guru API calls use `X-API-KEY`. Confirm the provider endpoint and plan scope in IPO Guru's documentation, and rotate keys using Cloudflare secrets. Provider records are matched to catalog rows by IPO Guru's `provider_id`: a match updates the existing row, preserving fields marked as manual overrides; a record without a match is inserted. If the database lookup fails, that record is counted as failed and is not inserted. Provider failures preserve existing catalog rows and are recorded in synchronization logs; omitted records are never converted to deleted rows. A `429` response from IPO Guru means the provider is rate-limited or the API quota is exhausted; synchronization will wait for the displayed cooldown rather than retrying immediately.

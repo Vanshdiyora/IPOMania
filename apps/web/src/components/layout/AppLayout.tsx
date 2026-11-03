@@ -8,6 +8,7 @@ import { useToast } from "../ui/ToastContext";
 import { LoadingState } from "../LoadingState";
 import { DrawerRouteHost } from "./DrawerRouteHost";
 import { DrawerRouteProvider } from "../ui/FormDrawer";
+import { AccountImportDialog } from "../../pages/accounts/AccountPages";
 
 export function AppLayout() {
   const { loading, user } = useAuth();
@@ -16,6 +17,9 @@ export function AppLayout() {
   const navigate = useNavigate();
   const { notify } = useToast();
   const successMessage = (state as { successMessage?: unknown } | null)?.successMessage;
+  const accountImportDialogOpen =
+    (pathname === "/accounts" || pathname.startsWith("/accounts/")) &&
+    new URLSearchParams(location.search).get("accountImport") === "true";
   const outlet = useOutlet();
   const drawerRoute =
     /^\/(accounts|ipos|applications)\/(new|[^/]+\/edit)$/.test(pathname) ||
@@ -42,6 +46,16 @@ export function AppLayout() {
     notify({ title: successMessage, tone: "success" });
     navigate(`${pathname}${location.search}${location.hash}`, { replace: true, state: null });
   }, [location.hash, location.search, navigate, notify, pathname, successMessage]);
+
+  const closeAccountImportDialog = () => {
+    const params = new URLSearchParams(location.search);
+    params.delete("accountImport");
+    const search = params.toString();
+    navigate(
+      { pathname, search: search ? `?${search}` : "", hash: location.hash },
+      { replace: true },
+    );
+  };
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -144,6 +158,7 @@ export function AppLayout() {
             </div>
             {drawerRoute && <div key={pathname}>{outlet}</div>}
             <DrawerRouteHost path={localDrawerPath} />
+            {accountImportDialogOpen && <AccountImportDialog onClose={closeAccountImportDialog} />}
           </main>
         </div>
       </div>
@@ -167,7 +182,6 @@ function getPageTitle(pathname: string) {
   if (/^\/applications\/[^/]+$/.test(pathname)) return "Application details";
   if (pathname === "/applications/new") return "Add application";
   if (pathname === "/ipos") return "IPOs";
-  if (pathname === "/ipo-calendar") return "IPO calendar";
   if (pathname === "/quota-calculator") return "Quota calculator";
   if (/^\/ipos\/[^/]+\/categories$/.test(pathname)) return "IPO categories";
   if (/^\/ipos\/[^/]+\/edit$/.test(pathname)) return "Edit IPO";

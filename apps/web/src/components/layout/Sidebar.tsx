@@ -186,7 +186,7 @@ export function Sidebar({
             />
             <NavItem
               to="/ipos"
-              activePrefixes={["/ipos", "/ipo-calendar", "/quota-calculator"]}
+              activePrefixes={["/ipos", "/quota-calculator"]}
               icon={<TrendingUp size={18} />}
               label="IPOs"
               onClick={onNavigate}

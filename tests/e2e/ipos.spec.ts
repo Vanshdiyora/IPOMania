@@ -226,19 +226,12 @@ test("a direct catalog detail link returns to the catalog", async ({ page }) => 
   await expect(page).toHaveURL(/\/ipos$/);
 });
 
-test("IPO calendar uses the shared catalog and retains access to personal records", async ({
-  page,
-}) => {
+test("the legacy IPO calendar URL redirects to the IPO list", async ({ page }) => {
   await prepareAuthenticatedPage(page);
-  await page.goto("/ipo-calendar");
-  await expect(page.getByRole("heading", { name: "IPO calendar", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: catalogIpo.company_name })).toBeVisible();
-  await page.getByRole("button", { name: "My IPOs", exact: true }).click();
-  await expect(page.getByRole("link", { name: ipo.company_name })).toBeVisible();
-  await expect(page.getByRole("link", { name: "IPO list", exact: true })).toHaveAttribute(
-    "href",
-    "/ipos?source=personal",
-  );
+  await page.goto("/ipo-calendar?source=personal");
+  await expect(page).toHaveURL(/\/ipos\?source=personal$/);
+  await expect(page.getByRole("heading", { name: "IPOs", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: /calendar/i })).toHaveCount(0);
 });
 
 test("browser back restores the catalog without status filters", async ({ page }) => {

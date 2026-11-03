@@ -653,6 +653,9 @@ export function AdminIposPage() {
                   </dl>
                   <div className="mt-4 flex gap-2">
                     <Button asChild size="sm" variant="outline">
+                      <Link to={`/admin/ipos/${row.id}/categories`}>Categories</Link>
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
                       <Link
                         to={`/ipos/catalog/${row.id}`}
                         state={{ from: `${location.pathname}${location.search}` }}
@@ -717,6 +720,9 @@ export function AdminIposPage() {
                     </td>
                     <td className="sticky right-0 bg-white px-4 py-2">
                       <div className="flex justify-end gap-1">
+                        <Button asChild size="sm" variant="ghost">
+                          <Link to={`/admin/ipos/${row.id}/categories`}>Categories</Link>
+                        </Button>
                         <Button asChild size="sm" variant="ghost">
                           <Link
                             to={`/ipos/catalog/${row.id}`}

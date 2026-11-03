@@ -3,7 +3,7 @@
 Application PostgreSQL migrations are stored here and applied by the Supabase CLI. Supabase Auth
 owns the `auth` schema; application tables may reference `auth.users` but must not modify that
 schema. Current migrations cover profiles/preferences, demat accounts/import history, user-owned
-IPO records, issue-specific category rules, quota snapshots, manual application records, mandates,
+IPO records, user-owned and admin-managed shared category rules, quota snapshots, manual application records, mandates,
 allotments, and the append-only capital ledger. See
 [RLS policies](../../docs/database/RLS_POLICIES.md), [ACCOUNT_SCHEMA.md](../../docs/database/ACCOUNT_SCHEMA.md),
 and [IPO_SCHEMA.md](../../docs/database/IPO_SCHEMA.md) for ownership, constraints, and retention.

@@ -17,6 +17,8 @@ type SearchableSelectProps = {
   value: string | string[];
   onChange: (value: string | string[]) => void;
   multiple?: boolean;
+  searchable?: boolean;
+  clearable?: boolean;
   searchPlaceholder?: string;
   emptyLabel?: string;
   disabled?: boolean;
@@ -40,6 +42,8 @@ export function SearchableSelect({
   value,
   onChange,
   multiple = false,
+  searchable = true,
+  clearable = true,
   searchPlaceholder = "Search options...",
   emptyLabel = "No matching options.",
   disabled = false,
@@ -71,11 +75,13 @@ export function SearchableSelect({
   const listId = useId();
   const selected = Array.isArray(value) ? value : value ? [value] : [];
   const selectedOptions = options.filter((option) => selected.includes(option.value));
-  const filtered = options.filter((option) =>
-    `${option.label} ${option.description ?? ""}`
-      .toLowerCase()
-      .includes(search.trim().toLowerCase()),
-  );
+  const filtered = searchable
+    ? options.filter((option) =>
+        `${option.label} ${option.description ?? ""}`
+          .toLowerCase()
+          .includes(search.trim().toLowerCase()),
+      )
+    : options;
 
   const updatePosition = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
@@ -118,7 +124,10 @@ export function SearchableSelect({
     window.addEventListener("scroll", updatePosition, true);
     document.addEventListener("mousedown", closeOnOutside);
     document.addEventListener("keydown", closeOnEscape);
-    const frame = requestAnimationFrame(() => searchRef.current?.focus());
+    const frame = requestAnimationFrame(() => {
+      if (searchable) searchRef.current?.focus();
+      else panelRef.current?.querySelector<HTMLButtonElement>("[data-select-option]")?.focus();
+    });
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", updatePosition);
@@ -245,66 +254,72 @@ export function SearchableSelect({
               maxHeight: position.maxHeight,
             }}
           >
-            <div className="border-b border-border p-3">
-              <label className="sr-only" htmlFor={`${listId}-search`}>
-                {searchPlaceholder}
-              </label>
-              <div className="flex items-center gap-2 rounded-lg border border-border px-3 transition-colors focus-within:border-slate-400">
-                <Search className="size-4 shrink-0 text-muted" aria-hidden="true" />
-                <input
-                  ref={searchRef}
-                  id={`${listId}-search`}
-                  type="search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "ArrowDown") {
-                      event.preventDefault();
-                      panelRef.current
-                        ?.querySelector<HTMLButtonElement>("[data-select-option]")
-                        ?.focus();
-                    }
-                  }}
-                  placeholder={searchPlaceholder}
-                  className="min-h-touch w-full bg-transparent text-sm !outline-none focus-visible:!outline-none focus-visible:!ring-0 placeholder:text-muted"
-                />
-                {search ? (
-                  <button
-                    type="button"
-                    onClick={() => setSearch("")}
-                    aria-label="Clear option search"
-                  >
-                    <X className="size-4 text-muted" />
-                  </button>
+            {searchable || (multiple && options.length > 1) || (clearable && selected.length) ? (
+              <div className="border-b border-border p-3">
+                {searchable ? (
+                  <>
+                    <label className="sr-only" htmlFor={`${listId}-search`}>
+                      {searchPlaceholder}
+                    </label>
+                    <div className="flex items-center gap-2 rounded-lg border border-border px-3 transition-colors focus-within:border-slate-400">
+                      <Search className="size-4 shrink-0 text-muted" aria-hidden="true" />
+                      <input
+                        ref={searchRef}
+                        id={`${listId}-search`}
+                        type="search"
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "ArrowDown") {
+                            event.preventDefault();
+                            panelRef.current
+                              ?.querySelector<HTMLButtonElement>("[data-select-option]")
+                              ?.focus();
+                          }
+                        }}
+                        placeholder={searchPlaceholder}
+                        className="min-h-touch w-full bg-transparent text-sm !outline-none focus-visible:!outline-none focus-visible:!ring-0 placeholder:text-muted"
+                      />
+                      {search ? (
+                        <button
+                          type="button"
+                          onClick={() => setSearch("")}
+                          aria-label="Clear option search"
+                        >
+                          <X className="size-4 text-muted" />
+                        </button>
+                      ) : null}
+                    </div>
+                  </>
                 ) : null}
-              </div>
-              {multiple && options.length > 1 ? (
-                <div className="mt-2 flex justify-between gap-3 text-sm font-semibold">
+                {multiple && options.length > 1 ? (
+                  <div className="mt-2 flex justify-between gap-3 text-sm font-semibold">
+                    <button
+                      type="button"
+                      className="text-action no-underline transition-colors hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 visited:text-action"
+                      onClick={() => onChange(options.map((option) => option.value))}
+                    >
+                      Select all
+                    </button>
+                    <button
+                      type="button"
+                      className="text-action no-underline transition-colors hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 visited:text-action"
+                      onClick={() => onChange([])}
+                    >
+                      Clear selection
+                    </button>
+                  </div>
+                ) : clearable && selected.length ? (
                   <button
                     type="button"
-                    className="text-action no-underline transition-colors hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 visited:text-action"
-                    onClick={() => onChange(options.map((option) => option.value))}
-                  >
-                    Select all
-                  </button>
-                  <button
-                    type="button"
-                    className="text-action no-underline transition-colors hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 visited:text-action"
-                    onClick={() => onChange([])}
+                    className="mt-2 text-sm font-semibold text-action no-underline transition-colors hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 visited:text-action"
+                    onClick={() => onChange(multiple ? [] : "")}
                   >
                     Clear selection
                   </button>
-                </div>
-              ) : selected.length ? (
-                <button
-                  type="button"
-                  className="mt-2 text-sm font-semibold text-action no-underline transition-colors hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 visited:text-action"
-                  onClick={() => onChange(multiple ? [] : "")}
-                >
-                  Clear selection
-                </button>
-              ) : null}
-            </div>
+                ) : null}
+              </div>
+            ) : null}
             <div
               ref={optionsListRef}
               className="max-h-64 overflow-y-auto p-1.5"

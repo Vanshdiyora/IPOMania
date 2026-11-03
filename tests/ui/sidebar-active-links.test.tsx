@@ -33,7 +33,7 @@ describe("sidebar active links", () => {
     ["/accounts/list", "Demat Accounts", "Applications"],
     ["/applications", "Applications", "Demat Accounts"],
     ["/applications/list", "Applications", "Demat Accounts"],
-    ["/ipo-calendar", "IPOs", "Applications"],
+    ["/ipos", "IPOs", "Applications"],
   ])("marks the current section for %s", (path, active, inactive) => {
     const navigation = renderSidebar(path);
 

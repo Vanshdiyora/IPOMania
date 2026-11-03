@@ -55,12 +55,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
 // ─── Select ───────────────────────────────────────────────────────────────────
 type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
   inputSize?: keyof typeof inputSizeClass;
+  searchable?: boolean;
+  clearable?: boolean;
 };
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
   {
     className,
     inputSize = "md",
+    searchable = false,
+    clearable = true,
     children,
     value,
     defaultValue,
@@ -142,6 +146,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         options={options.filter((option) => option.value !== "")}
         value={currentValue}
         multiple={multiple}
+        searchable={searchable}
+        clearable={clearable}
         disabled={disabled}
         hideLabel
         triggerId={id}
