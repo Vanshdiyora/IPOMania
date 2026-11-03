@@ -109,6 +109,41 @@ describe("user IPO catalog", () => {
     );
   });
 
+  it("shows the signed-in user's IPOs alongside the shared catalog without changing ownership", async () => {
+    const ownedIpo = {
+      ...catalogIpo,
+      id: "99999999-9999-4999-8999-999999999999",
+      company_name: "My Private IPO",
+      symbol: "PRIVATE",
+      exchange: "NSE",
+      status: "OPEN",
+      data_source: "MANUAL",
+    };
+    apiRequestMock.mockImplementation(async (path: string) =>
+      path.startsWith("/api/ipos?") ? listResponse([ownedIpo]) : listResponse([catalogIpo]),
+    );
+
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "Your IPOs" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /My Private IPO/ })).toHaveAttribute(
+      "href",
+      `/ipos/${ownedIpo.id}`,
+    );
+    expect(screen.getByRole("link", { name: catalogIpo.company_name })).toHaveAttribute(
+      "href",
+      `/ipos/catalog/${catalogIpo.id}`,
+    );
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/api/ipos?page=1&page_size=25&sort=date_desc",
+      expect.anything(),
+    );
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",
+      expect.anything(),
+    );
+  });
+
   it("keeps personal IPO records and their original details links available", async () => {
     apiRequestMock.mockImplementation(async (path: string) =>
       listResponse([
@@ -312,7 +347,7 @@ describe("user IPO catalog", () => {
   it("shows a loading failure without incorrectly reporting an empty catalog", async () => {
     apiRequestMock.mockRejectedValue(new Error("Unavailable"));
     renderPage();
-    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(await screen.findAllByRole("alert")).toHaveLength(2);
     expect(screen.queryByText("No IPO records match these filters.")).not.toBeInTheDocument();
   });
 });
