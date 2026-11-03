@@ -107,6 +107,7 @@ const ipoSortOptions = [
 ] as const;
 type IpoSort = (typeof ipoSortOptions)[number]["value"];
 const statuses = ipoStatusSchema.options;
+const catalogStatuses = ["UPCOMING", "OPEN", "CLOSED", "LISTED"] as const;
 const secondaryLinkClass =
   "inline-flex min-h-touch items-center justify-center rounded-lg border border-border bg-white px-5 py-2 font-semibold text-ink hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
 
@@ -121,6 +122,9 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get("search") ?? "";
+  const requestedStatus = searchParams.get("status");
+  const availableStatuses: readonly IpoStatus[] = personal ? statuses : catalogStatuses;
+  const status = availableStatuses.includes(requestedStatus as IpoStatus) ? requestedStatus! : "";
   const requestedSort = searchParams.get("sort");
   const selectedSort = ipoSortOptions.find((option) => option.value === requestedSort)?.value;
   const sort: IpoSort | "opening_asc" = calendar ? "opening_asc" : (selectedSort ?? "date_desc");
@@ -144,6 +148,7 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
     page_size: "25",
     sort,
     ...(search ? { search } : {}),
+    ...(status ? { status } : {}),
   });
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
@@ -248,12 +253,32 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
               }}
             />
           </label>
+          <label className="block w-full shrink-0 text-sm font-semibold text-ink sm:w-52">
+            Filter IPOs
+            <CustomSelect
+              aria-label="Filter IPOs"
+              value={status}
+              searchable={false}
+              onChange={(event) =>
+                updateListParams({ status: event.target.value || null, page: null }, true)
+              }
+            >
+              <option value="">All statuses</option>
+              {availableStatuses.map((option) => (
+                <option key={option} value={option}>
+                  {label(option)}
+                </option>
+              ))}
+            </CustomSelect>
+          </label>
           {!calendar ? (
             <label className="block w-full shrink-0 text-sm font-semibold text-ink sm:w-64">
               Sort IPOs
               <CustomSelect
                 aria-label="Sort IPOs"
                 value={sort}
+                searchable={false}
+                clearable={false}
                 onChange={(event) =>
                   updateListParams({ sort: event.target.value, page: null }, true)
                 }

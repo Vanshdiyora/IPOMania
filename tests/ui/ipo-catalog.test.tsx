@@ -122,7 +122,7 @@ describe("user IPO catalog", () => {
     );
   });
 
-  it("keeps IPO statuses mixed and supports server-side sorting and search", async () => {
+  it("keeps pagination and supports status filtering, sorting, and search", async () => {
     apiRequestMock.mockResolvedValue(
       listResponse(
         [
@@ -140,15 +140,22 @@ describe("user IPO catalog", () => {
     );
     renderPage();
     await screen.findByRole("link", { name: catalogIpo.company_name });
-    expect(screen.getByText("Upcoming")).toBeInTheDocument();
-    expect(screen.getByText("Closed")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open", exact: true })).not.toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "IPO list pages" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("combobox", { name: "Sort IPOs" }));
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("option", { name: "Price · high to low" }));
     await waitFor(() =>
       expect(apiRequestMock).toHaveBeenCalledWith(
         "/api/ipos/catalog?page=1&page_size=25&sort=price_desc",
+        expect.anything(),
+      ),
+    );
+    fireEvent.click(screen.getByRole("combobox", { name: "Filter IPOs" }));
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: "Open", exact: true }));
+    await waitFor(() =>
+      expect(apiRequestMock).toHaveBeenCalledWith(
+        "/api/ipos/catalog?page=1&page_size=25&sort=price_desc&status=OPEN",
         expect.anything(),
       ),
     );
@@ -157,7 +164,7 @@ describe("user IPO catalog", () => {
     });
     await waitFor(() =>
       expect(apiRequestMock).toHaveBeenCalledWith(
-        "/api/ipos/catalog?page=1&page_size=25&sort=price_desc&search=Catalog",
+        "/api/ipos/catalog?page=1&page_size=25&sort=price_desc&search=Catalog&status=OPEN",
         expect.anything(),
       ),
     );

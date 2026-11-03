@@ -21,7 +21,10 @@ application and its historical details remain available.
 ## Calculation and validation
 
 The add-application form keeps entry to an owned, unarchived IPO, an active owned demat account,
-an issue-specific category configuration, positive whole lots, and price. It shows the calculated
+an issue-specific category configuration, positive whole lots, and price. The IPO selector lists
+only the user's **My IPOs** records: the shared catalog remains read-only and does not supply
+personal category rules. If the selector is empty, the form links to add a personal IPO; configure
+an issue-specific category before recording an application. It shows the calculated
 total amount without exposing a price-type field; the application service selects an allowed price
 mode from the configured issue rules. The server records the submission date and time when the
 form is saved, rather than accepting a user-entered timestamp. The same decimal financial engine

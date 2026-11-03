@@ -896,6 +896,11 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                     value={ipoId}
                     loading={lists.optionLoading.ipos}
                     disabled={lists.optionLoading.ipos}
+                    emptyLabel={
+                      lists.ipos.length === 0
+                        ? "No personal IPOs are available."
+                        : "No matching options."
+                    }
                     options={lists.ipos.map((item) => ({
                       value: item.id,
                       label: item.company_name,
@@ -909,6 +914,18 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                       setCategoryId("");
                     }}
                   />
+                  {!lists.optionLoading.ipos && lists.ipos.length === 0 ? (
+                    <p className="mt-2 text-sm text-muted">
+                      No personal IPOs are available.{" "}
+                      <Link
+                        className="font-semibold text-action underline underline-offset-2 hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+                        to="/ipos/new"
+                      >
+                        Add an IPO
+                      </Link>{" "}
+                      and configure its category before recording an application.
+                    </p>
+                  ) : null}
                   {validation.errors.ipo_id ? (
                     <p role="alert" className="mt-1 text-sm font-medium text-red-700">
                       {validation.errors.ipo_id}

@@ -255,11 +255,15 @@ export async function runIpoSync(
         failed++;
         continue;
       }
-      const { data: existing } = await supabase
+      const { data: existing, error: lookupError } = await supabase
         .from("ipo_catalog")
         .select("id, manual_override_fields")
         .eq("provider_id", normalized.provider_id)
         .maybeSingle();
+      if (lookupError) {
+        failed++;
+        continue;
+      }
       if (!existing) {
         const { error } = await supabase.from("ipo_catalog").insert(normalized);
         if (error) failed++;
