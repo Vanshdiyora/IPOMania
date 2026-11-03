@@ -34,12 +34,15 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_WEB_APP_ORIGIN: ${{ vars.VITE_WEB_APP_ORIGIN }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
           API_HEALTH_URL: ${{ vars.API_HEALTH_URL }}
           WEB_HEALTH_URL: ${{ vars.WEB_HEALTH_URL }}
         run: |
           test -n "$VITE_SUPABASE_URL" || { echo "::error::Set VITE_SUPABASE_URL in the preview environment."; exit 1; }
           test -n "$VITE_SUPABASE_ANON_KEY" || { echo "::error::Set VITE_SUPABASE_ANON_KEY in the preview environment."; exit 1; }
           test -n "$VITE_WEB_APP_ORIGIN" || { echo "::error::Set VITE_WEB_APP_ORIGIN in the preview environment."; exit 1; }
+          test -n "$VITE_API_BASE_URL" || { echo "::error::Set VITE_API_BASE_URL to the preview API Worker origin."; exit 1; }
+          node -e 'const url = new URL(process.env.VITE_API_BASE_URL); if (url.protocol !== "https:" || url.pathname !== "/" || url.search || url.hash) process.exit(1);' || { echo "::error::VITE_API_BASE_URL must be an HTTPS origin without a path."; exit 1; }
           test -n "$API_HEALTH_URL" || { echo "::error::Set API_HEALTH_URL in the preview environment."; exit 1; }
           test -n "$WEB_HEALTH_URL" || { echo "::error::Set WEB_HEALTH_URL in the preview environment."; exit 1; }
 
@@ -75,6 +78,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_WEB_APP_ORIGIN: ${{ vars.VITE_WEB_APP_ORIGIN }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
         run: npm run build:web
 
       - name: Deploy preview frontend Worker

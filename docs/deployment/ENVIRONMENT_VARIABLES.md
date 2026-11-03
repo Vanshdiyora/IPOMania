@@ -23,7 +23,7 @@
 | `VITE_SUPABASE_URL`         | Browser build                | Local or hosted project URL                              | Test project URL if a browser test needs it | Preview Supabase project URL                       | Production Supabase project URL                                                                       |
 | `VITE_SUPABASE_ANON_KEY`    | Browser build                | Local or hosted publishable/anon key                     | Test project public key                     | Preview project's publishable/anon key             | Production project's publishable/anon key                                                             |
 | `VITE_WEB_APP_ORIGIN`       | Browser build/auth redirects | Usually omit; current origin is used                     | Test origin or omit                         | Exact preview web origin                           | Exact canonical web origin                                                                            |
-| `VITE_API_BASE_URL`         | Browser build                | Optional direct local API URL when needed                | Usually omit                                | Do not set; use the web Worker service binding     | Do not set; use the web Worker service binding                                                        |
+| `VITE_API_BASE_URL`         | Browser build                | Optional direct local API URL when needed                | Usually omit                                | Required preview API Worker HTTPS origin           | `https://ipo-mania-api.vanshadiyora.workers.dev`                                                      |
 | `SUPABASE_URL`              | API Worker                   | Same project as browser or local Supabase URL            | Local/test project URL                      | Preview project URL                                | Production project URL                                                                                |
 | `SUPABASE_ANON_KEY`         | API Worker                   | Matching project's public anon key                       | Matching test project key                   | Preview project key                                | Production project key                                                                                |
 | `SUPABASE_SERVICE_ROLE_KEY` | API Worker only              | Omit unless explicitly testing isolated account deletion | Never use a production value                | Preview-only secret if account deletion is enabled | Production Worker secret, only if account deletion is enabled                                         |
@@ -41,9 +41,11 @@ environment-specific secret; never add it to Wrangler `[vars]`. The service-role
 the narrowly scoped account deletion path and is not required for normal user-scoped API access.
 
 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_WEB_APP_ORIGIN`, `API_HEALTH_URL`, and
-`WEB_HEALTH_URL` are GitHub environment variables for the frontend build and health checks. The
-anon key is intended to be public; the API token and service-role key are secrets and must not be
-Actions variables.
+`WEB_HEALTH_URL` are GitHub environment variables for the frontend build and health checks.
+`VITE_API_BASE_URL` is fixed to the production API Worker origin in the production workflow; set it
+to the preview API Worker HTTPS origin in the preview environment. Browser API calls go directly to
+the API Worker, where its CORS policy allows the configured web origin. The anon key is intended
+to be public; the API token and service-role key are secrets and must not be Actions variables.
 
 ## Local development
 

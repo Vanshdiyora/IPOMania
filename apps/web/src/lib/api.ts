@@ -1,5 +1,9 @@
 import type { Session } from "@supabase/supabase-js";
 
+export const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.DEV ? "" : "https://ipo-mania-api.vanshadiyora.workers.dev");
+
 type ApiErrorResponse = {
   error?: {
     code?: string;
@@ -53,7 +57,7 @@ export async function apiRequest<T>(
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? ""}${path}`, {
+    response = await fetch(`${apiBaseUrl}${path}`, {
       ...init,
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -83,7 +87,7 @@ export async function apiRequest<T>(
 export async function downloadApiFile(path: string, session: Session): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? ""}${path}`, {
+    response = await fetch(`${apiBaseUrl}${path}`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     });
   } catch {
