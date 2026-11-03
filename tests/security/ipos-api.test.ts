@@ -313,6 +313,34 @@ describe("IPO management API", () => {
     expect(query.get("symbol")).toBe("ilike.IPOTEST");
   });
 
+  it("uses the requested server-side IPO sort and defaults to newest dates first", async () => {
+    const requests = installSupabaseMock(
+      async () =>
+        new Response(JSON.stringify([ipoRow]), {
+          headers: { "Content-Type": "application/json", "Content-Range": "0-24/1" },
+        }),
+    );
+    const sorts = [
+      ["", "opening_date.desc.nullslast,company_name.asc,id.asc"],
+      ["?sort=date_asc", "opening_date.asc.nullslast,company_name.asc,id.asc"],
+      ["?sort=price_asc", "issue_price_min.asc.nullslast,company_name.asc,id.asc"],
+      ["?sort=price_desc", "issue_price_min.desc.nullslast,company_name.asc,id.asc"],
+      ["?sort=name_asc", "company_name.asc.nullslast,id.asc"],
+      ["?sort=name_desc", "company_name.desc.nullslast,id.asc"],
+    ] as const;
+    for (const [queryString] of sorts) {
+      const response = await createApp().request(
+        `/api/ipos${queryString}`,
+        { headers: authHeaders() },
+        bindings,
+      );
+      expect(response.status).toBe(200);
+    }
+    expect(requests.map((request) => new URL(request.url).searchParams.get("order"))).toEqual(
+      sorts.map(([, order]) => order),
+    );
+  });
+
   it("creates a category rule version without accepting a client-assigned version", async () => {
     let inserted: Record<string, unknown> | undefined;
     const requests = installSupabaseMock(async (request) => {

@@ -329,7 +329,7 @@ export function DashboardPage() {
               onChange={(event) => updateDraftFilter("category", event.target.value)}
             >
               <option value="">All categories</option>
-              {["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"].map((category) => (
+              {["RETAIL", "SHNI", "BHNI", "SHAREHOLDER", "EMPLOYER"].map((category) => (
                 <option key={category} value={category}>
                   {categoryLabel(category)}
                 </option>

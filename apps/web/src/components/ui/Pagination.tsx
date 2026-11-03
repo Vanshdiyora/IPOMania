@@ -13,17 +13,20 @@ export function Pagination({
   onPageChange: (page: number) => void;
   label?: string;
 }) {
-  const visiblePages = Array.from({ length: Math.min(5, Math.max(1, totalPages)) }, (_, index) => {
-    const start = Math.min(Math.max(page - 2, 1), Math.max(1, totalPages - 4));
+  const visiblePages = Array.from({ length: Math.min(3, Math.max(1, totalPages)) }, (_, index) => {
+    const start = Math.min(Math.max(page - 1, 1), Math.max(1, totalPages - 2));
     return start + index;
   });
   return (
-    <nav aria-label={label} className="flex flex-wrap items-center justify-between gap-3">
+    <nav
+      aria-label={label}
+      className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+    >
       <p className="text-sm text-muted">
         Page {page} of {Math.max(1, totalPages)}
         {total === undefined ? "" : ` · ${total} records`}
       </p>
-      <div className="flex gap-2">
+      <div className="grid grid-cols-[auto_1fr_1fr_1fr_auto] gap-2 sm:flex">
         <Button variant="outline" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
           Previous
         </Button>

@@ -177,11 +177,22 @@ export function RouteFormDrawer({
         busy={busy || closing}
         onClose={requestClose}
         footer={
-          <div className="flex flex-wrap justify-end gap-3">
-            <Button variant="outline" disabled={busy || closing} onClick={requestClose}>
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-end">
+            <Button
+              className="w-full sm:w-auto"
+              variant="outline"
+              disabled={busy || closing}
+              onClick={requestClose}
+            >
               Cancel
             </Button>
-            <Button type="submit" form={formId} loading={busy} disabled={disabled || closing}>
+            <Button
+              className="w-full sm:w-auto"
+              type="submit"
+              form={formId}
+              loading={busy}
+              disabled={disabled || closing}
+            >
               {busy ? "Saving…" : submitLabel}
             </Button>
           </div>

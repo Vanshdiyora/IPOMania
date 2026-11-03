@@ -7,7 +7,7 @@ allocations, investment caps, reserved percentages, or shareholder criteria. Use
 values from an issue-specific published source or leave the corresponding rule unconfigured.
 There are no category-specific defaults.
 
-The supported category identifiers are `RETAIL`, `SHNI`, `BHNI`, and `SHAREHOLDER`. A category
+The supported category identifiers are `RETAIL`, `SHNI`, `BHNI`, `SHAREHOLDER`, and `EMPLOYER`. A category
 record is linked to exactly one user-owned IPO. Every saved configuration gets a monotonically
 assigned rule version; configurations are append-only and historical versions are not edited.
 

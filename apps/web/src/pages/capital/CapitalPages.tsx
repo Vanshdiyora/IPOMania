@@ -81,7 +81,7 @@ const inputClass =
   "mt-1 min-h-touch w-full rounded-lg border border-border bg-white px-3 py-2 text-base text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
 const linkClass =
   "font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action";
-const categories = ["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"];
+const categories = ["RETAIL", "SHNI", "BHNI", "SHAREHOLDER", "EMPLOYER"];
 const mandateStatuses = ["PENDING", "APPROVED", "REJECTED", "REVOKED", "EXPIRED", "RELEASED"];
 const allotmentStatuses = ["ALLOTTED", "NOT_ALLOTTED", "PARTIAL_ALLOTMENT"];
 const transactionTypes = [

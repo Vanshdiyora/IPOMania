@@ -28,7 +28,13 @@ describe("application boundary validation", () => {
   });
 
   it("accepts each supported application category and lifecycle status", () => {
-    expect(ipoCategorySchema.options).toEqual(["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"]);
+    expect(ipoCategorySchema.options).toEqual([
+      "RETAIL",
+      "SHNI",
+      "BHNI",
+      "SHAREHOLDER",
+      "EMPLOYER",
+    ]);
     expect(
       ["DRAFT", "SUBMITTED", "UNDER_PROCESSING", "REJECTED", "FAILED", "COMPLETED"].every(
         (status) =>

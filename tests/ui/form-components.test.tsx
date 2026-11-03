@@ -31,6 +31,52 @@ describe("shared form controls", () => {
     expect(screen.getByRole("option", { name: /Account 9/ })).toBeInTheDocument();
   });
 
+  it("anchors a dropdown above its trigger when the drawer has less space below", async () => {
+    const originalWidth = Object.getOwnPropertyDescriptor(window, "innerWidth");
+    const originalHeight = Object.getOwnPropertyDescriptor(window, "innerHeight");
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1920 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 900 });
+
+    try {
+      render(
+        <SearchableFormSelect
+          label="Status"
+          options={[
+            { value: "UPCOMING", label: "Upcoming" },
+            { value: "OPEN", label: "Open" },
+            { value: "CLOSED", label: "Closed" },
+          ]}
+        />,
+      );
+      const trigger = screen.getByRole("combobox", { name: "Status" });
+      vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+        x: 1567,
+        y: 620,
+        top: 620,
+        right: 1857,
+        bottom: 664,
+        left: 1567,
+        width: 290,
+        height: 44,
+        toJSON: () => ({}),
+      } as DOMRect);
+
+      await userEvent.setup().click(trigger);
+
+      await waitFor(() => {
+        const menu = screen.getByRole("listbox", { name: "Status" });
+        expect(menu.style.bottom).toBe("288px");
+        expect(menu.style.maxHeight).toBe("600px");
+        expect(menu.style.left).toBe("1567px");
+        expect(menu.style.width).toBe("290px");
+        expect(menu.style.top).toBe("");
+      });
+    } finally {
+      if (originalWidth) Object.defineProperty(window, "innerWidth", originalWidth);
+      if (originalHeight) Object.defineProperty(window, "innerHeight", originalHeight);
+    }
+  });
+
   it("uses the custom calendar and 24-hour time controls", async () => {
     const dateValues: string[] = [];
     const datetimeValues: string[] = [];

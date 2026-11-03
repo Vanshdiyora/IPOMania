@@ -1,6 +1,6 @@
 import { Check, ChevronDown, LoaderCircle, Search, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 
 export type SearchableSelectOption = {
   value: string;
@@ -57,7 +57,13 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [position, setPosition] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  }>({ left: 0, width: 0, maxHeight: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -75,24 +81,25 @@ export function SearchableSelect({
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
     const viewportPadding = 12;
+    const gap = 8;
     const width = Math.min(rect.width, window.innerWidth - viewportPadding * 2);
-    const panelHeight = Math.min(380, window.innerHeight - viewportPadding * 2);
-    const roomBelow = window.innerHeight - rect.bottom - viewportPadding;
-    const top =
-      roomBelow >= panelHeight || roomBelow >= rect.top - viewportPadding
-        ? Math.min(rect.bottom + 8, window.innerHeight - panelHeight - viewportPadding)
-        : Math.max(viewportPadding, rect.top - panelHeight - 8);
+    const roomBelow = Math.max(0, window.innerHeight - rect.bottom - viewportPadding - gap);
+    const roomAbove = Math.max(0, rect.top - viewportPadding - gap);
+    const preferredHeight = 380;
+    const openBelow = roomBelow >= preferredHeight || roomBelow >= roomAbove;
+
     setPosition({
-      top: Math.max(viewportPadding, top),
       left: Math.min(
         Math.max(viewportPadding, rect.left),
         window.innerWidth - width - viewportPadding,
       ),
       width,
+      maxHeight: openBelow ? roomBelow : roomAbove,
+      ...(openBelow ? { top: rect.bottom + gap } : { bottom: window.innerHeight - rect.top + gap }),
     });
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     updatePosition();
     const closeOnOutside = (event: MouseEvent) => {
@@ -232,9 +239,10 @@ export function SearchableSelect({
             className="fixed z-[70] overflow-y-auto rounded-xl border border-border bg-white shadow-xl"
             style={{
               top: position.top,
+              bottom: position.bottom,
               left: position.left,
               width: position.width,
-              maxHeight: "calc(100dvh - 24px)",
+              maxHeight: position.maxHeight,
             }}
           >
             <div className="border-b border-border p-3">

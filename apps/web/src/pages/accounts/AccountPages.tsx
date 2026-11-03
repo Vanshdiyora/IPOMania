@@ -1,11 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Archive, Building2, CheckCircle2, Plus, Upload, WalletCards } from "lucide-react";
 import type { z } from "@ipo-mania/validation";
 import { dematAccountSchema } from "@ipo-mania/validation";
 import type { AccountImportPreviewRow, DematAccount } from "@ipo-mania/shared";
@@ -18,11 +18,13 @@ import { DrawerRouteLink, RouteFormDrawer } from "../../components/ui/FormDrawer
 import { FormSection } from "../../components/ui/FormSection";
 import { useToast } from "../../components/ui/ToastContext";
 import { Card } from "../../components/ui/Card";
+import { StatusBadge } from "../../components/ui/Badge";
 import { BackLink } from "../../components/ui/BackLink";
 import { DataTable } from "../../components/ui/DataTable";
 import { ListToolbar } from "../../components/filters/ListToolbar";
 import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
 import { ApiRequestError, apiRequest } from "../../lib/api";
+import { applicationDrawerPath } from "../../lib/applicationDrawer";
 import {
   SkeletonCard,
   SkeletonDetailsPage,
@@ -114,9 +116,7 @@ const accountColumns: ColumnDef<DematAccount>[] = [
     accessorKey: "account_status",
     header: "Status",
     cell: ({ row }) => (
-      <span className="capitalize">
-        {row.original.archived_at ? "archived" : row.original.account_status}
-      </span>
+      <StatusBadge status={row.original.archived_at ? "archived" : row.original.account_status} />
     ),
   },
   {
@@ -124,7 +124,44 @@ const accountColumns: ColumnDef<DematAccount>[] = [
     header: "Created",
     cell: ({ row }) => formatDate(row.original.created_at),
   },
+  {
+    id: "actions",
+    header: "Action",
+    cell: ({ row }) => <AccountApplicationAction account={row.original} />,
+  },
 ];
+
+function AccountApplicationAction({
+  account,
+  className,
+}: {
+  account: DematAccount;
+  className?: string;
+}) {
+  const canRecordApplication = account.account_status === "active" && !account.archived_at;
+
+  if (!canRecordApplication) {
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        className={className}
+        disabled
+        aria-label="IPO application unavailable"
+      >
+        Unavailable
+      </Button>
+    );
+  }
+
+  return (
+    <Button asChild size="sm" variant="secondary" className={className}>
+      <DrawerRouteLink to={applicationDrawerPath(account.id)}>
+        Record IPO application
+      </DrawerRouteLink>
+    </Button>
+  );
+}
 
 function AccountDetailLink({
   account,
@@ -162,21 +199,26 @@ export function AccountDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-navy">Demat accounts</h1>
-          <p className="mt-1 text-sm text-muted">
+      <header className="relative overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-br from-white via-white to-indigo-50/80 p-5 shadow-card sm:flex sm:items-end sm:justify-between sm:p-6">
+        <div className="relative min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-action">
+            Portfolio setup
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-navy">Demat accounts</h1>
+          <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted">
             Manage the accounts associated with your profile.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="relative mt-5 grid grid-cols-2 gap-2 sm:mt-0 sm:flex sm:flex-wrap sm:gap-3">
           <DrawerRouteLink
-            className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
+            className="inline-flex min-h-touch items-center justify-center gap-2 rounded-xl bg-action px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
             to="/accounts/new"
           >
+            <Plus className="size-4" aria-hidden="true" />
             Add account
           </DrawerRouteLink>
-          <Link className={secondaryLinkClass} to="/accounts/import">
+          <Link className={`${secondaryLinkClass} gap-2 rounded-xl`} to="/accounts/import">
+            <Upload className="size-4" aria-hidden="true" />
             Import accounts
           </Link>
         </div>
@@ -195,9 +237,24 @@ export function AccountDashboardPage() {
           </>
         ) : (
           <>
-            <SummaryCard label="Total accounts" value={summary?.total} loading={false} />
-            <SummaryCard label="Active accounts" value={summary?.active} loading={false} />
-            <SummaryCard label="Archived accounts" value={summary?.archived} loading={false} />
+            <SummaryCard
+              label="Total accounts"
+              value={summary?.total}
+              loading={false}
+              icon={<WalletCards className="size-5" aria-hidden="true" />}
+            />
+            <SummaryCard
+              label="Active accounts"
+              value={summary?.active}
+              loading={false}
+              icon={<CheckCircle2 className="size-5" aria-hidden="true" />}
+            />
+            <SummaryCard
+              label="Archived accounts"
+              value={summary?.archived}
+              loading={false}
+              icon={<Archive className="size-5" aria-hidden="true" />}
+            />
           </>
         )}
       </section>
@@ -277,14 +334,6 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
     rowCount: data?.data.pagination.total ?? 0,
     state: { pagination: { pageIndex: page - 1, pageSize: 50 } },
   });
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const virtualizer = useVirtualizer({
-    count: table.getRowModel().rows.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 64,
-    overscan: 8,
-  });
-  const virtualRows = virtualizer.getVirtualItems();
   const totalPages = data?.data.pagination.totalPages ?? 0;
 
   function resetFilters() {
@@ -461,16 +510,17 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
       {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       <Card className="p-3 sm:p-5">
         <div className="hidden overflow-hidden md:block" aria-busy={isLoading}>
-          <div ref={scrollRef} className="max-h-[36rem] overflow-auto">
-            <DataTable minWidth="850px" className="table-fixed text-base">
+          <div className="max-h-[36rem] overflow-auto">
+            <DataTable minWidth="1080px" className="table-fixed text-base">
               <colgroup>
                 {[
-                  ["holder_name", "20%"],
-                  ["broker_name", "17%"],
-                  ["depository_type", "16%"],
-                  ["masked_demat_identifier", "17%"],
-                  ["account_status", "15%"],
-                  ["created_at", "15%"],
+                  ["holder_name", "16%"],
+                  ["broker_name", "14%"],
+                  ["depository_type", "12%"],
+                  ["masked_demat_identifier", "15%"],
+                  ["account_status", "10%"],
+                  ["created_at", "12%"],
+                  ["actions", "21%"],
                 ].map(([id, width]) => (
                   <col key={id} style={{ width }} />
                 ))}
@@ -481,7 +531,7 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
                     {group.headers.map((header) => (
                       <th
                         key={header.id}
-                        className={`border-b border-border px-3 py-4 font-bold ${["depository_type", "account_status", "created_at"].includes(header.column.id) ? "text-center" : "text-left"}`}
+                        className={`border-b border-border px-3 py-4 font-bold ${header.column.id === "actions" ? "text-right" : ["depository_type", "account_status", "created_at"].includes(header.column.id) ? "text-center" : "text-left"}`}
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                       </th>
@@ -489,33 +539,17 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
                   </tr>
                 ))}
               </thead>
-              <tbody
-                style={
-                  isLoading
-                    ? undefined
-                    : { height: `${virtualizer.getTotalSize()}px`, position: "relative" }
-                }
-              >
+              <tbody className="divide-y divide-border">
                 {isLoading ? (
                   <SkeletonTableRows rows={6} cols={accountColumns.length} />
                 ) : (
-                  virtualRows.map((virtualRow) => {
-                    const row = table.getRowModel().rows[virtualRow.index];
+                  table.getRowModel().rows.map((row) => {
                     return (
-                      <tr
-                        key={row.id}
-                        className="absolute left-0 top-0 w-full border-b border-border bg-white"
-                        style={{
-                          height: `${virtualRow.size}px`,
-                          transform: `translateY(${virtualRow.start}px)`,
-                          display: "table",
-                          tableLayout: "fixed",
-                        }}
-                      >
+                      <tr key={row.id} className="bg-white">
                         {row.getVisibleCells().map((cell) => (
                           <td
                             key={cell.id}
-                            className={`truncate px-3 py-4 ${["depository_type", "account_status", "created_at"].includes(cell.column.id) ? "text-center tabular-nums" : "text-left"}`}
+                            className={`px-3 py-4 ${cell.column.id === "actions" ? "text-right" : ["depository_type", "account_status", "created_at"].includes(cell.column.id) ? "truncate text-center tabular-nums" : "truncate text-left"}`}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </td>
@@ -536,45 +570,28 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
               <SkeletonCard />
             </div>
           ) : (
-            accounts.map((account) => (
-              <article key={account.id} className="rounded-lg border border-border p-4 text-base">
-                <AccountDetailLink
-                  account={account}
-                  className="text-lg font-bold text-action no-underline transition-colors hover:text-navy visited:text-action"
-                >
-                  {account.holder_name}
-                </AccountDetailLink>
-                <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-y-2">
-                  <dt className="font-semibold">Broker</dt>
-                  <dd>{account.broker_name}</dd>
-                  <dt className="font-semibold">Depository</dt>
-                  <dd>{account.depository_type}</dd>
-                  <dt className="font-semibold">Masked ID</dt>
-                  <dd className="break-all">{account.masked_demat_identifier}</dd>
-                  <dt className="font-semibold">Status</dt>
-                  <dd className="capitalize">
-                    {account.archived_at ? "archived" : account.account_status}
-                  </dd>
-                  <dt className="font-semibold">Created</dt>
-                  <dd>{formatDate(account.created_at)}</dd>
-                </dl>
-              </article>
-            ))
+            accounts.map((account) => <MobileAccountCard key={account.id} account={account} />)
           )}
         </div>
         {!isLoading && accounts.length === 0 ? (
           <p className="py-8 text-center text-base text-muted">No accounts match these filters.</p>
         ) : null}
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+        <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p aria-live="polite" className="text-base text-muted">
             Page {page} of {totalPages || 1}
           </p>
-          <div className="flex gap-3">
-            <Button variant="outline" disabled={page <= 1} onClick={() => changePage(page - 1)}>
+          <div className="grid grid-cols-2 gap-3 sm:flex">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              disabled={page <= 1}
+              onClick={() => changePage(page - 1)}
+            >
               Previous
             </Button>
             <Button
               variant="outline"
+              className="w-full sm:w-auto"
               disabled={page >= totalPages}
               onClick={() => changePage(page + 1)}
             >
@@ -800,7 +817,7 @@ export function AccountDetailsPage() {
 
   return (
     <div className="w-full space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <header className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
           <BackLink fallback="/accounts" allowedPath={/^\/accounts$/}>
             Back to accounts
@@ -811,7 +828,10 @@ export function AccountDetailsPage() {
           </p>
         </div>
         {account && !account.archived_at ? (
-          <DrawerRouteLink className={secondaryLinkClass} to={`/accounts/${account.id}/edit`}>
+          <DrawerRouteLink
+            className={`${secondaryLinkClass} w-full rounded-xl sm:w-auto`}
+            to={`/accounts/${account.id}/edit`}
+          >
             Edit account
           </DrawerRouteLink>
         ) : null}
@@ -1300,19 +1320,80 @@ function SummaryCard({
   label,
   value,
   loading,
+  icon,
 }: {
   label: string;
   value?: number;
   loading: boolean;
+  icon: React.ReactNode;
 }) {
   return (
-    <Card className="relative overflow-hidden">
+    <Card className="relative overflow-hidden border-indigo-100 bg-gradient-to-br from-white to-indigo-50/60 p-4 sm:p-5">
       <span className="absolute inset-y-0 left-0 w-1 bg-action" aria-hidden="true" />
-      <p className="text-sm font-semibold text-muted">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-navy" aria-live="polite">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-muted">{label}</p>
+        <span className="flex size-9 items-center justify-center rounded-xl bg-action-light text-action ring-1 ring-action-border">
+          {icon}
+        </span>
+      </div>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-navy" aria-live="polite">
         {loading ? "…" : (value ?? "—")}
       </p>
     </Card>
+  );
+}
+
+function MobileAccountCard({ account }: { account: DematAccount }) {
+  const status = account.archived_at ? "archived" : account.account_status;
+
+  return (
+    <article className="overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-br from-white via-white to-indigo-50/60 p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-navy text-white shadow-sm">
+          <Building2 className="size-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <AccountDetailLink
+              account={account}
+              className="min-w-0 text-lg font-bold leading-6 text-navy no-underline transition-colors hover:text-action visited:text-navy"
+            >
+              {account.holder_name}
+            </AccountDetailLink>
+            <StatusBadge status={status} />
+          </div>
+          <p className="mt-1 truncate text-sm font-medium text-muted">{account.broker_name}</p>
+        </div>
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-3 border-y border-indigo-100 py-3">
+        <AccountCardDetail label="Depository" value={account.depository_type} />
+        <AccountCardDetail label="Created" value={formatDate(account.created_at)} />
+        <AccountCardDetail
+          className="col-span-2"
+          label="Masked demat ID"
+          value={account.masked_demat_identifier}
+        />
+      </dl>
+      <AccountApplicationAction account={account} className="mt-4 w-full" />
+    </article>
+  );
+}
+
+function AccountCardDetail({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">{label}</dt>
+      <dd className="mt-1 break-words text-sm font-semibold text-ink">{value}</dd>
+    </div>
   );
 }
 

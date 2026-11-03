@@ -28,7 +28,7 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "rounded-2xl border border-border bg-surface px-5 py-5 shadow-card sm:px-6",
+        "rounded-2xl border border-border bg-surface px-4 py-5 shadow-card sm:px-6",
         className,
       )}
     >
@@ -41,7 +41,11 @@ export function PageHeader({
           <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">{title}</h1>
           {desc && <p className="mt-1.5 text-base text-muted leading-relaxed">{desc}</p>}
         </div>
-        {actions && <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div>}
+        {actions && (
+          <div className="flex w-full shrink-0 flex-col gap-2 [&>*]:w-full sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:[&>*]:w-auto">
+            {actions}
+          </div>
+        )}
       </div>
     </header>
   );

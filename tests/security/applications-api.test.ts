@@ -286,7 +286,13 @@ describe("application API", () => {
         new URL(request.url).pathname.endsWith("/applications") && request.method === "POST",
     );
     expect(insert).toBeDefined();
-    expect(await insert!.json()).toMatchObject({ user_id: userId });
+    await expect(insert!.json()).resolves.toMatchObject({
+      user_id: userId,
+      application_number: null,
+      external_reference: null,
+      notes: null,
+      submission_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    });
   });
 
   it("rejects an inactive or unowned account before inserting", async () => {
@@ -304,8 +310,8 @@ describe("application API", () => {
     expect(requests.some((request) => request.method === "POST")).toBe(false);
   });
 
-  it("creates applications only for categories with matching issue-specific rules", async () => {
-    for (const code of ["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"] as const) {
+  it("creates streamlined applications for every configured category", async () => {
+    for (const code of ["RETAIL", "SHNI", "BHNI", "SHAREHOLDER", "EMPLOYER"] as const) {
       const configuredCategory = {
         ...category,
         category: code,
@@ -323,7 +329,7 @@ describe("application API", () => {
           },
           body: JSON.stringify({
             ...applicationInput,
-            shareholder_shares: code === "SHAREHOLDER" ? 1 : null,
+            shareholder_shares: null,
           }),
         },
         bindings,

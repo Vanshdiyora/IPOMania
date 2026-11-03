@@ -3,6 +3,7 @@ import {
   ipoCatalogListQuerySchema,
   ipoCategoryConfigurationSchema,
   ipoCalculationSchema,
+  ipoListQuerySchema,
   ipoSchema,
 } from "@ipo-mania/validation";
 
@@ -49,7 +50,12 @@ const categoryRules = {
 
 describe("IPO boundary validation", () => {
   it("validates catalog pagination and only accepts catalog statuses", () => {
-    expect(ipoCatalogListQuerySchema.parse({})).toEqual({ page: 1, page_size: 25, sort: "latest" });
+    expect(ipoListQuerySchema.parse({}).sort).toBe("date_desc");
+    expect(ipoCatalogListQuerySchema.parse({})).toEqual({
+      page: 1,
+      page_size: 25,
+      sort: "date_desc",
+    });
     expect(
       ipoCatalogListQuerySchema.parse({
         page: "2",
@@ -57,7 +63,18 @@ describe("IPO boundary validation", () => {
         status: "OPEN",
         search: " Company ",
       }),
-    ).toEqual({ page: 2, page_size: 100, status: "OPEN", search: "Company", sort: "latest" });
+    ).toEqual({ page: 2, page_size: 100, status: "OPEN", search: "Company", sort: "date_desc" });
+    for (const sort of [
+      "date_desc",
+      "date_asc",
+      "price_asc",
+      "price_desc",
+      "name_asc",
+      "name_desc",
+      "opening_asc",
+    ]) {
+      expect(ipoCatalogListQuerySchema.parse({ sort }).sort).toBe(sort);
+    }
     for (const query of [
       { page: "0" },
       { page_size: "101" },

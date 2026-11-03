@@ -51,7 +51,7 @@ function makeInput(
 }
 
 describe("financial engine", () => {
-  it.each(["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"] as const)(
+  it.each(["RETAIL", "SHNI", "BHNI", "SHAREHOLDER", "EMPLOYER"] as const)(
     "evaluates an issue-specific %s configuration",
     (category) => {
       const rules: CategoryRules = {

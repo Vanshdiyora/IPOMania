@@ -1,4 +1,3 @@
-import { toIsoDateTime } from "../../lib/formValues";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -181,7 +180,7 @@ function useOwnedLists() {
     enabled: Boolean(session),
     initialPageParam: 1,
     queryFn: ({ pageParam }) =>
-      apiRequest<IpoListResponse>(`/api/ipos/catalog?page=${pageParam}&page_size=25`, session!),
+      apiRequest<IpoListResponse>(`/api/ipos?page=${pageParam}&page_size=25`, session!),
     getNextPageParam: (lastPage) => {
       const { page, total_pages: totalPages } = lastPage.data.pagination ?? {};
       return page && totalPages && page < totalPages ? page + 1 : undefined;
@@ -631,14 +630,17 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
                 <th scope="col" className="p-3 text-right">
                   Lots / amount
                 </th>
+                <th scope="col" className="p-3 text-left">
+                  Submitted
+                </th>
                 <th scope="col" className="p-3 text-center">
-                  Application
+                  Status
                 </th>
               </tr>
             </thead>
             <tbody aria-busy={isLoading}>
               {isLoading ? (
-                <SkeletonTableRows rows={6} cols={5} />
+                <SkeletonTableRows rows={6} cols={6} />
               ) : (
                 rows.map((row) => (
                   <tr key={row.id} className="border-b border-border">
@@ -673,6 +675,9 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
                     </td>
                     <td className="p-3 text-right tabular-nums whitespace-nowrap">
                       {row.lots} lots · {row.application_amount}
+                    </td>
+                    <td className="p-3 text-sm tabular-nums whitespace-nowrap">
+                      {formatDateTime(row.submission_date ?? row.created_at)}
                     </td>
                     <td className="p-3 text-center">{prettyStatus(row.application_status)}</td>
                   </tr>
@@ -710,6 +715,7 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
 
 export function ApplicationFormPage({ editing = false }: { editing?: boolean }) {
   const { applicationId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { session } = useAuth();
   const lists = useOwnedLists();
@@ -719,20 +725,16 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const [accountId, setAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [lots, setLots] = useState("1");
-  const [priceType, setPriceType] = useState<"BID" | "CUT_OFF">("CUT_OFF");
   const [price, setPrice] = useState("");
   const [applicationNumber, setApplicationNumber] = useState("");
   const [externalReference, setExternalReference] = useState("");
-  const [submissionDate, setSubmissionDate] = useState("");
   const [applicationStatus, setApplicationStatus] = useState("DRAFT");
-  const [shareholderShares, setShareholderShares] = useState("");
-  const [eligibilityAnswers, setEligibilityAnswers] = useState<Record<string, boolean | null>>({});
   const [notes, setNotes] = useState("");
   const [reviewedApplication, setReviewedApplication] = useState<{
     fingerprint: string;
     data: CalculationResponse["data"];
   } | null>(null);
-  const ipo = lists.ipos.find((item) => item.id === ipoId);
+  const preselectedAccountId = searchParams.get("demat_account_id");
   const categoriesQuery = useQuery({
     queryKey: ["ipo-categories", ipoId],
     enabled: Boolean(session && ipoId),
@@ -741,22 +743,25 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const categories = categoriesQuery.data?.data.configurations ?? [];
   const activeCategory = categories.find((category) => category.id === categoryId);
   useEffect(() => {
-    if (!editing && ipo && priceType === "CUT_OFF" && !price && ipo.cut_off_price) {
-      setPrice(ipo.cut_off_price);
+    if (editing || dirty || accountId || !preselectedAccountId) return;
+    const account = lists.accounts.find((item) => item.id === preselectedAccountId);
+    if (account?.account_status === "active" && !account.archived_at) {
+      setAccountId(account.id);
     }
-  }, [editing, ipo, price, priceType]);
+  }, [accountId, dirty, editing, lists.accounts, preselectedAccountId]);
+  const priceType = activeCategory?.allowed_price_types.includes("BID") ? "BID" : "CUT_OFF";
   const applicationPayload = {
     ipo_id: ipoId,
     demat_account_id: accountId,
     category_id: categoryId,
     lots: Number(lots),
     price_type: priceType,
-    price: price || (priceType === "CUT_OFF" ? ipo?.cut_off_price : ""),
-    shareholder_shares: shareholderShares ? Number(shareholderShares) : null,
-    eligibility_answers: eligibilityAnswers,
-    application_number: applicationNumber || null,
-    external_reference: externalReference || null,
-    submission_date: submissionDate ? toIsoDateTime(submissionDate) : null,
+    price,
+    shareholder_shares: null,
+    eligibility_answers: {},
+    application_number: null,
+    external_reference: null,
+    submission_date: null,
     application_status: applicationStatus,
     mandate_status: "UNKNOWN",
     allotment_status: "UNKNOWN",
@@ -787,7 +792,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
         ? {
             application_number: applicationNumber || null,
             external_reference: externalReference || null,
-            submission_date: submissionDate ? toIsoDateTime(submissionDate) : null,
             application_status: applicationStatus,
             notes: notes || null,
           }
@@ -825,14 +829,13 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     setLots(String(application.lots));
     setApplicationNumber(application.application_number ?? "");
     setExternalReference(application.external_reference ?? "");
-    setSubmissionDate(application.submission_date?.slice(0, 10) ?? "");
     setApplicationStatus(application.application_status);
     setNotes(application.notes ?? "");
   }, [application, editing, ipoId]);
   return (
     <RouteFormDrawer
       title={editing ? "Edit application" : "Add application"}
-      description="Choose an issue, an account, and a configured category. Existing manual records keep their calculation and rule version."
+      description="Choose an issue, an account, and a configured category. This records an application for tracking; it does not submit an IPO application to a broker or exchange."
       cancelTo="/applications"
       formId="application-form"
       submitLabel="Save application"
@@ -904,7 +907,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                       const nextValue = Array.isArray(value) ? (value[0] ?? "") : value;
                       setIpoId(nextValue);
                       setCategoryId("");
-                      setPrice("");
                     }}
                   />
                   {validation.errors.ipo_id ? (
@@ -949,7 +951,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                   </option>
                   {categories.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.category} (rules v{item.rule_version})
+                      {formatCategory(item.category)} (rules v{item.rule_version})
                     </option>
                   ))}
                 </FormSelect>
@@ -963,55 +965,14 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                   value={lots}
                   onChange={(event) => setLots(event.target.value)}
                 />
-                <FormSelect
-                  label="Price type"
-                  error={validation.errors.price_type}
-                  value={priceType}
-                  onChange={(event) => {
-                    setPriceType(event.target.value as "BID" | "CUT_OFF");
-                    setPrice(event.target.value === "CUT_OFF" ? (ipo?.cut_off_price ?? "") : "");
-                  }}
-                >
-                  <option value="CUT_OFF">Cut-off</option>
-                  <option value="BID">Bid price</option>
-                </FormSelect>
                 <FormInput
                   label="Price"
                   error={validation.errors.price}
                   required
                   inputMode="decimal"
-                  value={price || (priceType === "CUT_OFF" ? (ipo?.cut_off_price ?? "") : "")}
+                  value={price}
                   onChange={(event) => setPrice(event.target.value)}
                 />
-                {activeCategory?.category === "SHAREHOLDER" ? (
-                  <FormInput
-                    label="Shareholder shares on configured record date"
-                    error={validation.errors.shareholder_shares}
-                    type="number"
-                    min="0"
-                    value={shareholderShares}
-                    onChange={(event) => setShareholderShares(event.target.value)}
-                  />
-                ) : null}
-                {activeCategory?.eligibility_conditions.map((condition) => (
-                  <label
-                    key={condition.id}
-                    className="flex min-h-touch items-center gap-3 rounded-lg border border-border p-3 sm:col-span-2"
-                  >
-                    <input
-                      className="size-5"
-                      type="checkbox"
-                      checked={eligibilityAnswers[condition.id] === true}
-                      onChange={(event) =>
-                        setEligibilityAnswers((current) => ({
-                          ...current,
-                          [condition.id]: event.target.checked,
-                        }))
-                      }
-                    />
-                    <span>{condition.description}</span>
-                  </label>
-                ))}
               </div>
             </FormSection>
           ) : (
@@ -1025,11 +986,11 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
             disabled={!ipoId || !accountId || !categoryId || !price || calculation.isPending}
             onClick={() => calculation.mutate()}
           >
-            Review calculation and duplicates
+            Calculate total amount
           </Button>
           {currentReview ? (
             <p role="status" className="mt-3 rounded-lg bg-canvas p-4 text-lg font-semibold">
-              Calculation: {currentReview.total_shares} shares · {currentReview.application_amount}
+              Total amount: {currentReview.application_amount}
               {currentReview.warnings.map((warning) => (
                 <span className="mt-2 block text-base font-normal text-danger" key={warning}>
                   Potential duplicate: {warning}
@@ -1044,43 +1005,38 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
               checked against the configured issue rules.
             </p>
           ) : null}
-          <FormSection title="Record details">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormInput
-                label="Application number"
-                error={validation.errors.application_number}
-                value={applicationNumber}
-                onChange={(event) => setApplicationNumber(event.target.value)}
-              />
-              <FormInput
-                label="External reference"
-                error={validation.errors.external_reference}
-                value={externalReference}
-                onChange={(event) => setExternalReference(event.target.value)}
-              />
-              <FormInput
-                label="Submission date"
-                error={validation.errors.submission_date}
-                type="date"
-                value={submissionDate}
-                onChange={(event) => setSubmissionDate(event.target.value)}
-              />
-              <StatusSelect
-                label="Application status"
-                value={applicationStatus}
-                statuses={statuses}
-                onChange={setApplicationStatus}
-              />
-              <FormTextarea
-                label="Notes"
-                error={validation.errors.notes}
-                fieldClassName="sm:col-span-2"
-                rows={3}
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-              />
-            </div>
-          </FormSection>
+          {editing ? (
+            <FormSection title="Record details">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormInput
+                  label="Application number"
+                  error={validation.errors.application_number}
+                  value={applicationNumber}
+                  onChange={(event) => setApplicationNumber(event.target.value)}
+                />
+                <FormInput
+                  label="External reference"
+                  error={validation.errors.external_reference}
+                  value={externalReference}
+                  onChange={(event) => setExternalReference(event.target.value)}
+                />
+                <StatusSelect
+                  label="Application status"
+                  value={applicationStatus}
+                  statuses={statuses}
+                  onChange={setApplicationStatus}
+                />
+                <FormTextarea
+                  label="Notes"
+                  error={validation.errors.notes}
+                  fieldClassName="sm:col-span-2"
+                  rows={3}
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                />
+              </div>
+            </FormSection>
+          ) : null}
         </div>
       </form>
     </RouteFormDrawer>
@@ -1149,8 +1105,7 @@ export function ApplicationDetailsPage() {
             ["Lots", item.lots],
             ["Total shares", item.total_shares],
             ["Application amount", item.application_amount],
-            ["Application number", item.application_number ?? "Not recorded"],
-            ["External reference", item.external_reference ?? "Not recorded"],
+            ["Submitted", formatDateTime(item.submission_date ?? item.created_at)],
             ["Application status", prettyStatus(item.application_status)],
             ["Rule version", item.rule_version],
           ].map(([label, value]) => (
@@ -1859,6 +1814,24 @@ function prettyStatus(value: string) {
     .toLowerCase()
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatCategory(value: string) {
+  return (
+    {
+      RETAIL: "Retail",
+      SHNI: "sHNI",
+      BHNI: "bHNI",
+      SHAREHOLDER: "Shareholder",
+      EMPLOYER: "Employer",
+    }[value] ?? value
+  );
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
+    new Date(value),
+  );
 }
 
 function errorMessage(error: unknown) {

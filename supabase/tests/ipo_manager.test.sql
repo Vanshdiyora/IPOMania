@@ -1,6 +1,6 @@
 begin;
 
-select plan(23);
+select plan(24);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -152,6 +152,17 @@ select is(
   (select max(rule_version) from public.ipo_categories where ipo_id = '88888888-8888-4888-8888-888888888888' and category = 'RETAIL'),
   2,
   'New category rules receive a database-assigned version'
+);
+select lives_ok(
+  $$insert into public.ipo_categories (
+      user_id, ipo_id, category, lot_limit_status, lot_increment,
+      investment_limit_status, eligibility_conditions, allowed_price_types
+    ) values (
+      '66666666-6666-4666-8666-666666666666',
+      '88888888-8888-4888-8888-888888888888', 'EMPLOYER', 'UNCONFIGURED', 1,
+      'UNCONFIGURED', '[]'::jsonb, array['BID']
+    )$$,
+  'User A can configure the employer application category'
 );
 select is(
   (select count(*) from public.ipo_categories where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),

@@ -317,7 +317,9 @@ applicationsRoutes.get("/export", async (context) => {
 });
 
 applicationsRoutes.post("/preview", validateJson(applicationCreateSchema), async (context) => {
-  const prepared = await prepareApplication(context, context.req.valid("json"));
+  const prepared = await prepareApplication(context, context.req.valid("json"), undefined, {
+    allowUnconfirmedEligibility: true,
+  });
   if (!prepared.ok) return context.json({ error: prepared.error }, 422);
   return context.json({
     data: {
@@ -382,12 +384,22 @@ applicationsRoutes.patch(
 );
 
 applicationsRoutes.post("/", validateJson(applicationCreateSchema), async (context) => {
-  const prepared = await prepareApplication(context, context.req.valid("json"));
+  const prepared = await prepareApplication(context, context.req.valid("json"), undefined, {
+    allowUnconfirmedEligibility: true,
+  });
   if (!prepared.ok) return context.json({ error: prepared.error }, 422);
+  // The server, rather than an editable form field, is the source of the submission timestamp.
+  const record = {
+    ...prepared.record,
+    application_number: null,
+    external_reference: null,
+    notes: null,
+    submission_date: new Date().toISOString(),
+  };
   const { data, error } = await context
     .get("rlsSupabase")
     .from("applications")
-    .insert(prepared.record)
+    .insert(record)
     .select(applicationColumns)
     .single();
   if (error) return databaseError(context, error);
@@ -563,6 +575,7 @@ async function prepareApplication(
   context: RouteContext,
   input: ApplicationInput,
   cache?: ApplicationPreparationCache,
+  options: { allowUnconfirmedEligibility?: boolean } = {},
 ) {
   const userId = context.get("authenticatedUser").id;
   const supabase = context.get("rlsSupabase");
@@ -648,12 +661,23 @@ async function prepareApplication(
     eligibility_answers: input.eligibility_answers,
   };
   const calculation = validateApplicationConfiguration(calculationInput);
-  if (!calculation.eligible) {
+  const blockingErrors = calculation.validation_errors.filter(
+    ({ code }) =>
+      !options.allowUnconfirmedEligibility ||
+      ![
+        "SHAREHOLDER_ELIGIBILITY_UNCONFIRMED",
+        "SHAREHOLDER_HOLDING_REQUIRED",
+        "SHAREHOLDER_HOLDING_BELOW_MINIMUM",
+        "SHAREHOLDER_RECORD_DATE_MISSING",
+        "ELIGIBILITY_CONDITION_UNCONFIRMED",
+      ].includes(code),
+  );
+  if (blockingErrors.length) {
     return {
       ok: false as const,
       error: {
         code: "APPLICATION_NOT_ELIGIBLE",
-        message: calculation.validation_errors.map((issue) => issue.message).join(" "),
+        message: blockingErrors.map((issue) => issue.message).join(" "),
       },
     };
   }

@@ -262,8 +262,13 @@ test("IPO validation and close confirmation work inside the drawer", async ({ pa
 
 test("application form hides financial statuses and preserves them on edit", async ({ page }) => {
   await prepare(page);
+  const ownedIpoRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname === "/api/ipos" && url.searchParams.get("page") === "1";
+  });
   await page.goto("/applications/new");
   await expect(page.getByRole("dialog", { name: "Add application" })).toBeVisible();
+  await ownedIpoRequest;
   await expect(page.getByLabel("Mandate status")).toHaveCount(0);
   await expect(page.getByLabel("Allotment status")).toHaveCount(0);
 

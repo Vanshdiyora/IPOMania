@@ -14,22 +14,25 @@ Application status is independent of payment mandate and allotment:
 
 New and imported records default to `DRAFT` and do not imply an exchange submission. Imported
 statuses are only set to another value when the user explicitly maps that field. Editing statuses,
-numbers, dates, and notes never rewrites the calculation snapshot. Archiving is soft; the
+legacy numbers, and notes never rewrites the calculation snapshot; the server-recorded submission
+timestamp is not editable. Archiving is soft; the
 application and its historical details remain available.
 
 ## Calculation and validation
 
-Creating an application requires an owned, unarchived IPO, an active owned demat account, an
-issue-specific category configuration for that IPO, price type, price, and positive whole lots.
-The same decimal financial engine used by the quota calculator checks the selected issue rules.
-Unknown/unconfigured rules and failed eligibility checks are errors; a user's selected account is
-not presumed eligible for every category. Shareholder shares and each configured eligibility
-condition must be entered explicitly when applicable.
+The add-application form keeps entry to an owned, unarchived IPO, an active owned demat account,
+an issue-specific category configuration, positive whole lots, and price. It shows the calculated
+total amount without exposing a price-type field; the application service selects an allowed price
+mode from the configured issue rules. The server records the submission date and time when the
+form is saved, rather than accepting a user-entered timestamp. The same decimal financial engine
+checks the selected issue rules. Unknown or unconfigured lot, investment, and price rules remain
+errors. A saved application remains a tracking record, not issuer eligibility verification or
+investment advice.
 
-The saved record includes exact application amount, total shares, rule version, and a snapshot of
-the IPO pricing/lot-size inputs, category rule, applicant inputs, result, and timestamp. This
-snapshot is historical evidence of the calculation, not issuer verification, investment advice,
-or an allotment prediction.
+The saved record includes exact application amount, total shares, rule version, a server-recorded
+submission timestamp, and a snapshot of the IPO pricing/lot-size inputs, category rule, applicant
+inputs, and result. This snapshot is historical evidence of the calculation, not issuer
+verification, investment advice, or an allotment prediction.
 
 ## Duplicate review
 

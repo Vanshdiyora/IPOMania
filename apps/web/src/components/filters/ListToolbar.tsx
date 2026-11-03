@@ -47,11 +47,11 @@ export function ListToolbar({
           </button>
         ) : null}
       </label>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
           variant="outline"
-          className="gap-2"
+          className="flex-1 gap-2 sm:flex-none"
           aria-haspopup="dialog"
           onClick={onOpenFilters}
         >
