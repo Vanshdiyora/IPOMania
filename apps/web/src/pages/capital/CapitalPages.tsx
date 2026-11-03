@@ -1418,6 +1418,7 @@ function FinancialFilters({
           <input
             className={inputClass}
             value={filters.broker}
+            placeholder="Filter by broker name..."
             onChange={(event) => onChange({ ...filters, broker: event.target.value })}
           />
         </label>

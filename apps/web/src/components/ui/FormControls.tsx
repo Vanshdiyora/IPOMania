@@ -20,6 +20,12 @@ export const FormInput = forwardRef<HTMLInputElement, ComponentProps<typeof Inpu
           {...props}
           ref={ref}
           id={fieldId}
+          placeholder={
+            props.placeholder ??
+            (props.type === "date" || props.type === "datetime-local"
+              ? undefined
+              : `Enter ${label.toLowerCase()}`)
+          }
           aria-invalid={Boolean(error)}
           aria-describedby={
             error ? `${fieldId}-error` : hint ? `${fieldId}-hint` : props["aria-describedby"]
@@ -76,6 +82,7 @@ export const FormTextarea = forwardRef<
         {...props}
         ref={ref}
         id={fieldId}
+        placeholder={props.placeholder ?? `Enter ${label.toLowerCase()}`}
         aria-invalid={Boolean(error)}
         aria-describedby={
           error ? `${fieldId}-error` : hint ? `${fieldId}-hint` : props["aria-describedby"]

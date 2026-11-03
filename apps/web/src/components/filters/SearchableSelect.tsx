@@ -17,6 +17,7 @@ type SearchableSelectProps = {
   value: string | string[];
   onChange: (value: string | string[]) => void;
   multiple?: boolean;
+  showSelectAll?: boolean;
   searchable?: boolean;
   clearable?: boolean;
   searchPlaceholder?: string;
@@ -42,6 +43,7 @@ export function SearchableSelect({
   value,
   onChange,
   multiple = false,
+  showSelectAll = true,
   searchable = true,
   clearable = true,
   searchPlaceholder = "Search options...",
@@ -153,9 +155,11 @@ export function SearchableSelect({
     loading && !selectedOptions.length
       ? "Loading options…"
       : multiple
-        ? selectedOptions.length
-          ? `${selectedOptions.length} selected`
-          : placeholder
+        ? selectedOptions.length === 1
+          ? selectedOptions[0]!.label
+          : selectedOptions.length
+            ? `${selectedOptions.length} selected`
+            : placeholder
         : (selectedOptions[0]?.label ?? placeholder);
 
   return (
@@ -254,7 +258,9 @@ export function SearchableSelect({
               maxHeight: position.maxHeight,
             }}
           >
-            {searchable || (multiple && options.length > 1) || (clearable && selected.length) ? (
+            {searchable ||
+            (multiple && (options.length > 1 || selected.length > 0)) ||
+            (clearable && selected.length) ? (
               <div className="border-b border-border p-3">
                 {searchable ? (
                   <>
@@ -292,7 +298,7 @@ export function SearchableSelect({
                     </div>
                   </>
                 ) : null}
-                {multiple && options.length > 1 ? (
+                {multiple && options.length > 1 && showSelectAll ? (
                   <div className="mt-2 flex justify-between gap-3 text-sm font-semibold">
                     <button
                       type="button"

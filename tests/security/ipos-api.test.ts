@@ -162,6 +162,19 @@ describe("IPO management API", () => {
     expect(request.headers.get("apikey")).toBe(bindings.SUPABASE_ANON_KEY);
   });
 
+  it("filters the shared IPO catalog by multiple statuses", async () => {
+    const requests = installSupabaseMock(
+      () => new Response("[]", { headers: { "Content-Type": "application/json" } }),
+    );
+    const response = await createApp().request(
+      "/api/ipos/catalog?status=UPCOMING&status=CLOSED",
+      { headers: authHeaders() },
+      bindings,
+    );
+    expect(response.status).toBe(200);
+    expect(new URL(requests[0]!.url).searchParams.get("ipo_status")).toBe("in.(upcoming,closed)");
+  });
+
   it("quotes catalog search punctuation and escapes literal wildcards", async () => {
     const requests = installSupabaseMock(
       () => new Response("[]", { headers: { "Content-Type": "application/json" } }),

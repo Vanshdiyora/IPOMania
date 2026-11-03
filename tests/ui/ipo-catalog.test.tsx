@@ -167,9 +167,14 @@ describe("user IPO catalog", () => {
     fireEvent.click(screen.getByRole("combobox", { name: "Filter IPOs" }));
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("option", { name: "Open", exact: true }));
+    fireEvent.click(screen.getByRole("option", { name: "Closed", exact: true }));
+    expect(screen.getByRole("option", { name: "Open", exact: true })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     await waitFor(() =>
       expect(apiRequestMock).toHaveBeenCalledWith(
-        "/api/ipos/catalog?page=1&page_size=25&sort=price_desc&status=OPEN",
+        "/api/ipos/catalog?page=1&page_size=25&sort=price_desc&status=OPEN&status=CLOSED",
         expect.anything(),
       ),
     );
@@ -178,7 +183,7 @@ describe("user IPO catalog", () => {
     });
     await waitFor(() =>
       expect(apiRequestMock).toHaveBeenCalledWith(
-        "/api/ipos/catalog?page=1&page_size=25&sort=price_desc&search=Catalog&status=OPEN",
+        "/api/ipos/catalog?page=1&page_size=25&sort=price_desc&search=Catalog&status=OPEN&status=CLOSED",
         expect.anything(),
       ),
     );

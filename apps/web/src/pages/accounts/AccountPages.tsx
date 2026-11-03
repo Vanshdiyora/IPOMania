@@ -1474,6 +1474,7 @@ function FilterInput({
       <input
         className={inputClass}
         value={value}
+        placeholder={`Search ${label.toLowerCase()}...`}
         onChange={(event) => onChange(event.target.value)}
       />
     </label>

@@ -12,6 +12,25 @@ import { Input } from "../../apps/web/src/components/ui/Input";
 import { ConfirmButton } from "../../apps/web/src/components/ui/ConfirmButton";
 
 describe("shared form controls", () => {
+  it("provides field-specific placeholders without overriding explicit ones or date inputs", () => {
+    render(
+      <>
+        <FormInput label="Holder name" />
+        <FormInput label="Search" placeholder="Search companies..." />
+        <FormInput label="Opening date" type="date" />
+        <FormTextarea label="Notes" />
+      </>,
+    );
+
+    expect(screen.getByLabelText("Holder name")).toHaveAttribute(
+      "placeholder",
+      "Enter holder name",
+    );
+    expect(screen.getByLabelText("Search")).toHaveAttribute("placeholder", "Search companies...");
+    expect(screen.getByLabelText("Opening date")).not.toHaveAttribute("placeholder");
+    expect(screen.getByLabelText("Notes")).toHaveAttribute("placeholder", "Enter notes");
+  });
+
   it("filters large option lists while retaining the selected record", async () => {
     render(
       <SearchableFormSelect

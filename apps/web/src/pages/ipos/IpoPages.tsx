@@ -21,6 +21,7 @@ import { ConfirmButton } from "../../components/ui/ConfirmButton";
 import { Button } from "../../components/ui/Button";
 import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
 import { Input, Select as CustomSelect } from "../../components/ui/Input";
+import { SearchableSelect } from "../../components/filters/SearchableSelect";
 import { FormSection } from "../../components/ui/FormSection";
 import { ConfirmationDialog } from "../../components/ui/ConfirmationDialog";
 import { DrawerRouteLink, RouteFormDrawer } from "../../components/ui/FormDrawer";
@@ -134,21 +135,28 @@ function IpoListContent({ personal }: { personal: boolean }) {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get("search") ?? "";
-  const requestedStatus = searchParams.get("status");
   const availableStatuses: readonly IpoStatus[] = personal ? statuses : catalogStatuses;
-  const status = availableStatuses.includes(requestedStatus as IpoStatus) ? requestedStatus! : "";
+  const selectedStatuses = searchParams
+    .getAll("status")
+    .filter((requestedStatus) => availableStatuses.includes(requestedStatus as IpoStatus));
   const requestedSort = searchParams.get("sort");
   const selectedSort = ipoSortOptions.find((option) => option.value === requestedSort)?.value;
   const sort: IpoSort = selectedSort ?? "date_desc";
   const requestedPage = Number(searchParams.get("page"));
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-  const updateListParams = (changes: Record<string, string | null>, replace = false) => {
+  const updateListParams = (changes: Record<string, string | string[] | null>, replace = false) => {
     setSearchParams(
       (previous) => {
         const next = new URLSearchParams(previous);
         for (const [key, value] of Object.entries(changes)) {
-          if (value) next.set(key, value);
-          else next.delete(key);
+          next.delete(key);
+          if (Array.isArray(value)) {
+            value.forEach((item) => {
+              if (item) next.append(key, item);
+            });
+          } else if (value) {
+            next.set(key, value);
+          }
         }
         return next;
       },
@@ -160,8 +168,8 @@ function IpoListContent({ personal }: { personal: boolean }) {
     page_size: "25",
     sort,
     ...(search ? { search } : {}),
-    ...(status ? { status } : {}),
   });
+  selectedStatuses.forEach((selectedStatus) => params.append("status", selectedStatus));
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["ipos", personal ? "personal" : "catalog", params.toString()],
     enabled: Boolean(session),
@@ -240,30 +248,36 @@ function IpoListContent({ personal }: { personal: boolean }) {
             <Input
               aria-label="Search company or exact symbol"
               className={inputClass}
+              placeholder="Search company or exact symbol..."
               value={search}
               onChange={(event) => {
                 updateListParams({ search: event.target.value, page: null }, true);
               }}
             />
           </label>
-          <label className="block w-full shrink-0 text-sm font-semibold text-ink sm:w-52">
-            Filter IPOs
-            <CustomSelect
-              aria-label="Filter IPOs"
-              value={status}
+          <div className="block w-full shrink-0 sm:w-52">
+            <SearchableSelect
+              label="Filter IPOs"
+              placeholder="All statuses"
+              options={availableStatuses.map((option) => ({
+                value: option,
+                label: label(option),
+              }))}
+              value={selectedStatuses}
+              multiple
               searchable={false}
-              onChange={(event) =>
-                updateListParams({ status: event.target.value || null, page: null }, true)
+              showSelectAll={false}
+              onChange={(value) =>
+                updateListParams(
+                  {
+                    status: Array.isArray(value) ? value : value ? [value] : null,
+                    page: null,
+                  },
+                  true,
+                )
               }
-            >
-              <option value="">All statuses</option>
-              {availableStatuses.map((option) => (
-                <option key={option} value={option}>
-                  {label(option)}
-                </option>
-              ))}
-            </CustomSelect>
-          </label>
+            />
+          </div>
           <label className="block w-full shrink-0 text-sm font-semibold text-ink sm:w-64">
             Sort IPOs
             <CustomSelect
@@ -1198,6 +1212,7 @@ export function IpoCategoryConfigurationPage({
                 <input
                   className={inputClass}
                   value={conditionId}
+                  placeholder="Enter a condition ID"
                   onChange={(event) => setConditionId(event.target.value)}
                 />
               </label>
@@ -1206,6 +1221,7 @@ export function IpoCategoryConfigurationPage({
                 <input
                   className={inputClass}
                   value={conditionDescription}
+                  placeholder="Enter the published condition text"
                   onChange={(event) => setConditionDescription(event.target.value)}
                 />
               </label>
