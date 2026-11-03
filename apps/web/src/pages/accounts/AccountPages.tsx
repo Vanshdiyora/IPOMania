@@ -144,10 +144,7 @@ function AccountApplicationAction({ account }: { account: DematAccount }) {
 
   return (
     <Button asChild size="sm" variant="secondary">
-      <DrawerRouteLink
-        aria-label={`Record an IPO application for ${account.holder_name}`}
-        to={applicationDrawerPath(account.id)}
-      >
+      <DrawerRouteLink to={applicationDrawerPath(account.id)}>
         Record IPO application
       </DrawerRouteLink>
     </Button>
