@@ -35,7 +35,7 @@ const catalogColumns =
 
 function queryWithStatuses(context: IpoRouteContext) {
   const query = context.req.query();
-  const statuses = context.req.queries("status");
+  const statuses = new URL(context.req.url).searchParams.getAll("status");
   return statuses.length > 1 ? { ...query, status: statuses } : query;
 }
 
