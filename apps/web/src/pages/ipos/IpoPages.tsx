@@ -203,19 +203,19 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
           <p className="mt-2 text-3xl font-bold text-navy">{data?.data.pagination.total ?? 0}</p>
         </Card>
         <Card>
-          <p className="text-sm font-semibold text-muted">Open</p>
+          <p className="text-sm font-semibold text-muted">Open on this page</p>
           <p className="mt-2 text-3xl font-bold text-navy">
             {ipos.filter((ipo) => ipo.status === "OPEN").length}
           </p>
         </Card>
         <Card>
-          <p className="text-sm font-semibold text-muted">Upcoming</p>
+          <p className="text-sm font-semibold text-muted">Upcoming on this page</p>
           <p className="mt-2 text-3xl font-bold text-navy">
             {ipos.filter((ipo) => ipo.status === "UPCOMING").length}
           </p>
         </Card>
         <Card>
-          <p className="text-sm font-semibold text-muted">Listed</p>
+          <p className="text-sm font-semibold text-muted">Listed on this page</p>
           <p className="mt-2 text-3xl font-bold text-navy">
             {ipos.filter((ipo) => ipo.status === "LISTED").length}
           </p>
@@ -300,7 +300,7 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
             <label
               className={`flex min-h-touch cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${!draftStatus ? "border-action bg-[#EAF0F6] text-navy" : "border-border text-ink"}`}
             >
-              <Input
+              <input
                 className="accent-action"
                 type="radio"
                 name="ipo-status"

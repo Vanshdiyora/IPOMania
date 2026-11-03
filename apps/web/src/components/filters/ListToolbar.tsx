@@ -1,4 +1,4 @@
-import { SlidersHorizontal, X } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/Button";
 
@@ -25,12 +25,16 @@ export function ListToolbar({
     <div className={cn("flex flex-col gap-3 sm:flex-row sm:items-center", className)}>
       <label className="relative min-w-0 flex-1 sm:max-w-xl">
         <span className="sr-only">{searchLabel ?? searchPlaceholder}</span>
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle"
+          aria-hidden="true"
+        />
         <input
           type="search"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder={searchPlaceholder}
-          className="min-h-touch w-full rounded-lg border border-border bg-white py-2 pr-10 pl-4 text-base text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+          className="min-h-touch w-full rounded-xl border border-border bg-white py-2 pr-10 pl-10 text-base text-ink placeholder:text-muted shadow-sm shadow-indigo-950/[0.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus focus-visible:border-border-focus"
         />
         {search ? (
           <button

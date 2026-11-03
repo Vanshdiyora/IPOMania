@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useOutlet, Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-import { Menu } from "lucide-react";
 import { useAuth } from "../../auth/useAuth";
 import { Sidebar } from "./Sidebar";
+import { Header } from "./Header";
 import { useToast } from "../ui/ToastContext";
 import { LoadingState } from "../LoadingState";
 import { DrawerRouteHost } from "./DrawerRouteHost";
@@ -107,22 +107,14 @@ export function AppLayout() {
 
         {/* Main content */}
         <div ref={pageContentRef} className="flex min-w-0 flex-1 flex-col md:ml-64">
-          {!mobileMenuOpen && (
-            <button
-              ref={menuButtonRef}
-              type="button"
-              className="fixed left-4 top-4 z-30 grid min-h-touch min-w-touch place-items-center rounded-lg border border-border bg-white text-muted shadow-sm md:hidden"
-              aria-label="Open navigation"
-              aria-expanded={false}
-              aria-controls="main-navigation"
-              onClick={() => setMobileMenuOpen(true)}
-            >
-              <Menu aria-hidden="true" size={20} />
-            </button>
-          )}
+          <Header
+            mobileMenuOpen={mobileMenuOpen}
+            menuButtonRef={menuButtonRef}
+            onMenuToggle={() => setMobileMenuOpen((current) => !current)}
+          />
           <main
             id="main-content"
-            className="relative w-full min-w-0 flex-1 overflow-x-hidden bg-[radial-gradient(circle_at_top_right,rgba(79,70,229,0.055),transparent_32rem)] p-4 sm:p-6 lg:p-8 animate-fade-in"
+            className="relative w-full min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8 animate-fade-in"
           >
             <div aria-hidden={drawerRoute || undefined}>
               {drawerRoute

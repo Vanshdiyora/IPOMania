@@ -47,7 +47,7 @@ describe("WelcomePage accessibility and untrusted text", () => {
     expect(container.textContent).toContain('<img src=x onerror="alert(1)">');
   });
 
-  it("keeps the bottom sign-in link visible against the dark call-to-action", () => {
+  it("does not include fabricated portfolio examples", () => {
     render(
       <MemoryRouter>
         <WelcomePage />
@@ -56,6 +56,7 @@ describe("WelcomePage accessibility and untrusted text", () => {
 
     const signInLink = screen.getByRole("link", { name: "Sign In" });
     expect(signInLink).toHaveAttribute("href", "/login");
-    expect(signInLink).toHaveClass("bg-transparent", "text-white");
+    expect(screen.queryByText("Bharat Lights Ltd.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Solaris Tech Solutions")).not.toBeInTheDocument();
   });
 });

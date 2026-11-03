@@ -56,12 +56,19 @@ export function AdminRoute({ children }: { children: ReactNode }) {
       setAdmin(false);
       return;
     }
+    let active = true;
+    setAdmin(null);
     void supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .maybeSingle()
-      .then(({ data }) => setAdmin(isAdminEmail(user.email) && data?.role === "ADMIN"));
+      .then(({ data }) => {
+        if (active) setAdmin(isAdminEmail(user.email) && data?.role === "ADMIN");
+      });
+    return () => {
+      active = false;
+    };
   }, [user]);
   if (loading || (admin === null && user)) {
     return <LoadingState label="Checking administrator access" fullPage />;

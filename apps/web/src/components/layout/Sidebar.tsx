@@ -42,7 +42,7 @@ function NavItem({
           "flex min-h-touch items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
           "transition-colors duration-150",
           sectionActive
-            ? "border border-action-border bg-gradient-to-r from-action-light to-white text-action font-semibold shadow-sm"
+            ? "border border-action-border bg-action-light text-action font-semibold shadow-sm"
             : "text-muted hover:bg-canvas hover:text-ink",
         )}
       >
@@ -65,7 +65,7 @@ function NavItem({
           "flex min-h-touch items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
           "transition-colors duration-150",
           isActive || sectionActive
-            ? "border border-action-border bg-gradient-to-r from-action-light to-white text-action font-semibold shadow-sm"
+            ? "border border-action-border bg-action-light text-action font-semibold shadow-sm"
             : "text-muted hover:bg-canvas hover:text-ink",
         )
       }
@@ -157,6 +157,9 @@ export function Sidebar({
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-0.5 pr-1"
         onClick={onNavigate}
       >
+        <p className="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-subtle">
+          Workspace
+        </p>
         <NavItem
           to="/dashboard"
           end
@@ -189,8 +192,11 @@ export function Sidebar({
               onClick={onNavigate}
             />
 
-            {/* Divider */}
-            <div className="my-2 h-px bg-border" />
+            <div className="my-3 h-px bg-border" />
+
+            <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-subtle">
+              Account
+            </p>
 
             {/* Profile */}
             <NavItem

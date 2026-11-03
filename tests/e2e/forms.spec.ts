@@ -469,6 +469,7 @@ test("admin catalog filters, paginates, and recovers from a loading failure", as
   await page.getByRole("option", { name: "Listed", exact: true }).click();
   await page.getByRole("button", { name: "Apply filters (1)", exact: true }).click();
   await expect(page.getByText("Page 1 of 1 · 1 records")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "IPO catalog filters" })).toHaveCount(0);
   const search = page.getByRole("searchbox", { name: "Search IPO catalog" });
   await search.fill("missing");
   await expect(search).toHaveValue("missing");

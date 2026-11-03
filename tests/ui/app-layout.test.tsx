@@ -30,13 +30,13 @@ function renderLayout(path = "/") {
 describe("AppLayout", () => {
   beforeEach(() => useAuthMock.mockReturnValue({ user: null }));
 
-  it("renders the public landing content without the header or sidebar", () => {
+  it("renders the public landing content without the authenticated shell", () => {
     renderLayout();
 
     expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
     expect(
       screen.getByRole("heading", {
-        name: /Orchestrate IPO applications across all demat accounts/i,
+        name: /A clearer way to manage your IPO records/i,
       }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Create an account" })).toHaveAttribute(
@@ -48,11 +48,11 @@ describe("AppLayout", () => {
     expect(screen.queryByRole("button", { name: "Open navigation" })).not.toBeInTheDocument();
   });
 
-  it("keeps only the sidebar for the authenticated home route", () => {
+  it("keeps the navigation shell for the authenticated home route", () => {
     useAuthMock.mockReturnValue({ user: { email: "investor@example.test" } });
     renderLayout();
 
-    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+    expect(screen.getByRole("banner")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Main navigation" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
   });
@@ -61,7 +61,7 @@ describe("AppLayout", () => {
     renderLayout("/dashboard");
 
     expect(screen.getByRole("heading", { name: "Dashboard content" })).toBeInTheDocument();
-    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+    expect(screen.getByRole("banner")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Main navigation" })).toBeInTheDocument();
     expect(screen.getByRole("main")).not.toHaveClass("max-w-7xl", "mx-auto");
   });

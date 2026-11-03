@@ -28,14 +28,10 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-indigo-100 bg-white px-5 py-5 shadow-card sm:px-6",
+        "rounded-2xl border border-border bg-surface px-5 py-5 shadow-card sm:px-6",
         className,
       )}
     >
-      <div
-        aria-hidden="true"
-        className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-action via-indigo-400 to-teal-500"
-      />
       {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs items={breadcrumbs} />}
       {eyebrow && (
         <p className="text-xs font-semibold uppercase tracking-widest text-action">{eyebrow}</p>

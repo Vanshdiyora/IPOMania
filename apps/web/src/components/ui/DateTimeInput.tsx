@@ -194,7 +194,7 @@ export const DateTimeInput = forwardRef<HTMLInputElement, DateTimeInputProps>(
             className,
           )}
         >
-          <span className={currentValue ? "truncate" : "truncate text-subtle"}>
+          <span className={currentValue ? "truncate" : "truncate text-muted"}>
             {formattedValue}
           </span>
           <CalendarDays className="size-4 shrink-0 text-muted" aria-hidden="true" />
