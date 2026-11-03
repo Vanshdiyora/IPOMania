@@ -239,6 +239,6 @@ test("category configuration keeps unknown rules explicit", async ({ page }) => 
 
   await expect(page.getByRole("heading", { name: "Category configuration" })).toBeVisible();
   await expect(page.getByText(/Unknown limits stay unconfigured/)).toBeVisible();
-  await expect(page.getByLabel("Lot limits")).toHaveValue("UNCONFIGURED");
+  await expect(page.getByRole("combobox", { name: "Lot limits" })).toContainText("Unconfigured");
   await expect(page.getByLabel("Lot increment")).toHaveValue("");
 });

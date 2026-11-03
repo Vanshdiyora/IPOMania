@@ -52,7 +52,7 @@ export function NoResultsState({ query, onClear }: { query?: string; onClear?: (
         onClear ? (
           <button
             type="button"
-            className="text-sm font-semibold text-action hover:underline"
+            className="text-sm font-semibold text-action no-underline transition-colors hover:text-navy"
             onClick={onClear}
           >
             Clear filters
@@ -109,7 +109,7 @@ export function ErrorState({
       {onRetry && (
         <button
           type="button"
-          className="mt-5 text-sm font-semibold text-action hover:underline"
+          className="mt-5 text-sm font-semibold text-action no-underline transition-colors hover:text-navy"
           onClick={onRetry}
         >
           Try again

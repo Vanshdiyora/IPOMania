@@ -1,7 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
+import { createThirtyDayAuthStorage } from "./authStorage";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const authStorage =
+  typeof window === "undefined" ? undefined : createThirtyDayAuthStorage(window.localStorage);
 
 export const supabase =
   supabaseUrl && supabaseAnonKey
@@ -11,6 +14,7 @@ export const supabase =
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: false,
+          storage: authStorage,
         },
       })
     : null;

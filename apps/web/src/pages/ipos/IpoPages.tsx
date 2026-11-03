@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
   DematAccount,
@@ -19,9 +19,10 @@ import { useAuth } from "../../auth/useAuth";
 import { ConfirmButton } from "../../components/ui/ConfirmButton";
 import { Button } from "../../components/ui/Button";
 import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
+import { Input, Select as CustomSelect } from "../../components/ui/Input";
 import { FormSection } from "../../components/ui/FormSection";
 import { ConfirmationDialog } from "../../components/ui/ConfirmationDialog";
-import { RouteFormDrawer } from "../../components/ui/FormDrawer";
+import { DrawerRouteLink, RouteFormDrawer } from "../../components/ui/FormDrawer";
 import { useToast } from "../../components/ui/ToastContext";
 import { Card } from "../../components/ui/Card";
 import { BackLink } from "../../components/ui/BackLink";
@@ -39,6 +40,7 @@ import {
 import { ActiveFilterChips } from "../../components/filters/ActiveFilterChips";
 import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
 import { ApiRequestError, apiRequest } from "../../lib/api";
+import { DataTable } from "../../components/ui/DataTable";
 
 type IpoListResponse<T = IpoRecord> = {
   data: {
@@ -125,6 +127,7 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
   const params = new URLSearchParams({
     page: String(page),
     page_size: "25",
+    ...(calendar ? { sort: "opening_asc" } : {}),
     ...(search ? { search } : {}),
     ...(status ? { status } : {}),
   });
@@ -162,12 +165,12 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
               {calendar ? "IPO list" : "IPO calendar"}
             </Link>
             {!calendar ? (
-              <Link
+              <DrawerRouteLink
                 className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-5 py-2 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
                 to="/ipos/new"
               >
                 Add IPO
-              </Link>
+              </DrawerRouteLink>
             ) : null}
           </>
         }
@@ -194,11 +197,35 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
           </Button>
         ))}
       </div>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="IPO totals">
+        <Card>
+          <p className="text-sm font-semibold text-muted">Total IPOs</p>
+          <p className="mt-2 text-3xl font-bold text-navy">{data?.data.pagination.total ?? 0}</p>
+        </Card>
+        <Card>
+          <p className="text-sm font-semibold text-muted">Open on this page</p>
+          <p className="mt-2 text-3xl font-bold text-navy">
+            {ipos.filter((ipo) => ipo.status === "OPEN").length}
+          </p>
+        </Card>
+        <Card>
+          <p className="text-sm font-semibold text-muted">Upcoming on this page</p>
+          <p className="mt-2 text-3xl font-bold text-navy">
+            {ipos.filter((ipo) => ipo.status === "UPCOMING").length}
+          </p>
+        </Card>
+        <Card>
+          <p className="text-sm font-semibold text-muted">Listed on this page</p>
+          <p className="mt-2 text-3xl font-bold text-navy">
+            {ipos.filter((ipo) => ipo.status === "LISTED").length}
+          </p>
+        </Card>
+      </section>
       <Card className="overflow-hidden">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <label className="block min-w-0 flex-1 text-sm font-semibold text-ink">
             Search company or exact symbol
-            <input
+            <Input
               aria-label="Search company or exact symbol"
               className={inputClass}
               value={search}
@@ -322,39 +349,62 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
           />
         </Card>
       ) : null}
-      <div className="grid gap-4">
-        {ipos.map((ipo) => (
-          <Card key={ipo.id} className="flex flex-wrap items-center justify-between gap-4">
-            <div className="min-w-0">
-              <Link
-                className="text-xl font-bold text-action underline"
-                to={`/ipos/${personal ? "" : "catalog/"}${ipo.id}`}
-                state={{ from: `${location.pathname}${location.search}` }}
+      {!isLoading && !error && ipos.length > 0 ? (
+        <DataTable minWidth="1200px">
+          <thead>
+            <tr className="border-b border-border bg-canvas text-xs uppercase tracking-wide text-muted">
+              <th className="p-4 text-left">IPO</th>
+              <th className="p-4 text-left">Exchange</th>
+              <th className="p-4 text-left">Price band</th>
+              <th className="p-4 text-right">Lot size</th>
+              <th className="p-4 text-left">Bidding dates</th>
+              <th className="p-4 text-left">Source</th>
+              <th className="p-4 text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ipos.map((ipo) => (
+              <tr
+                key={ipo.id}
+                className="border-b border-border transition-colors hover:bg-canvas/60"
               >
-                {ipo.company_name}
-              </Link>
-              <p className="mt-1 text-sm text-muted">
-                {ipo.symbol ?? "Symbol not set"} · {ipo.exchange ?? "Exchange not set"} · Opens{" "}
-                {formatDate(ipo.opening_date)}
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                Price {ipo.issue_price_min ?? "Not set"}–{ipo.issue_price_max ?? "Not set"} · Lot
-                size {ipo.lot_size ?? "Not set"}
-              </p>
-              <p className="mt-1 text-xs text-muted">
-                {!personal
-                  ? `Admin-managed · ${ipo.data_source === "IPO_GURU" ? "IPO Guru" : ipo.data_source === "MANUAL" ? "Manual entry" : ipo.data_source}`
-                  : ipo.data_source === "MANUAL"
-                    ? ipo.last_verified_at
-                      ? "Manual entry · user-marked verification date"
-                      : "Manual entry · unverified"
-                    : "Published source · user-entered"}
-              </p>
-            </div>
-            <StatusBadge status={ipo.status} />
-          </Card>
-        ))}
-      </div>
+                <td className="p-4">
+                  <Link
+                    className="font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
+                    to={`/ipos/${personal ? "" : "catalog/"}${ipo.id}`}
+                    state={{ from: `${location.pathname}${location.search}` }}
+                  >
+                    {ipo.company_name}
+                  </Link>
+                  <p className="mt-1 text-xs text-muted">{ipo.symbol || "Symbol not published"}</p>
+                </td>
+                <td className="p-4 text-sm text-ink">{ipo.exchange || "Not published"}</td>
+                <td className="p-4 text-sm font-medium text-ink">
+                  {formatPriceBand(ipo.issue_price_min, ipo.issue_price_max)}
+                </td>
+                <td className="p-4 text-right text-sm font-medium text-ink tabular-nums">
+                  {ipo.lot_size ? ipo.lot_size.toLocaleString("en-IN") : "—"}
+                </td>
+                <td className="p-4 text-sm text-ink whitespace-nowrap">
+                  {formatDate(ipo.opening_date)} – {formatDate(ipo.closing_date)}
+                </td>
+                <td className="p-4 text-xs text-muted whitespace-nowrap">
+                  {!personal
+                    ? `Admin-managed · ${ipo.data_source === "IPO_GURU" ? "IPO Guru" : ipo.data_source === "MANUAL" ? "Manual entry" : ipo.data_source}`
+                    : ipo.data_source === "MANUAL"
+                      ? ipo.last_verified_at
+                        ? "Manual entry · user-marked verification date"
+                        : "Manual entry · unverified"
+                      : "Published source · user-entered"}
+                </td>
+                <td className="p-4 text-center">
+                  <StatusBadge status={ipo.status} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </DataTable>
+      ) : null}
       {data && data.data.pagination.total_pages > 1 ? (
         <Pagination
           label="IPO list pages"
@@ -455,17 +505,17 @@ export function IpoDetailsPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Link className={secondaryLinkClass} to={`/ipos/${ipo.id}/categories`}>
+          <DrawerRouteLink className={secondaryLinkClass} to={`/ipos/${ipo.id}/categories`}>
             Configure categories
-          </Link>
+          </DrawerRouteLink>
           <Link className={secondaryLinkClass} to={`/quota-calculator?ipo=${ipo.id}`}>
             Quota calculator
           </Link>
           {!ipo.archived_at ? (
             <>
-              <Link className={secondaryLinkClass} to={`/ipos/${ipo.id}/edit`}>
+              <DrawerRouteLink className={secondaryLinkClass} to={`/ipos/${ipo.id}/edit`}>
                 Edit IPO
-              </Link>
+              </DrawerRouteLink>
               <ConfirmButton
                 variant="outline"
                 disabled={archive.isPending}
@@ -489,9 +539,12 @@ export function IpoDetailsPage() {
               Each new configuration creates an immutable version for later calculation records.
             </p>
           </div>
-          <Link className="text-action underline" to={`/ipos/${ipo.id}/categories`}>
+          <DrawerRouteLink
+            className="text-action no-underline transition-colors hover:text-navy visited:text-action"
+            to={`/ipos/${ipo.id}/categories`}
+          >
             Manage rules
-          </Link>
+          </DrawerRouteLink>
         </div>
         {categoriesQuery.error ? (
           <div className="mt-4 space-y-3">
@@ -1188,7 +1241,7 @@ export function QuotaCalculatorPage() {
   }, [priceOptions, priceType]);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="w-full space-y-6">
       <header>
         <h1 className="text-3xl font-bold text-navy">Quota calculator</h1>
         <p className="mt-2 text-muted">
@@ -1218,7 +1271,7 @@ export function QuotaCalculatorPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-sm font-semibold text-ink">
             IPO
-            <select
+            <CustomSelect
               className={inputClass}
               value={ipoId}
               disabled={iposQuery.isLoading || Boolean(iposQuery.error)}
@@ -1233,14 +1286,14 @@ export function QuotaCalculatorPage() {
               </option>
               {ipoOptions.map((ipo) => (
                 <option key={ipo.id} value={ipo.id}>
-                  {ipo.company_name} ({ipo.symbol})
+                  {ipo.company_name}
                 </option>
               ))}
-            </select>
+            </CustomSelect>
           </label>
           <label className="text-sm font-semibold text-ink">
             Demat account
-            <select
+            <CustomSelect
               className={inputClass}
               value={dematAccountId}
               disabled={accountsQuery.isLoading || Boolean(accountsQuery.error)}
@@ -1258,11 +1311,11 @@ export function QuotaCalculatorPage() {
                   {account.holder_name} · {account.broker_name} · {account.masked_demat_identifier}
                 </option>
               ))}
-            </select>
+            </CustomSelect>
           </label>
           <label className="text-sm font-semibold text-ink">
             Category
-            <select
+            <CustomSelect
               className={inputClass}
               value={category}
               disabled={!ipoId || categoriesQuery.isLoading || Boolean(categoriesQuery.error)}
@@ -1274,7 +1327,7 @@ export function QuotaCalculatorPage() {
                   {latestRules.has(value) ? "" : " — not configured"}
                 </option>
               ))}
-            </select>
+            </CustomSelect>
           </label>
           <label className="text-sm font-semibold text-ink">
             Lots
@@ -1289,7 +1342,7 @@ export function QuotaCalculatorPage() {
           </label>
           <label className="text-sm font-semibold text-ink">
             Price type
-            <select
+            <CustomSelect
               className={inputClass}
               value={priceType}
               onChange={(event) => setPriceType(event.target.value as "BID" | "CUT_OFF")}
@@ -1299,7 +1352,7 @@ export function QuotaCalculatorPage() {
                   {type === "BID" ? "Bid price" : "Cut-off price"}
                 </option>
               ))}
-            </select>
+            </CustomSelect>
           </label>
           <label className="text-sm font-semibold text-ink">
             Price per share
@@ -1602,14 +1655,15 @@ function SelectField({
   children: React.ReactNode;
 }) {
   return (
-    <FormSelect
-      label={label}
-      required
-      error={form.formState.errors[name]?.message}
-      {...form.register(name)}
-    >
-      {children}
-    </FormSelect>
+    <Controller
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <FormSelect label={label} required error={form.formState.errors[name]?.message} {...field}>
+          {children}
+        </FormSelect>
+      )}
+    />
   );
 }
 
@@ -1687,6 +1741,13 @@ function formatRupees(value: string) {
     currency: "INR",
     maximumFractionDigits: 2,
   }).format(number);
+}
+
+function formatPriceBand(minimum: string | null, maximum: string | null) {
+  if (!minimum && !maximum) return "Not published";
+  if (!maximum || minimum === maximum) return formatRupees(minimum || maximum || "");
+  if (!minimum) return formatRupees(maximum);
+  return `${formatRupees(minimum)} – ${formatRupees(maximum)}`;
 }
 
 function Detail({ label, value }: { label: string; value: string }) {

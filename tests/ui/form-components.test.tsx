@@ -3,11 +3,12 @@ import React, { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { FormInput, FormSelect, FormTextarea } from "../../apps/web/src/components/ui/FormControls";
 import { FormDrawer } from "../../apps/web/src/components/ui/FormDrawer";
 import { SideDrawer } from "../../apps/web/src/components/ui/SideDrawer";
 import { SearchableFormSelect } from "../../apps/web/src/components/ui/SearchableFormSelect";
+import { Input } from "../../apps/web/src/components/ui/Input";
 import { ConfirmButton } from "../../apps/web/src/components/ui/ConfirmButton";
 
 describe("shared form controls", () => {
@@ -23,10 +24,50 @@ describe("shared form controls", () => {
         }))}
       />,
     );
-    await userEvent.setup().type(screen.getByRole("searchbox"), "Account 9");
-    expect(screen.getByRole("combobox")).toHaveValue("1");
-    expect(screen.getAllByRole("option")).toHaveLength(3);
-    expect(screen.getByRole("option", { name: "Account 9" })).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "Account" }));
+    await user.type(screen.getByRole("searchbox"), "Account 9");
+    expect(screen.getByRole("combobox", { name: "Account" })).toHaveTextContent("Account 1");
+    expect(screen.getByRole("option", { name: /Account 9/ })).toBeInTheDocument();
+  });
+
+  it("uses the custom calendar and 24-hour time controls", async () => {
+    const dateValues: string[] = [];
+    const datetimeValues: string[] = [];
+    const dateChange = vi.fn((event: React.ChangeEvent<HTMLInputElement>) => {
+      dateValues.push(event.target.value);
+    });
+    const datetimeChange = vi.fn((event: React.ChangeEvent<HTMLInputElement>) => {
+      datetimeValues.push(event.target.value);
+    });
+    const today = new Date();
+    const chosenDate = new Date(today.getFullYear(), today.getMonth(), 15);
+    const dateKey = `${chosenDate.getFullYear()}-${String(chosenDate.getMonth() + 1).padStart(2, "0")}-15`;
+    const accessibleDate = new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(
+      chosenDate,
+    );
+    const user = userEvent.setup();
+
+    const { rerender } = render(
+      <Input type="date" aria-label="Opening date" value="" onChange={dateChange} />,
+    );
+    await user.click(screen.getByRole("combobox", { name: "Opening date" }));
+    await user.click(screen.getByRole("button", { name: accessibleDate }));
+    expect(dateValues.at(-1)).toBe(dateKey);
+
+    rerender(
+      <Input
+        type="datetime-local"
+        aria-label="Verification time"
+        value=""
+        onChange={datetimeChange}
+      />,
+    );
+    await user.click(screen.getByRole("combobox", { name: "Verification time" }));
+    await user.clear(screen.getByLabelText("Time (24-hour)"));
+    await user.type(screen.getByLabelText("Time (24-hour)"), "12:30");
+    await user.click(screen.getByRole("button", { name: accessibleDate }));
+    expect(datetimeValues.at(-1)).toBe(`${dateKey}T12:30`);
   });
 
   it("registers input, select and textarea refs and restores loaded values", async () => {
@@ -34,6 +75,7 @@ describe("shared form controls", () => {
     function Form() {
       const {
         register,
+        control,
         reset,
         handleSubmit,
         formState: { errors },
@@ -45,10 +87,16 @@ describe("shared form controls", () => {
             error={errors.name?.message}
             {...register("name", { required: "Enter a holder name" })}
           />
-          <FormSelect label="Depository" {...register("type")}>
-            <option>NSDL</option>
-            <option>CDSL</option>
-          </FormSelect>
+          <Controller
+            control={control}
+            name="type"
+            render={({ field }) => (
+              <FormSelect label="Depository" {...field}>
+                <option>NSDL</option>
+                <option>CDSL</option>
+              </FormSelect>
+            )}
+          />
           <FormTextarea label="Notes" {...register("notes")} />
           <button
             type="button"
@@ -68,13 +116,18 @@ describe("shared form controls", () => {
     expect(screen.getByLabelText("Holder")).toHaveFocus();
     await user.click(screen.getByText("Load"));
     expect(screen.getByLabelText("Holder")).toHaveValue("Loaded holder");
-    expect(screen.getByLabelText("Depository")).toHaveValue("CDSL");
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Depository" })).toHaveTextContent("CDSL"),
+    );
     expect(screen.getByLabelText("Notes")).toHaveValue("Loaded note");
+    await user.click(screen.getByRole("combobox", { name: "Depository" }));
+    await user.click(screen.getByRole("option", { name: "NSDL" }));
+    expect(screen.getByRole("combobox", { name: "Depository" })).toHaveTextContent("NSDL");
     await user.type(screen.getByLabelText("Holder"), " edited");
     await user.click(screen.getByText("Save"));
     await waitFor(() =>
       expect(saved).toHaveBeenCalledWith(
-        { name: "Loaded holder edited", type: "CDSL", notes: "Loaded note" },
+        { name: "Loaded holder edited", type: "NSDL", notes: "Loaded note" },
         expect.anything(),
       ),
     );

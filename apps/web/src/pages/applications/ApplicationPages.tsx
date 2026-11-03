@@ -1,5 +1,5 @@
 import { toIsoDateTime } from "../../lib/formValues";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
@@ -11,15 +11,18 @@ import type {
 import { useAuth } from "../../auth/useAuth";
 import { ConfirmButton } from "../../components/ui/ConfirmButton";
 import { Button } from "../../components/ui/Button";
-import { RouteFormDrawer } from "../../components/ui/FormDrawer";
+import { DrawerRouteLink, RouteFormDrawer } from "../../components/ui/FormDrawer";
 import { SearchableFormSelect } from "../../components/ui/SearchableFormSelect";
+import { SearchableSelect } from "../../components/filters/SearchableSelect";
 import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
+import { Select as CustomSelect } from "../../components/ui/Input";
 import { FormSection } from "../../components/ui/FormSection";
 import { useFormValidation } from "../../components/ui/useFormValidation";
 import { applicationCreateSchema, applicationUpdateSchema } from "@ipo-mania/validation";
 import { Card } from "../../components/ui/Card";
 import { BackLink } from "../../components/ui/BackLink";
 import { Pagination } from "../../components/ui/Pagination";
+import { DataTable } from "../../components/ui/DataTable";
 import { useToast } from "../../components/ui/ToastContext";
 import {
   ActiveFilterChips,
@@ -173,24 +176,15 @@ function filterCount(filters: ApplicationFilters) {
 
 function useOwnedLists() {
   const { session } = useAuth();
-  const ipos = useQuery({
+  const ipos = useInfiniteQuery({
     queryKey: ["ipos", "application-options"],
     enabled: Boolean(session),
-    queryFn: async () => {
-      const first = await apiRequest<IpoListResponse>("/api/ipos?page_size=100", session!);
-      const totalPages = first.data.pagination?.total_pages ?? 1;
-      if (totalPages <= 1) return first;
-      const pages = await Promise.all(
-        Array.from({ length: totalPages - 1 }, (_, index) =>
-          apiRequest<IpoListResponse>(`/api/ipos?page=${index + 2}&page_size=100`, session!),
-        ),
-      );
-      return {
-        data: {
-          ...first.data,
-          ipos: [first.data.ipos, ...pages.map((page) => page.data.ipos)].flat(),
-        },
-      };
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      apiRequest<IpoListResponse>(`/api/ipos/catalog?page=${pageParam}&page_size=25`, session!),
+    getNextPageParam: (lastPage) => {
+      const { page, total_pages: totalPages } = lastPage.data.pagination ?? {};
+      return page && totalPages && page < totalPages ? page + 1 : undefined;
     },
   });
   const accounts = useQuery({
@@ -214,7 +208,7 @@ function useOwnedLists() {
     },
   });
   return {
-    ipos: ipos.data?.data.ipos ?? [],
+    ipos: ipos.data?.pages.flatMap((page) => page.data.ipos) ?? [],
     accounts: accounts.data?.data.accounts ?? [],
     loading: ipos.isLoading || accounts.isLoading,
     optionLoading: {
@@ -223,6 +217,7 @@ function useOwnedLists() {
     },
     error: ipos.error ?? accounts.error,
     refetch: () => Promise.all([ipos.refetch(), accounts.refetch()]),
+    iposInfinite: ipos,
   };
 }
 
@@ -249,9 +244,9 @@ export function ApplicationDashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Link className={linkClass} to="/applications/new">
+          <DrawerRouteLink className={linkClass} to="/applications/new">
             Add application
-          </Link>
+          </DrawerRouteLink>
           <Link className={linkClass} to="/applications/bulk">
             Bulk entry
           </Link>
@@ -282,23 +277,12 @@ export function ApplicationDashboardPage() {
           ))
         )}
       </section>
-      <Card>
-        <h2 className="text-xl font-bold text-ink">Keep each status up to date</h2>
-        <p className="mt-2 text-base text-muted">
-          Keep application progress up to date as your records change.
-        </p>
-        <Link
-          className="mt-4 inline-flex min-h-touch items-center text-action underline"
-          to="/applications/list"
-        >
-          View application table
-        </Link>
-      </Card>
+      <ApplicationListPage embedded />
     </div>
   );
 }
 
-export function ApplicationListPage() {
+export function ApplicationListPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { session } = useAuth();
   const { notify } = useToast();
   const location = useLocation();
@@ -421,7 +405,7 @@ export function ApplicationListPage() {
   const activeFilterCount = filterCount(appliedFilters);
   const ipoOptions = lists.ipos.map((ipo) => ({
     value: ipo.id,
-    label: ipo.symbol ? `${ipo.symbol} — ${ipo.company_name}` : ipo.company_name,
+    label: ipo.company_name,
     badge: ipo.status ? prettyStatus(ipo.status) : undefined,
   }));
   const accountOptions = lists.accounts.map((account) => ({
@@ -505,35 +489,37 @@ export function ApplicationListPage() {
   }
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-navy">Application table</h1>
-          <p className="mt-2 text-base text-muted">
-            {data?.data.pagination.total ?? 0} matching applications
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Button
-            variant="outline"
-            onClick={() =>
-              void exportCsv()
-                .then(() => notify({ title: "Application CSV downloaded", tone: "success" }))
-                .catch((reason: unknown) =>
-                  notify({
-                    title: "Export failed",
-                    description: errorMessage(reason),
-                    tone: "error",
-                  }),
-                )
-            }
-          >
-            Export CSV
-          </Button>
-          <Link className={linkClass} to="/applications/new">
-            Add application
-          </Link>
-        </div>
-      </header>
+      {!embedded && (
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-navy">Application table</h1>
+            <p className="mt-2 text-base text-muted">
+              {data?.data.pagination.total ?? 0} matching applications
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              onClick={() =>
+                void exportCsv()
+                  .then(() => notify({ title: "Application CSV downloaded", tone: "success" }))
+                  .catch((reason: unknown) =>
+                    notify({
+                      title: "Export failed",
+                      description: errorMessage(reason),
+                      tone: "error",
+                    }),
+                  )
+              }
+            >
+              Export CSV
+            </Button>
+            <DrawerRouteLink className={linkClass} to="/applications/new">
+              Add application
+            </DrawerRouteLink>
+          </div>
+        </header>
+      )}
       <ApplicationSearchToolbar
         search={searchInput}
         activeFilterCount={activeFilterCount}
@@ -608,7 +594,7 @@ export function ApplicationListPage() {
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <label className="font-semibold">
             Set application status for selected
-            <select
+            <CustomSelect
               className={fieldClass}
               value={bulkStatus}
               onChange={(event) => setBulkStatus(event.target.value)}
@@ -619,7 +605,7 @@ export function ApplicationListPage() {
                   {prettyStatus(status)}
                 </option>
               ))}
-            </select>
+            </CustomSelect>
           </label>
           <Button
             variant="outline"
@@ -630,7 +616,7 @@ export function ApplicationListPage() {
           </Button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left">
+          <DataTable minWidth="760px">
             <thead>
               <tr className="border-b border-border text-sm text-muted">
                 <th scope="col" className="p-3 text-center">
@@ -673,7 +659,7 @@ export function ApplicationListPage() {
                     </td>
                     <td className="p-3">
                       <Link
-                        className="font-semibold text-action underline"
+                        className="font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
                         to={`/applications/${row.id}`}
                         state={{ from: `${location.pathname}${location.search}` }}
                       >
@@ -693,7 +679,7 @@ export function ApplicationListPage() {
                 ))
               )}
             </tbody>
-          </table>
+          </DataTable>
           {!isLoading && !rows.length ? (
             <div className="p-8 text-center">
               <p className="font-semibold text-ink">No applications found.</p>
@@ -820,7 +806,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       );
     },
     onSuccess: () =>
-      navigate("/applications/list", {
+      navigate("/applications", {
         state: { successMessage: editing ? "Application updated." : "Application created." },
       }),
     onError: (error) =>
@@ -847,7 +833,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     <RouteFormDrawer
       title={editing ? "Edit application" : "Add application"}
       description="Choose an issue, an account, and a configured category. Existing manual records keep their calculation and rule version."
-      cancelTo="/applications/list"
+      cancelTo="/applications"
       formId="application-form"
       submitLabel="Save application"
       busy={mutation.isPending}
@@ -900,23 +886,33 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
           {!editing ? (
             <FormSection title="Issue and account">
               <div className="grid gap-4 sm:grid-cols-2">
-                <SearchableFormSelect
-                  label="IPO"
-                  required
-                  error={validation.errors.ipo_id}
-                  value={ipoId}
-                  placeholder={lists.optionLoading.ipos ? "Loading IPOs…" : "Choose an IPO"}
-                  disabled={lists.optionLoading.ipos}
-                  options={lists.ipos.map((item) => ({
-                    value: item.id,
-                    label: `${item.symbol} — ${item.company_name}`,
-                  }))}
-                  onChange={(event) => {
-                    setIpoId(event.target.value);
-                    setCategoryId("");
-                    setPrice("");
-                  }}
-                />
+                <div className="min-w-0">
+                  <SearchableSelect
+                    label="IPO"
+                    placeholder="Choose an IPO"
+                    value={ipoId}
+                    loading={lists.optionLoading.ipos}
+                    disabled={lists.optionLoading.ipos}
+                    options={lists.ipos.map((item) => ({
+                      value: item.id,
+                      label: item.company_name,
+                    }))}
+                    hasMore={Boolean(lists.iposInfinite.hasNextPage)}
+                    loadingMore={lists.iposInfinite.isFetchingNextPage}
+                    onLoadMore={() => void lists.iposInfinite.fetchNextPage()}
+                    onChange={(value) => {
+                      const nextValue = Array.isArray(value) ? (value[0] ?? "") : value;
+                      setIpoId(nextValue);
+                      setCategoryId("");
+                      setPrice("");
+                    }}
+                  />
+                  {validation.errors.ipo_id ? (
+                    <p role="alert" className="mt-1 text-sm font-medium text-red-700">
+                      {validation.errors.ipo_id}
+                    </p>
+                  ) : null}
+                </div>
                 <SearchableFormSelect
                   label="Demat account"
                   required
@@ -934,7 +930,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                       value: account.id,
                       label: `${account.holder_name} — ${account.masked_demat_identifier}`,
                     }))}
-                  onChange={(event) => setAccountId(event.target.value)}
+                  onChange={setAccountId}
                 />
                 <FormSelect
                   label="Application category"
@@ -1108,7 +1104,7 @@ export function ApplicationDetailsPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
       notify({ title: "Application archived", tone: "success" });
-      navigate("/applications/list");
+      navigate("/applications");
     },
     onError: (error) =>
       notify({
@@ -1123,13 +1119,10 @@ export function ApplicationDetailsPage() {
     return <ErrorMessage error={detail.error} onRetry={() => void detail.refetch()} />;
   if (!item) return <p>Application not found.</p>;
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="w-full space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <BackLink
-            fallback="/applications/list"
-            allowedPath={/^\/(applications(\/list)?|dashboard)?$/}
-          >
+          <BackLink fallback="/applications" allowedPath={/^\/(applications|dashboard)?$/}>
             Back to applications
           </BackLink>
           <h1 className="text-3xl font-bold text-navy">Application details</h1>
@@ -1137,9 +1130,9 @@ export function ApplicationDetailsPage() {
             Historical calculation rules are retained with this record.
           </p>
         </div>
-        <Link className={linkClass} to={`/applications/${item.id}/edit`}>
+        <DrawerRouteLink className={linkClass} to={`/applications/${item.id}/edit`}>
           Edit status and notes
-        </Link>
+        </DrawerRouteLink>
       </header>
       <Card>
         <dl className="grid gap-4 sm:grid-cols-2">
@@ -1258,7 +1251,7 @@ export function BulkApplicationPage() {
     setPreview(null);
   }
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="w-full space-y-6">
       <header>
         <h1 className="text-3xl font-bold text-navy">Bulk application entry</h1>
         <p className="mt-2 text-base text-muted">
@@ -1270,7 +1263,7 @@ export function BulkApplicationPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="font-semibold">
             1. Select IPO
-            <select
+            <CustomSelect
               className={fieldClass}
               value={ipoId}
               onChange={(event) => {
@@ -1282,14 +1275,14 @@ export function BulkApplicationPage() {
               <option value="">Choose IPO</option>
               {lists.ipos.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.symbol} — {item.company_name}
+                  {item.company_name}
                 </option>
               ))}
-            </select>
+            </CustomSelect>
           </label>
           <label className="font-semibold">
             2. Category
-            <select
+            <CustomSelect
               className={fieldClass}
               value={categoryId}
               onChange={(event) => {
@@ -1303,7 +1296,7 @@ export function BulkApplicationPage() {
                   {item.category}
                 </option>
               ))}
-            </select>
+            </CustomSelect>
           </label>
           <label className="font-semibold">
             3. Lots
@@ -1320,7 +1313,7 @@ export function BulkApplicationPage() {
           </label>
           <label className="font-semibold">
             Price type
-            <select
+            <CustomSelect
               className={fieldClass}
               value={priceType}
               onChange={(event) => {
@@ -1330,7 +1323,7 @@ export function BulkApplicationPage() {
             >
               <option value="CUT_OFF">Cut-off</option>
               <option value="BID">Bid</option>
-            </select>
+            </CustomSelect>
           </label>
           <label className="font-semibold">
             Price
@@ -1533,7 +1526,7 @@ export function ApplicationImportPage() {
       }),
   });
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="w-full space-y-6">
       <header>
         <h1 className="text-3xl font-bold text-navy">Application import wizard</h1>
         <p className="mt-2 text-base text-muted">
@@ -1579,7 +1572,7 @@ export function ApplicationImportPage() {
                   )
                     ? `${label} (required)`
                     : label}
-                  <select
+                  <CustomSelect
                     className={fieldClass}
                     value={mapping[name] ?? ""}
                     onChange={(event) =>
@@ -1592,7 +1585,7 @@ export function ApplicationImportPage() {
                         {header}
                       </option>
                     ))}
-                  </select>
+                  </CustomSelect>
                 </label>
               ))}
             </div>
@@ -1661,7 +1654,7 @@ export function ApplicationImportPage() {
           </section>
         ) : null}
         <Link
-          className="mt-5 inline-flex min-h-touch items-center text-action underline"
+          className="mt-5 inline-flex min-h-touch items-center text-action no-underline transition-colors hover:text-navy visited:text-action"
           to="/applications/import-history"
         >
           View import history
@@ -1706,7 +1699,7 @@ export function ApplicationImportHistoryPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[620px] text-left">
+              <DataTable minWidth="620px">
                 <thead>
                   <tr>
                     <th className="p-3">File</th>
@@ -1727,7 +1720,7 @@ export function ApplicationImportHistoryPage() {
                       <td className="p-3">{new Date(item.created_at).toLocaleDateString()}</td>
                       <td className="p-3">
                         <Link
-                          className="text-action underline"
+                          className="text-action no-underline transition-colors hover:text-navy visited:text-action"
                           to={`/applications/import-history/${item.id}`}
                         >
                           Open report
@@ -1736,7 +1729,7 @@ export function ApplicationImportHistoryPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </DataTable>
               {data && data.data.imports.length === 0 ? (
                 <p className="p-3">No imports yet.</p>
               ) : null}
@@ -1845,7 +1838,7 @@ function StatusSelect({
   return (
     <label className="font-semibold">
       {label}
-      <select
+      <CustomSelect
         className={fieldClass}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -1856,7 +1849,7 @@ function StatusSelect({
             {prettyStatus(item)}
           </option>
         ))}
-      </select>
+      </CustomSelect>
     </label>
   );
 }

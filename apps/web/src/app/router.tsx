@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
+import { ListTabRedirect } from "../components/layout/ListTabRedirect";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { RegisterPage } from "../pages/RegisterPage";
 import { LoginPage } from "../pages/LoginPage";
@@ -14,7 +15,6 @@ import {
   AccountDetailsPage,
   AccountFormPage,
   AccountImportPage,
-  AccountListPage,
   ImportHistoryPage,
 } from "../pages/accounts/AccountPages";
 import {
@@ -40,7 +40,6 @@ import {
   ApplicationFormPage,
   ApplicationImportHistoryPage,
   ApplicationImportPage,
-  ApplicationListPage,
   BulkApplicationPage,
 } from "../pages/applications/ApplicationPages";
 
@@ -77,7 +76,7 @@ export const router = createBrowserRouter([
       { index: true, element: <DashboardHomePage /> },
       { path: "dashboard", element: protectedPage(<DashboardHomePage />) },
       { path: "accounts", element: protectedPage(<AccountDashboardPage />) },
-      { path: "accounts/list", element: protectedPage(<AccountListPage />) },
+      { path: "accounts/list", element: <ListTabRedirect path="/accounts" /> },
       { path: "accounts/new", element: protectedPage(<AccountFormPage />) },
       { path: "accounts/import", element: protectedPage(<AccountImportPage />) },
       { path: "accounts/import-history", element: protectedPage(<ImportHistoryPage />) },
@@ -96,7 +95,7 @@ export const router = createBrowserRouter([
       { path: "ipos/:ipoId", element: protectedPage(<IpoDetailsPage />) },
       { path: "quota-calculator", element: protectedPage(<QuotaCalculatorPage />) },
       { path: "applications", element: protectedPage(<ApplicationDashboardPage />) },
-      { path: "applications/list", element: protectedPage(<ApplicationListPage />) },
+      { path: "applications/list", element: <ListTabRedirect path="/applications" /> },
       { path: "applications/new", element: protectedPage(<ApplicationFormPage />) },
       { path: "applications/bulk", element: protectedPage(<BulkApplicationPage />) },
       { path: "applications/import", element: protectedPage(<ApplicationImportPage />) },

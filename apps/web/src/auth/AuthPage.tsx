@@ -19,7 +19,7 @@ export function AuthPage({
   return (
     <div className="flex min-h-screen bg-canvas">
       {/* Left decorative panel */}
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-navy p-10 lg:flex">
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-indigo-950 via-indigo-900 to-teal-800 p-10 lg:flex">
         {/* Background pattern */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-action/10" />
@@ -41,9 +41,7 @@ export function AuthPage({
 
         {/* Logo */}
         <Link to="/" className="relative flex items-center gap-3 w-fit">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-action text-white font-bold">
-            IM
-          </div>
+          <img src="/logo.png" alt="" className="h-10 w-10 rounded-xl object-contain" />
           <span className="text-lg font-bold text-white">IPO Mania</span>
         </Link>
 
@@ -86,9 +84,7 @@ export function AuthPage({
       <div className="flex flex-1 flex-col items-center justify-center p-6 sm:p-10">
         {/* Mobile logo */}
         <Link to="/" className="mb-8 flex items-center gap-2.5 lg:hidden">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-action text-white font-bold text-sm">
-            IM
-          </div>
+          <img src="/logo.png" alt="" className="h-9 w-9 rounded-xl object-contain" />
           <span className="text-base font-bold text-ink">IPO Mania</span>
         </Link>
 

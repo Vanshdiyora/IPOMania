@@ -48,7 +48,10 @@ export function LoginPage() {
       footer={
         <>
           New to IPO Mania?{" "}
-          <Link className="font-semibold text-action hover:underline" to="/register">
+          <Link
+            className="font-semibold text-action transition-colors hover:text-navy"
+            to="/register"
+          >
             Create an account
           </Link>
         </>
@@ -80,7 +83,10 @@ export function LoginPage() {
         </FormField>
 
         <div className="flex items-center justify-end">
-          <Link className="text-sm font-semibold text-action hover:underline" to="/forgot-password">
+          <Link
+            className="text-sm font-semibold text-action transition-colors hover:text-navy"
+            to="/forgot-password"
+          >
             Forgot password?
           </Link>
         </div>

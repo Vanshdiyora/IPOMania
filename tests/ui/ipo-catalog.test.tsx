@@ -77,7 +77,7 @@ describe("user IPO catalog", () => {
       "true",
     );
     expect(screen.getByText("Admin-managed · IPO Guru")).toBeInTheDocument();
-    expect(screen.getByText(/Lot size Not set/)).toBeInTheDocument();
+    expect(screen.getAllByText("Not published")).toHaveLength(2);
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/api/ipos/catalog?page=1&page_size=25",
       expect.anything(),
@@ -153,7 +153,7 @@ describe("user IPO catalog", () => {
     renderPage("/ipo-calendar");
     expect(await screen.findByRole("link", { name: catalogIpo.company_name })).toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
-      "/api/ipos/catalog?page=1&page_size=25",
+      "/api/ipos/catalog?page=1&page_size=25&sort=opening_asc",
       expect.anything(),
     );
   });

@@ -16,6 +16,8 @@ import {
 } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { DataTable } from "../components/ui/DataTable";
+import { Select as CustomSelect } from "../components/ui/Input";
 import {
   BriefcaseBusiness,
   Building2,
@@ -27,7 +29,6 @@ import {
   FileSpreadsheet,
   Filter,
   TrendingUp,
-  X,
 } from "lucide-react";
 import type {
   DashboardAnalytics,
@@ -38,12 +39,14 @@ import type {
 import { useAuth } from "../auth/useAuth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { Badge, StatusBadge } from "../components/ui/Badge";
+import { StatusBadge } from "../components/ui/Badge";
 import { LoadingState } from "../components/LoadingState";
 import { SkeletonStatCard } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastContext";
 import { ApiRequestError, apiRequest, downloadApiFile } from "../lib/api";
 import { WelcomePage } from "./WelcomePage";
+import { FilterDrawer, FilterSection } from "../components/filters/FilterDrawer";
+import { DateRangePicker } from "../components/filters/DateRangePicker";
 
 type AnalyticsResponse = { data: DashboardAnalytics };
 type IpoOptionsResponse = {
@@ -78,9 +81,7 @@ const emptyFilters: Filters = {
 
 const selectClass =
   "min-h-touch w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/20 focus-visible:border-action";
-const inputClass =
-  "min-h-touch w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/20 focus-visible:border-action";
-const chartColors = ["#2563EB", "#059669", "#D97706", "#DC2626", "#64748B", "#1E3A8A"];
+const chartColors = ["#4F46E5", "#0D9488", "#F59E0B", "#F43F5E", "#8B5CF6", "#06B6D4"];
 
 export function DashboardHomePage() {
   const { loading, user } = useAuth();
@@ -93,6 +94,8 @@ export function DashboardPage() {
   const { notify } = useToast();
   const { session, markSessionExpired } = useAuth();
   const [filters, setFilters] = useState<Filters>(emptyFilters);
+  const [draftFilters, setDraftFilters] = useState<Filters>(emptyFilters);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [exportError, setExportError] = useState("");
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -192,208 +195,164 @@ export function DashboardPage() {
   const optionsError =
     ipoOptionsQuery.error ?? catalogOptionsQuery.error ?? accountOptionsQuery.error;
 
-  const hasActiveFilters = Object.values(filters).some(Boolean);
-
   function analyticsCount(value: number | undefined): string {
     if (analyticsQuery.isLoading) return "Loading…";
     if (analyticsQuery.error || value === undefined) return "Unavailable";
     return String(value);
   }
 
-  function updateFilter(key: keyof Filters, value: string) {
-    setFilters((current) => ({ ...current, [key]: value }));
+  function updateDraftFilter(key: keyof Filters, value: string) {
+    setDraftFilters((current) => ({ ...current, [key]: value }));
   }
+
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+  const invalidDateRange = Boolean(
+    draftFilters.date_from && draftFilters.date_to && draftFilters.date_from > draftFilters.date_to,
+  );
 
   return (
     <div className="min-w-0 w-full space-y-8 animate-fade-in">
       {/* ─── Page Header ─────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-action/10 px-2.5 py-0.5 text-xs font-semibold text-action mb-1.5">
-            <TrendingUp size={13} />
-            <span>PORTFOLIO INTELLIGENCE</span>
+      <div className="relative overflow-hidden rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-950 via-indigo-800 to-teal-700 px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7">
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-white/10 blur-2xl" />
+        <div className="pointer-events-none absolute bottom-0 right-28 h-24 w-24 rounded-full bg-teal-300/20 blur-xl" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-indigo-50 backdrop-blur">
+              <TrendingUp size={13} />
+              <span>PORTFOLIO INTELLIGENCE</span>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Dashboard &amp; Analytics
+            </h1>
+            <p className="mt-2 max-w-xl text-sm text-indigo-100">
+              Unified view of applications, demat accounts, and tracked IPOs.
+            </p>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-navy sm:text-3xl">
-            Dashboard &amp; Analytics
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            Unified view of applications, demat accounts, and tracked IPOs.
-          </p>
-        </div>
 
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-2 bg-surface"
-            disabled={exportMutation.isPending || !analytics}
-            onClick={() => exportMutation.mutate("csv")}
-          >
-            <Download size={15} />
-            <span>Export CSV</span>
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            className="gap-2 shadow-xs"
-            disabled={exportMutation.isPending || !analytics}
-            onClick={() => exportMutation.mutate("xlsx")}
-          >
-            <FileSpreadsheet size={15} />
-            <span>Export Excel</span>
-          </Button>
+          {/* Action Controls */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2 border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15 hover:text-white"
+              onClick={() => {
+                setDraftFilters(filters);
+                setFiltersOpen(true);
+              }}
+            >
+              <Filter size={15} />
+              <span>Filters{activeFilterCount ? ` (${activeFilterCount})` : ""}</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2 border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15 hover:text-white"
+              disabled={exportMutation.isPending || !analytics}
+              onClick={() => exportMutation.mutate("csv")}
+            >
+              <Download size={15} />
+              <span>Export CSV</span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="gap-2 border border-white bg-white text-indigo-950 shadow-md hover:bg-indigo-50"
+              disabled={exportMutation.isPending || !analytics}
+              onClick={() => exportMutation.mutate("xlsx")}
+            >
+              <FileSpreadsheet size={15} />
+              <span>Export Excel</span>
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* ─── Filter Bar ───────────────────────────────────────────────────── */}
-      <Card noPadding className="border-border/80 bg-surface shadow-xs">
-        <div className="border-b border-border/60 px-5 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Filter size={16} className="text-action" />
-            <span className="text-sm font-semibold text-ink">Analytics Filters</span>
-            {hasActiveFilters && (
-              <Badge variant="primary" size="sm">
-                Filtered
-              </Badge>
-            )}
-          </div>
-          {hasActiveFilters && (
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 text-xs font-medium text-danger hover:underline"
-              onClick={() => setFilters(emptyFilters)}
+      <FilterDrawer
+        open={filtersOpen}
+        activeCount={Object.values(draftFilters).filter(Boolean).length}
+        description="Refine dashboard analytics and downloadable reports."
+        onClose={() => setFiltersOpen(false)}
+        onReset={() => setDraftFilters(emptyFilters)}
+        onApply={() => {
+          setFilters(draftFilters);
+          setFiltersOpen(false);
+        }}
+        applyDisabled={invalidDateRange}
+      >
+        <div className="space-y-5">
+          <FilterSection title="Date range">
+            <DateRangePicker
+              from={draftFilters.date_from}
+              to={draftFilters.date_to}
+              onFromChange={(value) => updateDraftFilter("date_from", value)}
+              onToChange={(value) => updateDraftFilter("date_to", value)}
+            />
+          </FilterSection>
+          <FilterSection title="My IPO">
+            <CustomSelect
+              aria-label="My IPO filter"
+              className={selectClass}
+              value={draftFilters.ipo_id}
+              onChange={(event) => updateDraftFilter("ipo_id", event.target.value)}
             >
-              <X size={13} />
-              <span>Reset filters</span>
-            </button>
-          )}
+              <option value="">All my IPOs</option>
+              {ipoOptions.map((ipo) => (
+                <option key={ipo.id} value={ipo.id}>
+                  {ipo.company_name}
+                </option>
+              ))}
+            </CustomSelect>
+          </FilterSection>
+          <FilterSection title="Shared IPO">
+            <CustomSelect
+              aria-label="Shared IPO filter"
+              className={selectClass}
+              value={draftFilters.catalog_ipo_id}
+              onChange={(event) => updateDraftFilter("catalog_ipo_id", event.target.value)}
+            >
+              <option value="">All shared IPOs</option>
+              {catalogOptions.map((ipo) => (
+                <option key={ipo.id} value={ipo.id}>
+                  {ipo.company_name}
+                </option>
+              ))}
+            </CustomSelect>
+          </FilterSection>
+          <FilterSection title="Bid category">
+            <CustomSelect
+              aria-label="Category filter"
+              className={selectClass}
+              value={draftFilters.category}
+              onChange={(event) => updateDraftFilter("category", event.target.value)}
+            >
+              <option value="">All categories</option>
+              {["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"].map((category) => (
+                <option key={category} value={category}>
+                  {categoryLabel(category)}
+                </option>
+              ))}
+            </CustomSelect>
+          </FilterSection>
+          <FilterSection title="Demat account">
+            <CustomSelect
+              aria-label="Demat account filter"
+              className={selectClass}
+              value={draftFilters.account_id}
+              onChange={(event) => updateDraftFilter("account_id", event.target.value)}
+            >
+              <option value="">All accounts</option>
+              {accountOptions.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.holder_name} · {account.masked_demat_identifier}
+                </option>
+              ))}
+            </CustomSelect>
+          </FilterSection>
         </div>
-        <div className="p-5">
-          <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <div>
-              <label className="text-xs font-semibold text-muted block mb-1">From date</label>
-              <input
-                aria-label="From date"
-                className={`${inputClass} min-w-0 max-w-full`}
-                type="date"
-                value={filters.date_from}
-                onChange={(event) => updateFilter("date_from", event.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted block mb-1">To date</label>
-              <input
-                aria-label="To date"
-                className={`${inputClass} min-w-0 max-w-full`}
-                type="date"
-                value={filters.date_to}
-                onChange={(event) => updateFilter("date_to", event.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted block mb-1">My IPO</label>
-              <select
-                aria-label="My IPO filter"
-                className={selectClass}
-                value={filters.ipo_id}
-                onChange={(event) => updateFilter("ipo_id", event.target.value)}
-              >
-                <option value="">All my IPOs</option>
-                {ipoOptions.map((ipo) => (
-                  <option key={ipo.id} value={ipo.id}>
-                    {ipo.company_name} ({ipo.symbol})
-                  </option>
-                ))}
-              </select>
-              {ipoOptionsQuery.hasNextPage ? (
-                <button
-                  type="button"
-                  className="mt-1 text-xs font-medium text-action hover:underline"
-                  disabled={ipoOptionsQuery.isFetchingNextPage}
-                  onClick={() => void ipoOptionsQuery.fetchNextPage()}
-                >
-                  {ipoOptionsQuery.isFetchingNextPage ? "Loading…" : "+ Load more my IPOs"}
-                </button>
-              ) : null}
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted block mb-1">Shared IPO</label>
-              <select
-                aria-label="Shared IPO filter"
-                className={selectClass}
-                value={filters.catalog_ipo_id}
-                onChange={(event) => updateFilter("catalog_ipo_id", event.target.value)}
-              >
-                <option value="">All shared IPOs</option>
-                {catalogOptions.map((ipo) => (
-                  <option key={ipo.id} value={ipo.id}>
-                    {ipo.company_name}
-                    {ipo.symbol ? ` (${ipo.symbol})` : ""}
-                  </option>
-                ))}
-              </select>
-              {catalogOptionsQuery.hasNextPage ? (
-                <button
-                  type="button"
-                  className="mt-1 text-xs font-medium text-action hover:underline"
-                  disabled={catalogOptionsQuery.isFetchingNextPage}
-                  onClick={() => void catalogOptionsQuery.fetchNextPage()}
-                >
-                  {catalogOptionsQuery.isFetchingNextPage ? "Loading…" : "+ Load more shared IPOs"}
-                </button>
-              ) : null}
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted block mb-1">Bid Category</label>
-              <select
-                aria-label="Category filter"
-                className={selectClass}
-                value={filters.category}
-                onChange={(event) => updateFilter("category", event.target.value)}
-              >
-                <option value="">All categories</option>
-                {["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"].map((category) => (
-                  <option key={category} value={category}>
-                    {categoryLabel(category)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted block mb-1">Demat Account</label>
-              <select
-                aria-label="Demat account filter"
-                className={selectClass}
-                value={filters.account_id}
-                onChange={(event) => updateFilter("account_id", event.target.value)}
-              >
-                <option value="">All accounts</option>
-                {accountOptions.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.holder_name} · {account.masked_demat_identifier}
-                  </option>
-                ))}
-              </select>
-              {accountOptionsQuery.hasNextPage ? (
-                <button
-                  type="button"
-                  className="mt-1 text-xs font-medium text-action hover:underline"
-                  disabled={accountOptionsQuery.isFetchingNextPage}
-                  onClick={() => void accountOptionsQuery.fetchNextPage()}
-                >
-                  {accountOptionsQuery.isFetchingNextPage ? "Loading…" : "+ Load more accounts"}
-                </button>
-              ) : null}
-            </div>
-          </div>
-          <p className="mt-3 text-xs text-muted">
-            Date, category, account, and My IPO filters scope personal applications. Shared IPO
-            filters scope catalog details. Current inventory is shown for accounts and IPOs.
-          </p>
-        </div>
-      </Card>
+      </FilterDrawer>
 
       {/* ─── Feedback Notices ────────────────────────────────────────────── */}
       {queryError ? <ErrorNotice error={queryError} /> : null}
@@ -427,24 +386,28 @@ export function DashboardPage() {
               value={analyticsCount(analytics?.totals.applications)}
               detail="Active bid records"
               icon={<ClipboardList size={18} className="text-action" />}
+              accent="indigo"
             />
             <MetricCard
               label="Demat Accounts"
               value={analyticsCount(analytics?.totals.active_demat_accounts)}
               detail="Active demat units"
               icon={<BriefcaseBusiness size={18} className="text-action-emerald" />}
+              accent="teal"
             />
             <MetricCard
               label="Tracked IPOs"
               value={analyticsCount(analytics?.totals.tracked_ipos)}
               detail="My saved IPOs"
               icon={<TrendingUp size={18} className="text-action" />}
+              accent="amber"
             />
             <MetricCard
               label="Shared IPOs"
               value={analyticsCount(analytics?.catalog.total)}
               detail="Admin managed catalog"
               icon={<TrendingUp size={18} className="text-action" />}
+              accent="violet"
             />
           </>
         )}
@@ -589,7 +552,7 @@ export function DashboardPage() {
             <div role="img" aria-label="Top IPOs by application count" className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={analytics.applications_by_ipo} margin={{ bottom: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6E9F2" />
                   <XAxis
                     dataKey="symbol"
                     angle={-25}
@@ -607,7 +570,7 @@ export function DashboardPage() {
                     }}
                     formatter={(value) => [value, "Applications"]}
                   />
-                  <Bar dataKey="count" name="Applications" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" name="Applications" fill="#4F46E5" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -634,7 +597,7 @@ export function DashboardPage() {
                   }))}
                   margin={{ bottom: 30 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6E9F2" />
                   <XAxis
                     dataKey="category_label"
                     angle={-15}
@@ -651,7 +614,7 @@ export function DashboardPage() {
                     }}
                     formatter={(value) => [value, "Applications"]}
                   />
-                  <Bar dataKey="count" name="Applications" fill="#059669" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" name="Applications" fill="#0D9488" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -672,7 +635,7 @@ export function DashboardPage() {
             <div role="img" aria-label="Monthly application trend" className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={analytics.monthly_application_trends}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6E9F2" />
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                   <Tooltip
@@ -687,9 +650,9 @@ export function DashboardPage() {
                     type="monotone"
                     dataKey="count"
                     name="Applications"
-                    stroke="#2563EB"
+                    stroke="#4F46E5"
                     strokeWidth={2.5}
-                    dot={{ r: 4, fill: "#2563EB" }}
+                    dot={{ r: 4, fill: "#4F46E5" }}
                     activeDot={{ r: 6 }}
                   />
                 </LineChart>
@@ -714,7 +677,7 @@ export function DashboardPage() {
             <div role="img" aria-label="Applications by demat account" className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={analytics.applications_by_account} margin={{ bottom: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6E9F2" />
                   <XAxis
                     dataKey="masked_demat_identifier"
                     angle={-25}
@@ -732,7 +695,7 @@ export function DashboardPage() {
                     }}
                     formatter={(value) => [value, "Applications"]}
                   />
-                  <Bar dataKey="count" name="Applications" fill="#1E3A8A" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" name="Applications" fill="#312E81" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -760,7 +723,7 @@ export function DashboardPage() {
           <CardContent noPadding>
             {analytics?.applications_by_broker.length ? (
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-sm">
+                <DataTable minWidth="640px">
                   <thead>
                     <tr className="border-b border-border bg-canvas/40 text-xs font-semibold uppercase text-muted">
                       <th scope="col" className="px-5 py-3">
@@ -786,7 +749,7 @@ export function DashboardPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </DataTable>
               </div>
             ) : (
               <div className="p-5">
@@ -879,7 +842,7 @@ export function DashboardPage() {
               </CardDescription>
             </div>
             <Button asChild variant="outline" size="sm" className="gap-1.5 bg-surface text-xs">
-              <Link to="/applications/list">
+              <Link to="/applications">
                 <span>View all applications</span>
                 <ChevronRight size={14} />
               </Link>
@@ -951,18 +914,35 @@ function MetricCard({
   value,
   detail,
   icon,
+  accent = "indigo",
 }: {
   label: string;
   value: string;
   detail: string;
   icon?: React.ReactNode;
+  accent?: "indigo" | "teal" | "amber" | "violet";
 }) {
+  const accentClasses = {
+    indigo: "bg-indigo-50 text-indigo-600 ring-indigo-100",
+    teal: "bg-teal-50 text-teal-600 ring-teal-100",
+    amber: "bg-amber-50 text-amber-600 ring-amber-100",
+    violet: "bg-violet-50 text-violet-600 ring-violet-100",
+  };
   return (
-    <Card hoverable className="border-border/80">
+    <Card
+      hoverable
+      className="group overflow-hidden border-border/80 bg-gradient-to-br from-white to-slate-50/70"
+    >
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted">{label}</span>
-          {icon && <span className="shrink-0">{icon}</span>}
+          {icon && (
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ${accentClasses[accent]} transition-transform duration-200 group-hover:scale-105`}
+            >
+              {icon}
+            </span>
+          )}
         </div>
         <p className="mt-2 text-2xl font-bold tabular text-navy tracking-tight">{value}</p>
         <p className="mt-1 text-xs text-muted truncate">{detail}</p>

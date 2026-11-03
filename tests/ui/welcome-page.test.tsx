@@ -46,4 +46,17 @@ describe("WelcomePage accessibility and untrusted text", () => {
     expect(container.querySelector("img")).toBeNull();
     expect(container.textContent).toContain('<img src=x onerror="alert(1)">');
   });
+
+  it("does not include fabricated portfolio examples", () => {
+    render(
+      <MemoryRouter>
+        <WelcomePage />
+      </MemoryRouter>,
+    );
+
+    const signInLink = screen.getByRole("link", { name: "Sign In" });
+    expect(signInLink).toHaveAttribute("href", "/login");
+    expect(screen.queryByText("Bharat Lights Ltd.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Solaris Tech Solutions")).not.toBeInTheDocument();
+  });
 });

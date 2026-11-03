@@ -178,18 +178,21 @@ test("account form preserves typed values, validates, saves, and loads existing 
   await prepare(page);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/accounts/list");
+  await page.goto("/accounts");
   await page
     .getByRole("link", { name: /Add.*account/i })
     .first()
     .click();
+  await expect(page).toHaveURL(/\/accounts$/);
   const drawer = page.getByRole("dialog");
   await expect(drawer).toHaveAccessibleName("Add demat account");
   await page.getByRole("button", { name: "Save account", exact: true }).click();
   await expect(page.getByLabel("Account holder name")).toHaveAttribute("aria-invalid", "true");
   await page.getByLabel("Account holder name").fill("New test holder");
   await page.getByRole("textbox", { name: "Broker name", exact: true }).fill("New test broker");
-  await page.getByLabel("Depository", { exact: true }).selectOption("CDSL");
+  const depository = page.getByRole("combobox", { name: "Depository" });
+  await depository.click();
+  await page.getByRole("option", { name: "CDSL", exact: true }).click();
   await page.getByLabel("Masked demat identifier").fill("XXXX5678");
   await page.getByLabel("Notes (optional)").fill("A saved note");
   await page.keyboard.press("Escape");
@@ -209,26 +212,28 @@ test("account form preserves typed values, validates, saves, and loads existing 
     await route.fulfill({ json: { data: account } });
   });
   await page.getByRole("button", { name: "Save account", exact: true }).click();
-  await expect(page).toHaveURL(/\/accounts\/list$/);
+  await expect(page).toHaveURL(/\/accounts$/);
   await expect(page.getByText("Account created.")).toBeVisible();
   await page.goto(`/accounts/${recordId}/edit`);
   await expect(page.getByLabel("Account holder name")).toHaveValue(account.holder_name);
-  await expect(page.getByLabel("Depository", { exact: true })).toHaveValue("CDSL");
+  await expect(page.getByRole("combobox", { name: "Depository" })).toContainText("CDSL");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
-test("IPO validation, back navigation and optional fields work inside the drawer", async ({
-  page,
-}) => {
+test("IPO validation and close confirmation work inside the drawer", async ({ page }) => {
   await prepare(page);
   await page.goto("/ipos?source=personal");
   await page.getByRole("link", { name: "Add IPO", exact: true }).click();
+  await expect(page).toHaveURL(/\/ipos\?source=personal$/);
   await page.getByRole("button", { name: "Add IPO", exact: true }).click();
   await expect(page.getByLabel("Company name")).toHaveAttribute("aria-invalid", "true");
   await page.getByLabel("Company name").fill("Unsaved company");
-  await page.goBack();
+  await page
+    .getByRole("dialog", { name: "Add IPO" })
+    .getByRole("button", { name: "Close drawer" })
+    .click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.getByRole("button", { name: "Keep editing" }).click();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
@@ -290,7 +295,16 @@ test("application form hides financial statuses and preserves them on edit", asy
   await expect(page.getByLabel("Mandate status")).toHaveCount(0);
   await expect(page.getByLabel("Allotment status")).toHaveCount(0);
   await page.getByRole("button", { name: "Save application" }).click();
-  await expect(page).toHaveURL(/\/applications\/list$/);
+  await expect(page).toHaveURL(/\/applications$/);
+});
+
+test("opening the add-application drawer keeps the applications tab URL", async ({ page }) => {
+  await prepare(page);
+  await page.goto("/applications");
+  await page.getByRole("link", { name: "Add application", exact: true }).first().click();
+
+  await expect(page).toHaveURL(/\/applications$/);
+  await expect(page.getByRole("dialog", { name: "Add application" })).toBeVisible();
 });
 
 test("admin typing remains focused, errors stay inline, and edits and archive actions work", async ({
@@ -449,9 +463,16 @@ test("admin catalog filters, paginates, and recovers from a loading failure", as
   await expect(page.getByText("Page 1 of 2 · 21 records")).toBeVisible();
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(page.getByText("Page 2 of 2 · 21 records")).toBeVisible();
-  await page.getByRole("combobox", { name: "Filter catalog status" }).selectOption("listed");
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  const catalogStatus = page.getByRole("combobox", { name: "Filter catalog status" });
+  await catalogStatus.click();
+  await page.getByRole("option", { name: "Listed", exact: true }).click();
+  await page.getByRole("button", { name: "Apply filters (1)", exact: true }).click();
   await expect(page.getByText("Page 1 of 1 · 1 records")).toBeVisible();
-  await page.getByRole("searchbox", { name: "Search IPO catalog" }).fill("missing");
+  await expect(page.getByRole("dialog", { name: "IPO catalog filters" })).toHaveCount(0);
+  const search = page.getByRole("searchbox", { name: "Search IPO catalog" });
+  await search.fill("missing");
+  await expect(search).toHaveValue("missing");
   await expect(page.getByText("No IPOs found.").filter({ visible: true })).toBeVisible();
 });
 
@@ -508,7 +529,17 @@ test("application search and IPO filter update the actual list request", async (
       },
     }),
   );
-  await page.goto("/applications/list");
+  await page.route("**/api/ipos/catalog?*", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          ipos: [{ ...ipo, data_source: "IPO_GURU" }],
+          pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+        },
+      },
+    }),
+  );
+  await page.goto("/applications");
   const searchRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());
     return url.pathname === "/api/applications" && url.searchParams.get("ipo_search") === "Form";
@@ -517,14 +548,14 @@ test("application search and IPO filter update the actual list request", async (
   await searchRequest;
 
   await page.getByRole("button", { name: "Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Select IPOs" }).click();
+  await page.getByRole("combobox", { name: "Select IPOs" }).click();
   const optionSearch = page.getByPlaceholder("Search IPOs...");
   await expect(optionSearch).toBeFocused();
   await optionSearch.press("Tab");
   await expect(page.getByRole("option", { name: /Form test company/ })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Filters" })).toBeVisible();
-  await page.getByRole("button", { name: "Select IPOs" }).click();
+  await page.getByRole("combobox", { name: "Select IPOs" }).click();
   await page.getByRole("option", { name: /Form test company/ }).click();
   const filteredRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());
@@ -548,9 +579,9 @@ test("application filter options remain visible in the mobile drawer", async ({ 
       },
     }),
   );
-  await page.goto("/applications/list");
+  await page.goto("/applications");
   await page.getByRole("button", { name: "Filters", exact: true }).click();
-  await page.getByRole("button", { name: "All statuses", exact: true }).click();
+  await page.getByRole("combobox", { name: "Status", exact: true }).click();
   const box = await page.getByRole("listbox", { name: "Status" }).boundingBox();
   expect(box).not.toBeNull();
   expect(box!.y).toBeGreaterThanOrEqual(0);
@@ -561,14 +592,17 @@ test("category switching protects unsaved rule changes", async ({ page }) => {
   await prepare(page);
   await page.goto(`/ipos/${recordId}/categories`);
   await page.getByLabel("Lot increment").fill("2");
-  await page.getByLabel("Category", { exact: true }).selectOption("BHNI");
+  const category = page.getByRole("combobox", { name: "Category" });
+  await category.click();
+  await page.getByRole("option", { name: "BHNI", exact: true }).click();
   await expect(page.getByRole("alertdialog")).toHaveAccessibleName("Discard category changes?");
   await page.getByRole("button", { name: "Keep editing" }).click();
-  await expect(page.getByLabel("Category", { exact: true })).toHaveValue("RETAIL");
+  await expect(category).toContainText("RETAIL");
   await expect(page.getByLabel("Lot increment")).toHaveValue("2");
-  await page.getByLabel("Category", { exact: true }).selectOption("BHNI");
+  await category.click();
+  await page.getByRole("option", { name: "BHNI", exact: true }).click();
   await page.getByRole("button", { name: "Switch category" }).click();
-  await expect(page.getByLabel("Category", { exact: true })).toHaveValue("BHNI");
+  await expect(category).toContainText("BHNI");
   await expect(page.getByLabel("Lot increment")).toHaveValue("");
 });
 

@@ -49,7 +49,7 @@ const categoryRules = {
 
 describe("IPO boundary validation", () => {
   it("validates catalog pagination and only accepts catalog statuses", () => {
-    expect(ipoCatalogListQuerySchema.parse({})).toEqual({ page: 1, page_size: 25 });
+    expect(ipoCatalogListQuerySchema.parse({})).toEqual({ page: 1, page_size: 25, sort: "latest" });
     expect(
       ipoCatalogListQuerySchema.parse({
         page: "2",
@@ -57,7 +57,7 @@ describe("IPO boundary validation", () => {
         status: "OPEN",
         search: " Company ",
       }),
-    ).toEqual({ page: 2, page_size: 100, status: "OPEN", search: "Company" });
+    ).toEqual({ page: 2, page_size: 100, status: "OPEN", search: "Company", sort: "latest" });
     for (const query of [
       { page: "0" },
       { page_size: "101" },

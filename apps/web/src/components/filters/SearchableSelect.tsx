@@ -7,6 +7,7 @@ export type SearchableSelectOption = {
   label: string;
   description?: string;
   badge?: string;
+  disabled?: boolean;
 };
 
 type SearchableSelectProps = {
@@ -20,6 +21,16 @@ type SearchableSelectProps = {
   emptyLabel?: string;
   disabled?: boolean;
   loading?: boolean;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
+  hideLabel?: boolean;
+  triggerId?: string;
+  triggerClassName?: string;
+  ariaInvalid?: boolean;
+  ariaRequired?: boolean;
+  ariaDescribedby?: string;
+  onTriggerBlur?: () => void;
 };
 
 export function SearchableSelect({
@@ -33,6 +44,16 @@ export function SearchableSelect({
   emptyLabel = "No matching options.",
   disabled = false,
   loading = false,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
+  hideLabel = false,
+  triggerId,
+  triggerClassName,
+  ariaInvalid,
+  ariaRequired,
+  ariaDescribedby,
+  onTriggerBlur,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -40,6 +61,7 @@ export function SearchableSelect({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const optionsListRef = useRef<HTMLDivElement>(null);
   const listId = useId();
   const selected = Array.isArray(value) ? value : value ? [value] : [];
   const selectedOptions = options.filter((option) => selected.includes(option.value));
@@ -53,7 +75,7 @@ export function SearchableSelect({
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
     const viewportPadding = 12;
-    const width = Math.min(Math.max(rect.width, 300), window.innerWidth - viewportPadding * 2);
+    const width = Math.min(rect.width, window.innerWidth - viewportPadding * 2);
     const panelHeight = Math.min(380, window.innerHeight - viewportPadding * 2);
     const roomBelow = window.innerHeight - rect.bottom - viewportPadding;
     const top =
@@ -122,17 +144,28 @@ export function SearchableSelect({
 
   return (
     <div className="min-w-0">
-      <span className="mb-1.5 block text-sm font-semibold text-ink">{label}</span>
+      {!hideLabel ? (
+        <span className="mb-1.5 block text-sm font-semibold text-ink">{label}</span>
+      ) : null}
       <button
         ref={triggerRef}
+        id={triggerId}
         type="button"
         disabled={disabled || loading}
         aria-busy={loading || undefined}
+        aria-label={label || undefined}
+        aria-invalid={ariaInvalid}
+        aria-required={ariaRequired}
+        aria-describedby={ariaDescribedby}
+        onBlur={onTriggerBlur}
+        role="combobox"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
         onClick={() => setOpen((current) => !current)}
-        className="flex min-h-touch w-full items-center justify-between gap-3 rounded-lg border border-border bg-white px-3 py-2 text-left text-base text-ink hover:border-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy disabled:cursor-not-allowed disabled:opacity-50"
+        className={`flex min-h-touch w-full items-center justify-between gap-3 rounded-lg border bg-white px-3 py-2 text-left text-base text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 disabled:cursor-not-allowed disabled:opacity-50 ${
+          open ? "border-slate-400" : "border-border hover:border-slate-400"
+        } ${triggerClassName ?? ""}`}
       >
         <span className={selectedOptions.length ? "truncate" : "truncate text-muted"}>
           {selectedLabel}
@@ -155,7 +188,7 @@ export function SearchableSelect({
               key={option.value}
               type="button"
               onClick={() => select(option.value)}
-              className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-full bg-[#EAF0F6] px-2.5 py-1 text-xs font-semibold text-navy hover:bg-[#DCE6F0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+              className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-full bg-[#EAF0F6] px-2.5 py-1 text-xs font-semibold text-navy hover:bg-[#DCE6F0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500"
             >
               <span className="truncate">{option.label}</span>
               <X className="size-3.5 shrink-0" aria-hidden="true" />
@@ -208,11 +241,12 @@ export function SearchableSelect({
               <label className="sr-only" htmlFor={`${listId}-search`}>
                 {searchPlaceholder}
               </label>
-              <div className="flex items-center gap-2 rounded-lg border border-border px-3">
+              <div className="flex items-center gap-2 rounded-lg border border-border px-3 transition-colors focus-within:border-slate-400">
                 <Search className="size-4 shrink-0 text-muted" aria-hidden="true" />
                 <input
                   ref={searchRef}
                   id={`${listId}-search`}
+                  type="search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   onKeyDown={(event) => {
@@ -224,7 +258,7 @@ export function SearchableSelect({
                     }
                   }}
                   placeholder={searchPlaceholder}
-                  className="min-h-touch w-full bg-transparent text-sm outline-none placeholder:text-muted"
+                  className="min-h-touch w-full bg-transparent text-sm !outline-none focus-visible:!outline-none focus-visible:!ring-0 placeholder:text-muted"
                 />
                 {search ? (
                   <button
@@ -240,14 +274,14 @@ export function SearchableSelect({
                 <div className="mt-2 flex justify-between gap-3 text-sm font-semibold">
                   <button
                     type="button"
-                    className="text-action underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+                    className="text-action no-underline transition-colors hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 visited:text-action"
                     onClick={() => onChange(options.map((option) => option.value))}
                   >
                     Select all
                   </button>
                   <button
                     type="button"
-                    className="text-action underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+                    className="text-action no-underline transition-colors hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 visited:text-action"
                     onClick={() => onChange([])}
                   >
                     Clear selection
@@ -256,14 +290,24 @@ export function SearchableSelect({
               ) : selected.length ? (
                 <button
                   type="button"
-                  className="mt-2 text-sm font-semibold text-action underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+                  className="mt-2 text-sm font-semibold text-action no-underline transition-colors hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 visited:text-action"
                   onClick={() => onChange(multiple ? [] : "")}
                 >
                   Clear selection
                 </button>
               ) : null}
             </div>
-            <div className="max-h-64 overflow-y-auto p-1.5">
+            <div
+              ref={optionsListRef}
+              className="max-h-64 overflow-y-auto p-1.5"
+              onScroll={(event) => {
+                if (!hasMore || loadingMore || !onLoadMore) return;
+                const element = event.currentTarget;
+                if (element.scrollHeight - element.scrollTop - element.clientHeight < 80) {
+                  onLoadMore();
+                }
+              }}
+            >
               {filtered.length ? (
                 filtered.map((option, index) => {
                   const isSelected = selected.includes(option.value);
@@ -272,6 +316,7 @@ export function SearchableSelect({
                       key={option.value}
                       data-select-option
                       type="button"
+                      disabled={option.disabled}
                       role="option"
                       aria-selected={isSelected}
                       onClick={() => select(option.value)}
@@ -294,7 +339,7 @@ export function SearchableSelect({
                           ]?.focus();
                         }
                       }}
-                      className={`flex min-h-touch w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy ${isSelected ? "bg-[#EAF0F6]" : ""}`}
+                      className={`flex min-h-touch w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 ${isSelected ? "bg-[#EAF0F6]" : ""}`}
                     >
                       <span
                         className={`flex size-5 shrink-0 items-center justify-center rounded border ${isSelected ? "border-action bg-action text-white" : "border-slate-400 bg-white"}`}
@@ -323,6 +368,12 @@ export function SearchableSelect({
               ) : (
                 <p className="px-3 py-5 text-center text-sm text-muted">{emptyLabel}</p>
               )}
+              {loadingMore ? (
+                <p className="flex min-h-10 items-center justify-center gap-2 text-sm text-muted">
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                  Loading more options…
+                </p>
+              ) : null}
             </div>
           </div>,
           document.body,

@@ -111,7 +111,7 @@ export function ProfilePage() {
   const initial = user?.email?.charAt(0).toUpperCase() ?? "U";
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8 animate-fade-in">
+    <div className="w-full space-y-8 animate-fade-in">
       <PageHeader
         eyebrow="Account Settings"
         title="Your Profile"

@@ -138,7 +138,10 @@ export function ResetPasswordPage() {
       ) : null}
 
       <p className="mt-5 text-center text-sm">
-        <Link className="font-semibold text-action hover:underline" to="/forgot-password">
+        <Link
+          className="font-semibold text-action transition-colors hover:text-navy"
+          to="/forgot-password"
+        >
           Request another reset link
         </Link>
       </p>

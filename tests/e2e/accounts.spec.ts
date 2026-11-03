@@ -66,14 +66,14 @@ async function prepareAccountPage(page: Page) {
   );
 }
 
-test("account list uses readable cards without horizontal page overflow on mobile", async ({
+test("accounts tab shows readable cards without horizontal page overflow on mobile", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await prepareAccountPage(page);
-  await page.goto("/accounts/list");
+  await page.goto("/accounts");
 
-  await expect(page.getByRole("heading", { name: "Account list" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Demat accounts" })).toBeVisible();
   await expect(page.getByRole("article")).toContainText("Asha Mehta");
   await expect(page.getByRole("article")).toContainText("XXXX1234");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
@@ -81,12 +81,12 @@ test("account list uses readable cards without horizontal page overflow on mobil
   );
 });
 
-test("account list renders the TanStack table on desktop", async ({ page }) => {
+test("accounts tab renders the account table on desktop", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await prepareAccountPage(page);
-  await page.goto("/accounts/list");
+  await page.goto("/accounts");
 
-  await expect(page.getByRole("heading", { name: "Account list" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Demat accounts" })).toBeVisible();
   await expect(page.getByRole("table").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Asha Mehta" })).toBeVisible();
 });
@@ -101,9 +101,27 @@ test("account dashboard shows totals without a capacity limit", async ({ page })
   await expect(page.getByText(/capacity remaining|up to 500 unarchived/i)).toHaveCount(0);
 });
 
+test("opening the add-account drawer keeps the accounts tab URL", async ({ page }) => {
+  await prepareAccountPage(page);
+  await page.goto("/accounts");
+  await page.getByRole("link", { name: "Add account", exact: true }).click();
+
+  await expect(page).toHaveURL(/\/accounts$/);
+  await expect(page.getByRole("dialog", { name: "Add demat account" })).toBeVisible();
+});
+
+test("legacy table routes redirect to the main tabs and keep filters", async ({ page }) => {
+  await prepareAccountPage(page);
+  await page.goto("/accounts/list?archived=true");
+  await expect(page).toHaveURL(/\/accounts\?archived=true$/);
+
+  await page.goto("/applications/list?application_status=SUBMITTED");
+  await expect(page).toHaveURL(/\/applications\?application_status=SUBMITTED$/);
+});
+
 test("account list passes automated WCAG 2.2 AA checks", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await prepareAccountPage(page);
-  await page.goto("/accounts/list");
+  await page.goto("/accounts");
   expect(await auditAccessibility(page)).toEqual([]);
 });
