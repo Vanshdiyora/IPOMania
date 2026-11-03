@@ -6,7 +6,12 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ApiModule from "../../apps/web/src/lib/api";
-import { IpoCatalogDetailsPage, IpoListPage } from "../../apps/web/src/pages/ipos/IpoPages";
+import { ToastProvider } from "../../apps/web/src/components/ui/Toast";
+import {
+  IpoCatalogDetailsPage,
+  IpoDetailsPage,
+  IpoListPage,
+} from "../../apps/web/src/pages/ipos/IpoPages";
 
 const { apiRequestMock } = vi.hoisted(() => ({ apiRequestMock: vi.fn() }));
 vi.mock("../../apps/web/src/auth/useAuth", () => ({
@@ -50,15 +55,18 @@ function listResponse(ipos = [catalogIpo], page = 1, totalPages = 1) {
 function renderPage(path = "/ipos") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/ipos" element={<IpoListPage />} />
-          <Route path="/ipo-calendar" element={<IpoListPage calendar />} />
-          <Route path="/ipos/catalog/:ipoId" element={<IpoCatalogDetailsPage />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <ToastProvider>
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/ipos" element={<IpoListPage />} />
+            <Route path="/ipo-calendar" element={<IpoListPage calendar />} />
+            <Route path="/ipos/:ipoId" element={<IpoDetailsPage />} />
+            <Route path="/ipos/catalog/:ipoId" element={<IpoCatalogDetailsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </ToastProvider>,
   );
 }
 
@@ -76,10 +84,10 @@ describe("user IPO catalog", () => {
       "aria-pressed",
       "true",
     );
-    expect(screen.getByText("Admin-managed · IPO Guru")).toBeInTheDocument();
+    expect(screen.getByText("Admin-managed", { exact: true })).toBeInTheDocument();
     expect(screen.getAllByText("Not published")).toHaveLength(2);
     expect(apiRequestMock).toHaveBeenCalledWith(
-      "/api/ipos/catalog?page=1&page_size=25",
+      "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",
       expect.anything(),
     );
   });
@@ -108,17 +116,40 @@ describe("user IPO catalog", () => {
       "href",
       "/ipo-calendar?source=personal",
     );
-    expect(apiRequestMock).toHaveBeenCalledWith("/api/ipos?page=1&page_size=25", expect.anything());
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/api/ipos?page=1&page_size=25&sort=date_desc",
+      expect.anything(),
+    );
   });
 
-  it("sends search, status, and pagination to the catalog and resets them when switching sources", async () => {
-    apiRequestMock.mockResolvedValue(listResponse([catalogIpo], 1, 2));
+  it("keeps IPO statuses mixed and supports server-side sorting and search", async () => {
+    apiRequestMock.mockResolvedValue(
+      listResponse(
+        [
+          catalogIpo,
+          {
+            ...catalogIpo,
+            id: "99999999-9999-4999-8999-999999999999",
+            company_name: "Closed Test Company",
+            status: "CLOSED",
+          },
+        ],
+        1,
+        2,
+      ),
+    );
     renderPage();
     await screen.findByRole("link", { name: catalogIpo.company_name });
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Upcoming")).toBeInTheDocument();
+    expect(screen.getByText("Closed")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open", exact: true })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort IPOs" }), {
+      target: { value: "price_desc" },
+    });
     await waitFor(() =>
       expect(apiRequestMock).toHaveBeenCalledWith(
-        "/api/ipos/catalog?page=2&page_size=25",
+        "/api/ipos/catalog?page=1&page_size=25&sort=price_desc",
         expect.anything(),
       ),
     );
@@ -127,21 +158,14 @@ describe("user IPO catalog", () => {
     });
     await waitFor(() =>
       expect(apiRequestMock).toHaveBeenCalledWith(
-        "/api/ipos/catalog?page=1&page_size=25&search=Catalog",
-        expect.anything(),
-      ),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Open", exact: true }));
-    await waitFor(() =>
-      expect(apiRequestMock).toHaveBeenCalledWith(
-        "/api/ipos/catalog?page=1&page_size=25&search=Catalog&status=OPEN",
+        "/api/ipos/catalog?page=1&page_size=25&sort=price_desc&search=Catalog",
         expect.anything(),
       ),
     );
     fireEvent.click(screen.getByRole("button", { name: "My IPOs" }));
     await waitFor(() =>
       expect(apiRequestMock).toHaveBeenCalledWith(
-        "/api/ipos?page=1&page_size=25",
+        "/api/ipos?page=1&page_size=25&sort=price_desc",
         expect.anything(),
       ),
     );
@@ -164,13 +188,60 @@ describe("user IPO catalog", () => {
     expect(
       await screen.findByRole("heading", { name: catalogIpo.company_name }),
     ).toBeInTheDocument();
-    expect(screen.getByText("IPO Guru")).toBeInTheDocument();
+    expect(screen.getByText("Admin-managed", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText("IPO Guru", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit IPO" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Configure categories" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledTimes(1);
     expect(apiRequestMock).toHaveBeenCalledWith(
       `/api/ipos/catalog/${catalogIpo.id}`,
+      expect.anything(),
+    );
+  });
+
+  it("shows applications recorded for a personal IPO", async () => {
+    const applicationId = "77777777-7777-4777-8777-777777777777";
+    apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/applications?")) {
+        return {
+          data: {
+            applications: [
+              {
+                id: applicationId,
+                ipo_id: catalogIpo.id,
+                lots: 2,
+                total_shares: 20,
+                application_amount: "400.00",
+                application_number: "APP-2026-001",
+                submission_date: "2026-11-02T10:00:00.000Z",
+                created_at: "2026-11-02T10:00:00.000Z",
+                application_status: "SUBMITTED",
+                demat_accounts: { holder_name: "Test Holder", broker_name: "Test Broker" },
+                ipo_categories: { category: "RETAIL" },
+              },
+            ],
+            pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+          },
+        };
+      }
+      if (path === `/api/ipos/${catalogIpo.id}/categories`) {
+        return { data: { configurations: [] } };
+      }
+      return { data: { ...catalogIpo, exchange: "NSE", ipo_type: "MAINBOARD" } };
+    });
+    renderPage(`/ipos/${catalogIpo.id}`);
+    expect(
+      await screen.findByRole("heading", { name: "Applications for this IPO" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "APP-2026-001" })).toHaveAttribute(
+      "href",
+      `/applications/${applicationId}`,
+    );
+    expect(screen.getByText("Test Holder")).toBeInTheDocument();
+    expect(screen.getByText("RETAIL")).toBeInTheDocument();
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      `/api/applications?ipo_id=${catalogIpo.id}&page=1&page_size=25`,
       expect.anything(),
     );
   });

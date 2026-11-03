@@ -2,11 +2,11 @@ import { toIsoDateTime, toLocalDateTime, formValuesFromRecord } from "../../lib/
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
   DematAccount,
+  IpoApplication,
   IpoCategoryCode,
   IpoCategoryConfiguration,
   IpoCatalogRecord,
@@ -37,8 +37,6 @@ import {
   SkeletonPage,
   Skeleton,
 } from "../../components/ui/Skeleton";
-import { ActiveFilterChips } from "../../components/filters/ActiveFilterChips";
-import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
 import { ApiRequestError, apiRequest } from "../../lib/api";
 import { DataTable } from "../../components/ui/DataTable";
 
@@ -50,6 +48,17 @@ type IpoListResponse<T = IpoRecord> = {
 };
 type IpoResponse = { data: IpoRecord };
 type IpoCategoryResponse = { data: { configurations: IpoCategoryConfiguration[] } };
+type IpoApplicationsResponse = {
+  data: {
+    applications: Array<
+      IpoApplication & {
+        demat_accounts?: { holder_name: string; broker_name: string };
+        ipo_categories?: { category: string };
+      }
+    >;
+    pagination: { page: number; page_size: number; total: number; total_pages: number };
+  };
+};
 type IpoValues = z.input<typeof ipoSchema>;
 type IpoOutput = z.output<typeof ipoSchema>;
 type AccountListResponse = { data: { accounts: DematAccount[] } };
@@ -88,6 +97,15 @@ const blankIpo: IpoValues = {
 };
 
 const categories: IpoCategoryCode[] = ["RETAIL", "SHNI", "BHNI", "SHAREHOLDER", "EMPLOYER"];
+const ipoSortOptions = [
+  { value: "date_desc", label: "Date · newest first" },
+  { value: "date_asc", label: "Date · oldest first" },
+  { value: "price_asc", label: "Price · low to high" },
+  { value: "price_desc", label: "Price · high to low" },
+  { value: "name_asc", label: "Alphabetical · A to Z" },
+  { value: "name_desc", label: "Alphabetical · Z to A" },
+] as const;
+type IpoSort = (typeof ipoSortOptions)[number]["value"];
 const statuses = ipoStatusSchema.options;
 const secondaryLinkClass =
   "inline-flex min-h-touch items-center justify-center rounded-lg border border-border bg-white px-5 py-2 font-semibold text-ink hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
@@ -103,11 +121,11 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get("search") ?? "";
-  const status = searchParams.get("status") ?? "";
+  const requestedSort = searchParams.get("sort");
+  const selectedSort = ipoSortOptions.find((option) => option.value === requestedSort)?.value;
+  const sort: IpoSort | "opening_asc" = calendar ? "opening_asc" : (selectedSort ?? "date_desc");
   const requestedPage = Number(searchParams.get("page"));
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-  const [draftStatus, setDraftStatus] = useState("");
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const updateListParams = (changes: Record<string, string | null>, replace = false) => {
     setSearchParams(
       (previous) => {
@@ -121,15 +139,11 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
       { replace },
     );
   };
-  const listStatuses = personal
-    ? statuses
-    : statuses.filter((value) => value !== "ALLOTMENT_PENDING" && value !== "WITHDRAWN");
   const params = new URLSearchParams({
     page: String(page),
     page_size: "25",
-    ...(calendar ? { sort: "opening_asc" } : {}),
+    sort,
     ...(search ? { search } : {}),
-    ...(status ? { status } : {}),
   });
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
@@ -234,99 +248,26 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
               }}
             />
           </label>
-          <Button
-            variant="outline"
-            className="w-full shrink-0 gap-2 sm:w-auto"
-            aria-haspopup="dialog"
-            onClick={() => {
-              setDraftStatus(status);
-              setFiltersOpen(true);
-            }}
-          >
-            <SlidersHorizontal size={18} aria-hidden="true" /> Filters
-            {status ? (
-              <span className="rounded-full bg-action px-2 py-0.5 text-xs text-white">1</span>
-            ) : null}
-          </Button>
-        </div>
-        <div
-          className="mt-3 flex max-w-full gap-2 overflow-x-auto pb-1"
-          aria-label="Quick IPO status filters"
-        >
-          {["", ...listStatuses].map((value) => {
-            const selected = status === value;
-            return (
-              <button
-                key={value || "all"}
-                type="button"
-                aria-pressed={selected}
-                className={`min-h-touch shrink-0 rounded-full px-4 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy ${selected ? "bg-action text-white" : "border border-border bg-white text-navy hover:bg-canvas"}`}
-                onClick={() => {
-                  updateListParams({ status: value, page: null }, true);
-                }}
+          {!calendar ? (
+            <label className="block w-full shrink-0 text-sm font-semibold text-ink sm:w-64">
+              Sort IPOs
+              <CustomSelect
+                aria-label="Sort IPOs"
+                value={sort}
+                onChange={(event) =>
+                  updateListParams({ sort: event.target.value, page: null }, true)
+                }
               >
-                {value ? label(value) : "All IPOs"}
-              </button>
-            );
-          })}
+                {ipoSortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </CustomSelect>
+            </label>
+          ) : null}
         </div>
       </Card>
-      <ActiveFilterChips
-        filters={status ? [{ key: "status", label: `Status: ${label(status)}` }] : []}
-        onRemove={() => {
-          updateListParams({ status: null, page: null }, true);
-        }}
-        onClear={() => {
-          updateListParams({ status: null, page: null }, true);
-        }}
-      />
-      <FilterDrawer
-        open={filtersOpen}
-        title="IPO filters"
-        activeCount={status ? 1 : 0}
-        onClose={() => setFiltersOpen(false)}
-        onReset={() => {
-          setDraftStatus("");
-          updateListParams({ status: null, page: null }, true);
-          setFiltersOpen(false);
-        }}
-        onApply={() => {
-          updateListParams({ status: draftStatus, page: null }, true);
-          setFiltersOpen(false);
-        }}
-      >
-        <FilterSection title="IPO status">
-          <div className="grid grid-cols-2 gap-2">
-            <label
-              className={`flex min-h-touch cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${!draftStatus ? "border-action bg-[#EAF0F6] text-navy" : "border-border text-ink"}`}
-            >
-              <input
-                className="accent-action"
-                type="radio"
-                name="ipo-status"
-                checked={!draftStatus}
-                onChange={() => setDraftStatus("")}
-              />{" "}
-              All statuses
-            </label>
-            {listStatuses.map((value) => (
-              <label
-                key={value}
-                className={`flex min-h-touch cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${draftStatus === value ? "border-action bg-[#EAF0F6] text-navy" : "border-border text-ink"}`}
-              >
-                <input
-                  className="accent-action"
-                  type="radio"
-                  name="ipo-status"
-                  checked={draftStatus === value}
-                  onChange={() => setDraftStatus(value)}
-                />{" "}
-                {label(value)}
-              </label>
-            ))}
-          </div>
-        </FilterSection>
-      </FilterDrawer>
       {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       {isLoading ? (
         <SkeletonPage label="Loading IPO records">
@@ -340,11 +281,11 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
       {!isLoading && !error && ipos.length === 0 ? (
         <Card>
           <EmptyState
-            title="No IPO records match these filters."
+            title="No IPO records found."
             description={
               personal
                 ? "Add an issue to start an issue-specific rule record."
-                : "Try another search or status. New IPOs appear here when added to the catalog."
+                : "Try another search. New IPOs appear here when added to the catalog."
             }
           />
         </Card>
@@ -390,7 +331,9 @@ function IpoListContent({ calendar, personal }: { calendar: boolean; personal: b
                 </td>
                 <td className="p-4 text-xs text-muted whitespace-nowrap">
                   {!personal
-                    ? `Admin-managed · ${ipo.data_source === "IPO_GURU" ? "IPO Guru" : ipo.data_source === "MANUAL" ? "Manual entry" : ipo.data_source}`
+                    ? ipo.data_source === "IPO_GURU"
+                      ? "Admin-managed"
+                      : `Admin-managed · ${ipo.data_source === "MANUAL" ? "Manual entry" : ipo.data_source}`
                     : ipo.data_source === "MANUAL"
                       ? ipo.last_verified_at
                         ? "Manual entry · user-marked verification date"
@@ -451,6 +394,7 @@ export function IpoCatalogDetailsPage() {
 export function IpoDetailsPage() {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
+  const [applicationPage, setApplicationPage] = useState(1);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { notify } = useToast();
@@ -463,6 +407,15 @@ export function IpoDetailsPage() {
     queryKey: ["ipo-categories", ipoId],
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<IpoCategoryResponse>(`/api/ipos/${ipoId}/categories`, session!),
+  });
+  const applicationsQuery = useQuery({
+    queryKey: ["ipo-applications", ipoId, applicationPage],
+    enabled: Boolean(session && ipoId),
+    queryFn: () =>
+      apiRequest<IpoApplicationsResponse>(
+        `/api/applications?ipo_id=${ipoId}&page=${applicationPage}&page_size=25`,
+        session!,
+      ),
   });
   const archive = useMutation({
     mutationFn: () =>
@@ -579,6 +532,95 @@ export function IpoDetailsPage() {
               );
             })}
           </ul>
+        )}
+      </Card>
+      <Card>
+        <div className="mb-4">
+          <h2 className="text-xl font-bold text-ink">Applications for this IPO</h2>
+          <p className="mt-1 text-sm text-muted">Applications you have recorded for this IPO.</p>
+        </div>
+        {applicationsQuery.error ? (
+          <ErrorNotice
+            error={applicationsQuery.error}
+            onRetry={() => void applicationsQuery.refetch()}
+          />
+        ) : applicationsQuery.isLoading ? (
+          <p role="status">Loading applications…</p>
+        ) : applicationsQuery.data?.data.applications.length ? (
+          <>
+            <DataTable minWidth="760px">
+              <thead>
+                <tr className="border-b border-border text-sm text-muted">
+                  <th scope="col" className="p-3 text-left">
+                    Application
+                  </th>
+                  <th scope="col" className="p-3 text-left">
+                    Account
+                  </th>
+                  <th scope="col" className="p-3 text-left">
+                    Category
+                  </th>
+                  <th scope="col" className="p-3 text-right">
+                    Lots / amount
+                  </th>
+                  <th scope="col" className="p-3 text-left">
+                    Submitted
+                  </th>
+                  <th scope="col" className="p-3 text-center">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {applicationsQuery.data.data.applications.map((application) => (
+                  <tr key={application.id} className="border-b border-border">
+                    <td className="p-3">
+                      <Link
+                        className="font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
+                        to={`/applications/${application.id}`}
+                      >
+                        {application.application_number ?? "View application"}
+                      </Link>
+                    </td>
+                    <td className="p-3">
+                      {application.demat_accounts?.holder_name ?? "Account"}
+                      <br />
+                      <span className="text-sm text-muted">
+                        {application.demat_accounts?.broker_name ?? "Broker not available"}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      {application.ipo_categories?.category ?? "Not available"}
+                    </td>
+                    <td className="p-3 text-right tabular-nums whitespace-nowrap">
+                      {application.lots} lots · {formatRupees(application.application_amount)}
+                    </td>
+                    <td className="p-3 text-sm tabular-nums whitespace-nowrap">
+                      {formatDateTime(application.submission_date ?? application.created_at)}
+                    </td>
+                    <td className="p-3 text-center">
+                      <StatusBadge status={application.application_status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </DataTable>
+            {applicationsQuery.data.data.pagination.total_pages > 1 ? (
+              <div className="mt-4">
+                <Pagination
+                  label="IPO application pages"
+                  page={applicationPage}
+                  totalPages={applicationsQuery.data.data.pagination.total_pages}
+                  total={applicationsQuery.data.data.pagination.total}
+                  onPageChange={setApplicationPage}
+                />
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <p className="py-6 text-center font-semibold text-muted">
+            No applications recorded for this IPO.
+          </p>
         )}
       </Card>
     </div>
@@ -1715,7 +1757,7 @@ function IssueSummary({ ipo, personal }: { ipo: IpoRecord | IpoCatalogRecord; pe
         <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Detail
             label="Data source"
-            value={ipo.data_source === "IPO_GURU" ? "IPO Guru" : labelValue(ipo.data_source)}
+            value={ipo.data_source === "IPO_GURU" ? "Admin-managed" : labelValue(ipo.data_source)}
           />
           <Detail label="Source reference" value={ipo.source_reference ?? "Not provided"} />
           <Detail

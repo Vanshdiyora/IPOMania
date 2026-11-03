@@ -27,6 +27,30 @@ const ipo = {
   updated_at: "2026-10-31T12:00:00.000Z",
   archived_at: null,
 };
+const application = {
+  id: "77777777-7777-4777-8777-777777777777",
+  user_id: userId,
+  ipo_id: ipoId,
+  demat_account_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  category_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  lots: 2,
+  total_shares: 20,
+  application_amount: "400.00",
+  application_number: "APP-2026-001",
+  external_reference: null,
+  submission_date: "2026-11-02T10:00:00.000Z",
+  application_status: "SUBMITTED",
+  mandate_status: "PENDING",
+  allotment_status: "PENDING",
+  notes: null,
+  rule_version: 1,
+  calculation_snapshot: {},
+  created_at: "2026-11-02T10:00:00.000Z",
+  updated_at: "2026-11-02T10:00:00.000Z",
+  archived_at: null,
+  demat_accounts: { holder_name: "Test Holder", broker_name: "Test Broker" },
+  ipo_categories: { category: "RETAIL" },
+};
 const catalogIpo = {
   ...ipo,
   company_name: "Admin Catalog Test Company",
@@ -112,6 +136,16 @@ async function prepareAuthenticatedPage(page: Page) {
       body: JSON.stringify({ data: { configurations: [] } }),
     }),
   );
+  await page.route("**/api/applications?*", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          applications: [application],
+          pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+        },
+      },
+    }),
+  );
 }
 
 test("IPO list and details show user-entered provenance and rule setup links", async ({ page }) => {
@@ -129,6 +163,8 @@ test("IPO list and details show user-entered provenance and rule setup links", a
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Configure categories" })).toBeVisible();
   await expect(page.getByText("Rules not configured").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Applications for this IPO" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "APP-2026-001" })).toBeVisible();
 });
 
 test("regular users see admin-managed IPOs by default and can open shared details", async ({
@@ -140,19 +176,20 @@ test("regular users see admin-managed IPOs by default and can open shared detail
     "aria-pressed",
     "true",
   );
-  await expect(page.getByText("Admin-managed · IPO Guru")).toBeVisible();
+  await expect(page.getByText("Admin-managed", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "IPO Test Company", exact: true })).toHaveCount(0);
   await page.getByRole("link", { name: catalogIpo.company_name }).click();
   await expect(page).toHaveURL(new RegExp(`/ipos/catalog/${ipoId}$`));
   await expect(page.getByRole("heading", { name: catalogIpo.company_name })).toBeVisible();
-  await expect(page.getByText("IPO Guru", { exact: true })).toBeVisible();
+  await expect(page.getByText("Admin-managed", { exact: true })).toBeVisible();
+  await expect(page.getByText("IPO Guru", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Edit IPO" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Configure categories" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Archive" })).toHaveCount(0);
   expect(await auditAccessibility(page)).toEqual([]);
 });
 
-test("catalog search and status filters reach the shared endpoint", async ({ page }) => {
+test("catalog search and sorting reach the shared endpoint", async ({ page }) => {
   await prepareAuthenticatedPage(page);
   await page.goto("/ipos");
   const searched = page.waitForRequest((request) => {
@@ -161,27 +198,24 @@ test("catalog search and status filters reach the shared endpoint", async ({ pag
   });
   await page.getByRole("textbox", { name: "Search company or exact symbol" }).fill("Catalog");
   await searched;
-  const filtered = page.waitForRequest((request) => {
+  const sorted = page.waitForRequest((request) => {
     const url = new URL(request.url());
     return (
       url.pathname === "/api/ipos/catalog" &&
-      url.searchParams.get("status") === "OPEN" &&
+      url.searchParams.get("sort") === "price_desc" &&
       url.searchParams.get("search") === "Catalog"
     );
   });
-  await page.getByRole("button", { name: "Open", exact: true }).click();
-  await filtered;
+  await page.getByRole("combobox", { name: "Sort IPOs" }).selectOption("price_desc");
+  await sorted;
   await expect(page.getByRole("link", { name: catalogIpo.company_name })).toBeVisible();
   await page.getByRole("link", { name: catalogIpo.company_name }).click();
   await page.getByRole("link", { name: "Back to IPOs" }).click();
-  await expect(page).toHaveURL(/\/ipos\?search=Catalog&status=OPEN$/);
+  await expect(page).toHaveURL(/\/ipos\?search=Catalog&sort=price_desc$/);
   await expect(page.getByRole("textbox", { name: "Search company or exact symbol" })).toHaveValue(
     "Catalog",
   );
-  await expect(page.getByRole("button", { name: "Open", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("combobox", { name: "Sort IPOs" })).toHaveValue("price_desc");
 });
 
 test("a direct catalog detail link returns to the catalog", async ({ page }) => {
@@ -206,21 +240,13 @@ test("IPO calendar uses the shared catalog and retains access to personal record
   );
 });
 
-test("browser back restores the catalog without personal-only filters", async ({ page }) => {
+test("browser back restores the catalog without status filters", async ({ page }) => {
   await prepareAuthenticatedPage(page);
   await page.goto("/ipos");
   await page.getByRole("button", { name: "My IPOs", exact: true }).click();
-  await page.getByRole("button", { name: "Withdrawn", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Withdrawn", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await page.getByRole("combobox", { name: "Sort IPOs" }).selectOption("name_desc");
   await page.goBack();
   await expect(page.getByRole("button", { name: "IPO catalog", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(page.getByRole("button", { name: "All IPOs", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
   );

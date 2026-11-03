@@ -50,17 +50,21 @@ iposRoutes.get("/catalog", async (context) => {
   const parsed = ipoCatalogListQuerySchema.safeParse(context.req.query());
   if (!parsed.success) return validationError(context);
   const query = parsed.data;
+  const sortColumn =
+    query.sort === "opening_asc" || query.sort.startsWith("date_")
+      ? "bidding_start_date"
+      : query.sort.startsWith("price_")
+        ? "price_band_min"
+        : "company_name";
+  const sortAscending = query.sort.endsWith("_asc");
   let request = context
     .get("rlsSupabase")
     .from("ipo_catalog")
     .select(catalogColumns, { count: "exact" })
     .is("archived_at", null)
-    .order(
-      query.sort === "opening_asc" ? "bidding_start_date" : "created_at",
-      query.sort === "opening_asc" ? { ascending: true, nullsFirst: false } : { ascending: false },
-    )
-    .order("company_name", { ascending: true })
-    .order("id", { ascending: true });
+    .order(sortColumn, { ascending: sortAscending, nullsFirst: false });
+  if (sortColumn !== "company_name") request = request.order("company_name", { ascending: true });
+  request = request.order("id", { ascending: true });
   if (query.status) request = request.eq("ipo_status", query.status.toLowerCase());
   if (query.search) {
     // Quote PostgREST values so punctuation cannot introduce extra filter expressions.
@@ -107,16 +111,20 @@ iposRoutes.get("/", async (context) => {
 
   const query = parsed.data;
   const userId = context.get("authenticatedUser").id;
+  const sortColumn = query.sort.startsWith("date_")
+    ? "opening_date"
+    : query.sort.startsWith("price_")
+      ? "issue_price_min"
+      : "company_name";
+  const sortAscending = query.sort.endsWith("_asc");
   let request = context
     .get("rlsSupabase")
     .from("ipos")
     .select(ipoColumns, { count: "exact" })
     .eq("user_id", userId)
-    .order(
-      query.sort === "opening_asc" ? "opening_date" : "created_at",
-      query.sort === "opening_asc" ? { ascending: true, nullsFirst: false } : { ascending: false },
-    )
-    .order("id", { ascending: true });
+    .order(sortColumn, { ascending: sortAscending, nullsFirst: false });
+  if (sortColumn !== "company_name") request = request.order("company_name", { ascending: true });
+  request = request.order("id", { ascending: true });
 
   if (query.include_archived === "false") request = request.is("archived_at", null);
   if (query.include_archived === "true") request = request.not("archived_at", "is", null);
