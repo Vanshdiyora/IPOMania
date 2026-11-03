@@ -32,7 +32,7 @@ import {
   type ApplicationFilters,
 } from "../../components/applications/ApplicationFilterDrawer";
 import { ApplicationSearchToolbar } from "../../components/applications/ApplicationSearchToolbar";
-import { ApiRequestError, apiRequest } from "../../lib/api";
+import { ApiRequestError, apiBaseUrl, apiRequest } from "../../lib/api";
 import {
   SkeletonDetailsPage,
   SkeletonFormFields,
@@ -445,12 +445,9 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
       : []),
   ];
   async function exportCsv() {
-    const response = await fetch(
-      `${import.meta.env.VITE_API_BASE_URL ?? ""}/api/applications/export?${params}`,
-      {
-        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
-      },
-    );
+    const response = await fetch(`${apiBaseUrl}/api/applications/export?${params}`, {
+      headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+    });
     if (!response.ok) throw new Error("Export failed. Please try again.");
     const url = URL.createObjectURL(await response.blob());
     const anchor = document.createElement("a");
