@@ -534,16 +534,6 @@ test("application search and IPO filter update the actual list request", async (
       },
     }),
   );
-  await page.route("**/api/ipos/catalog?*", (route) =>
-    route.fulfill({
-      json: {
-        data: {
-          ipos: [{ ...ipo, data_source: "IPO_GURU" }],
-          pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
-        },
-      },
-    }),
-  );
   await page.goto("/applications");
   const searchRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());
@@ -552,23 +542,22 @@ test("application search and IPO filter update the actual list request", async (
   await page.getByRole("textbox", { name: "Search IPO or company name" }).fill("Form");
   await searchRequest;
 
-  await page.getByRole("button", { name: "Filters", exact: true }).click();
-  await page.getByRole("combobox", { name: "Select IPOs" }).click();
+  const ipoFilter = page.getByRole("combobox", { name: "View applications for IPO" });
+  await ipoFilter.click();
   const optionSearch = page.getByPlaceholder("Search IPOs...");
   await expect(optionSearch).toBeFocused();
   await optionSearch.press("Tab");
   await expect(page.getByRole("option", { name: /Form test company/ })).toBeFocused();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Filters" })).toBeVisible();
-  await page.getByRole("combobox", { name: "Select IPOs" }).click();
-  await page.getByRole("option", { name: /Form test company/ }).click();
+  await expect(ipoFilter).toHaveAttribute("aria-expanded", "false");
+  await ipoFilter.click();
   const filteredRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());
-    return url.pathname === "/api/applications" && url.searchParams.get("ipo_ids") === recordId;
+    return url.pathname === "/api/applications" && url.searchParams.get("ipo_id") === recordId;
   });
-  await page.getByRole("button", { name: /Apply filters/ }).click();
+  await page.getByRole("option", { name: /Form test company/ }).click();
   await filteredRequest;
-  await expect(page).toHaveURL(new RegExp(`ipo_ids=${recordId}`));
+  await expect(page).toHaveURL(new RegExp(`ipo_id=${recordId}`));
 });
 
 test("application filter options remain visible in the mobile drawer", async ({ page }) => {
@@ -586,8 +575,8 @@ test("application filter options remain visible in the mobile drawer", async ({ 
   );
   await page.goto("/applications");
   await page.getByRole("button", { name: "Filters", exact: true }).click();
-  await page.getByRole("combobox", { name: "Status", exact: true }).click();
-  const box = await page.getByRole("listbox", { name: "Status" }).boundingBox();
+  await page.getByRole("combobox", { name: "Records to show", exact: true }).click();
+  const box = await page.getByRole("listbox", { name: "Records to show" }).boundingBox();
   expect(box).not.toBeNull();
   expect(box!.y).toBeGreaterThanOrEqual(0);
   expect(box!.y + box!.height).toBeLessThanOrEqual(800);
