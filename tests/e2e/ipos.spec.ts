@@ -206,7 +206,8 @@ test("catalog search and sorting reach the shared endpoint", async ({ page }) =>
       url.searchParams.get("search") === "Catalog"
     );
   });
-  await page.getByRole("combobox", { name: "Sort IPOs" }).selectOption("price_desc");
+  await page.getByRole("combobox", { name: "Sort IPOs" }).click();
+  await page.getByRole("option", { name: "Price · high to low" }).click();
   await sorted;
   await expect(page.getByRole("link", { name: catalogIpo.company_name })).toBeVisible();
   await page.getByRole("link", { name: catalogIpo.company_name }).click();
@@ -215,7 +216,7 @@ test("catalog search and sorting reach the shared endpoint", async ({ page }) =>
   await expect(page.getByRole("textbox", { name: "Search company or exact symbol" })).toHaveValue(
     "Catalog",
   );
-  await expect(page.getByRole("combobox", { name: "Sort IPOs" })).toHaveValue("price_desc");
+  await expect(page.getByRole("combobox", { name: "Sort IPOs" })).toHaveText("Price · high to low");
 });
 
 test("a direct catalog detail link returns to the catalog", async ({ page }) => {
@@ -244,7 +245,8 @@ test("browser back restores the catalog without status filters", async ({ page }
   await prepareAuthenticatedPage(page);
   await page.goto("/ipos");
   await page.getByRole("button", { name: "My IPOs", exact: true }).click();
-  await page.getByRole("combobox", { name: "Sort IPOs" }).selectOption("name_desc");
+  await page.getByRole("combobox", { name: "Sort IPOs" }).click();
+  await page.getByRole("option", { name: "Alphabetical · Z to A" }).click();
   await page.goBack();
   await expect(page.getByRole("button", { name: "IPO catalog", exact: true })).toHaveAttribute(
     "aria-pressed",

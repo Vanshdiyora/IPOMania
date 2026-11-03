@@ -144,9 +144,8 @@ describe("user IPO catalog", () => {
     expect(screen.getByText("Closed")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open", exact: true })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox", { name: "Sort IPOs" }), {
-      target: { value: "price_desc" },
-    });
+    fireEvent.click(screen.getByRole("combobox", { name: "Sort IPOs" }));
+    fireEvent.click(screen.getByRole("option", { name: "Price · high to low" }));
     await waitFor(() =>
       expect(apiRequestMock).toHaveBeenCalledWith(
         "/api/ipos/catalog?page=1&page_size=25&sort=price_desc",
@@ -239,7 +238,7 @@ describe("user IPO catalog", () => {
       `/applications/${applicationId}`,
     );
     expect(screen.getByText("Test Holder")).toBeInTheDocument();
-    expect(screen.getByText("RETAIL")).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /APP-2026-001/ })).toHaveTextContent("RETAIL");
     expect(apiRequestMock).toHaveBeenCalledWith(
       `/api/applications?ipo_id=${catalogIpo.id}&page=1&page_size=25`,
       expect.anything(),

@@ -1,6 +1,6 @@
 import { Check, ChevronDown, LoaderCircle, Search, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 
 export type SearchableSelectOption = {
   value: string;
