@@ -28,6 +28,7 @@ describe("protected API authentication", () => {
     "/api/me/preferences",
     "/api/accounts",
     "/api/ipos",
+    "/api/public/ipos",
     "/api/applications",
     "/api/capital/summary",
   ])("rejects an unauthenticated request to %s", async (path) => {
