@@ -46,4 +46,16 @@ describe("WelcomePage accessibility and untrusted text", () => {
     expect(container.querySelector("img")).toBeNull();
     expect(container.textContent).toContain('<img src=x onerror="alert(1)">');
   });
+
+  it("keeps the bottom sign-in link visible against the dark call-to-action", () => {
+    render(
+      <MemoryRouter>
+        <WelcomePage />
+      </MemoryRouter>,
+    );
+
+    const signInLink = screen.getByRole("link", { name: "Sign In" });
+    expect(signInLink).toHaveAttribute("href", "/login");
+    expect(signInLink).toHaveClass("bg-transparent", "text-white");
+  });
 });

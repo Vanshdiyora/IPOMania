@@ -27,8 +27,12 @@ the values reported by `supabase status` to use the local Supabase stack.
 - Registration uses email and password, requires a 12-character minimum, and creates the account
   immediately without email confirmation. A database trigger provisions the profile and
   preferences.
-- Login uses Supabase `signInWithPassword`. Supabase persists the browser session and refreshes
-  tokens; protected routes wait for initial session restoration.
+- Login uses Supabase `signInWithPassword`. The browser persists the session in `localStorage` so
+  reopening the site can restore it, and refreshes access tokens while it remains valid. The stored
+  session has a fixed 30-day maximum lifetime from its first write; token refreshes do not extend
+  that lifetime. Protected routes wait for initial session restoration. `sessionStorage` is not
+  used here because browsers clear it when their session ends, which would prevent automatic
+  sign-in after reopening the site.
 - Forgot password returns a non-enumerating success message and sends a recovery link. Reset
   exchanges the one-time PKCE code, removes the query string immediately, and updates the password
   through Supabase Auth.
@@ -40,9 +44,9 @@ the values reported by `supabase status` to use the local Supabase stack.
   service-role key. Foreign-key cascades remove the profile and preferences.
 
 The browser exchanges PKCE codes from the callback query only in memory and immediately replaces
-the URL. Access and refresh tokens are not put in application URLs or logs. Supabase's browser
-session persistence uses the SDK's default browser storage; protect the application from XSS and
-use a restrictive production Content Security Policy.
+the URL. Access and refresh tokens are not put in application URLs or logs. The browser keeps the
+session in `localStorage` for its 30-day bounded lifetime; protect the application from XSS and use
+a restrictive production Content Security Policy.
 
 ## Protected API
 

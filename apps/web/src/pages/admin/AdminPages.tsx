@@ -85,7 +85,19 @@ export function AdminLayout() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const mobilePanelRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuWasOpen = useRef(false);
   useModalLayer(open, mobilePanelRef, () => setOpen(false), "[data-navigation-close]");
+  useEffect(() => {
+    if (open) {
+      menuWasOpen.current = true;
+      return;
+    }
+    if (menuWasOpen.current) {
+      menuButtonRef.current?.focus();
+      menuWasOpen.current = false;
+    }
+  }, [open]);
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className="flex h-16 items-center px-5 text-lg font-bold text-white">
@@ -154,6 +166,7 @@ export function AdminLayout() {
       <div className="min-w-0 flex-1 lg:ml-64">
         {!open && (
           <button
+            ref={menuButtonRef}
             className="fixed left-4 top-4 z-30 grid min-h-touch min-w-touch place-items-center rounded-lg border border-border bg-white text-muted shadow-sm lg:hidden"
             aria-label="Open navigation"
             aria-expanded={open}

@@ -339,7 +339,7 @@ export function WelcomePage() {
               asChild
               variant="outline"
               size="lg"
-              className="border-white/30 text-white hover:bg-white/10"
+              className="border-white/30 bg-transparent text-white hover:bg-white/10"
             >
               <Link to="/login">Sign In</Link>
             </Button>

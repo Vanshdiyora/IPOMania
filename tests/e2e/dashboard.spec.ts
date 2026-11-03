@@ -268,12 +268,14 @@ test("dashboard exposes analytics, filters and downloadable reports", async ({ p
   expect(download.suggestedFilename()).toBe("analytics.csv");
 
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await page.getByLabel("Category filter").selectOption("RETAIL");
-  await expect(page.getByLabel("Category filter")).toHaveValue("RETAIL");
-  await page.getByLabel("Shared IPO filter").selectOption("99999999-9999-4999-8999-999999999999");
-  await expect(page.getByLabel("Shared IPO filter")).toHaveValue(
-    "99999999-9999-4999-8999-999999999999",
-  );
+  const categoryFilter = page.getByRole("combobox", { name: "Category filter" });
+  await categoryFilter.click();
+  await page.getByRole("option", { name: "RETAIL", exact: true }).click();
+  await expect(categoryFilter).toContainText("RETAIL");
+  const sharedIpoFilter = page.getByRole("combobox", { name: "Shared IPO filter" });
+  await sharedIpoFilter.click();
+  await page.getByRole("option", { name: "Shared Dashboard IPO", exact: true }).click();
+  await expect(sharedIpoFilter).toContainText("Shared Dashboard IPO");
   await page.getByRole("button", { name: "Apply filters (2)" }).click();
 });
 

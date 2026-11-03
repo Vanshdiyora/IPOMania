@@ -98,7 +98,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
     };
     const optionLabel =
       option.label ??
-      (typeof option.children === "string" ? option.children : String(option.children ?? ""));
+      Children.toArray(option.children)
+        .map((value) => (typeof value === "string" || typeof value === "number" ? value : ""))
+        .join("");
     options.push({
       value: String(option.value ?? optionLabel),
       label: optionLabel,

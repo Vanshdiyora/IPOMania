@@ -56,6 +56,7 @@ export const DateTimeInput = forwardRef<HTMLInputElement, DateTimeInputProps>(
     const triggerRef = useRef<HTMLButtonElement>(null);
     const panelRef = useRef<HTMLDivElement>(null);
     const timeInputId = useId();
+    const calendarId = useId();
     const [uncontrolledValue, setUncontrolledValue] = useState(String(defaultValue ?? ""));
     const [open, setOpen] = useState(false);
     const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
@@ -171,9 +172,11 @@ export const DateTimeInput = forwardRef<HTMLInputElement, DateTimeInputProps>(
           id={id}
           type="button"
           disabled={disabled}
+          role="combobox"
           aria-label={ariaLabel}
           aria-haspopup="dialog"
           aria-expanded={open}
+          aria-controls={calendarId}
           aria-invalid={ariaInvalid}
           aria-required={required}
           aria-describedby={ariaDescribedby}
@@ -213,6 +216,7 @@ export const DateTimeInput = forwardRef<HTMLInputElement, DateTimeInputProps>(
           ? createPortal(
               <div
                 ref={panelRef}
+                id={calendarId}
                 role="dialog"
                 aria-label={type === "date" ? "Choose a date" : "Choose date and time"}
                 className="fixed z-[80] rounded-xl border border-border bg-white p-3 shadow-xl"

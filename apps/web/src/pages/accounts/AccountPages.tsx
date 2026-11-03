@@ -4,7 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { z } from "@ipo-mania/validation";
 import { dematAccountSchema } from "@ipo-mania/validation";
@@ -604,6 +604,7 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
     queryFn: () => apiRequest<AccountResponse>(`/api/accounts/${accountId}`, session!),
   });
   const {
+    control,
     register,
     handleSubmit,
     reset,
@@ -706,14 +707,16 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
               error={errors.broker_code?.message}
               {...register("broker_code")}
             />
-            <FormSelect
-              label="Depository"
-              error={errors.depository_type?.message}
-              {...register("depository_type")}
-            >
-              <option value="NSDL">NSDL</option>
-              <option value="CDSL">CDSL</option>
-            </FormSelect>
+            <Controller
+              control={control}
+              name="depository_type"
+              render={({ field }) => (
+                <FormSelect label="Depository" error={errors.depository_type?.message} {...field}>
+                  <option value="NSDL">NSDL</option>
+                  <option value="CDSL">CDSL</option>
+                </FormSelect>
+              )}
+            />
             <FormInput
               label="Masked demat identifier"
               error={errors.masked_demat_identifier?.message}
@@ -726,15 +729,21 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
               error={errors.masked_client_reference?.message}
               {...register("masked_client_reference")}
             />
-            <FormSelect
-              label="Account status"
-              error={errors.account_status?.message}
-              {...register("account_status")}
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="closed">Closed</option>
-            </FormSelect>
+            <Controller
+              control={control}
+              name="account_status"
+              render={({ field }) => (
+                <FormSelect
+                  label="Account status"
+                  error={errors.account_status?.message}
+                  {...field}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="closed">Closed</option>
+                </FormSelect>
+              )}
+            />
           </div>
         </FormSection>
         <FormTextarea
