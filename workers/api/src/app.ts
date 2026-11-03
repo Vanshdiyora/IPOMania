@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cors } from "hono/cors";
 import type { ApiErrorResponse, ApiSuccessResponse, HealthStatus } from "@ipo-mania/shared";
 import { validateEnvironment, type EnvironmentBindings } from "./env";
+import { authenticate } from "./middleware/authenticate";
 import { meRoutes } from "./routes/me";
 import { accountRoutes } from "./routes/account";
 import { accountsRoutes } from "./routes/accounts";
@@ -54,7 +55,7 @@ export function createApp() {
   app.route("/api/imports", applicationImportRoutes);
   app.route("/api/admin/ipos", adminIpoRoutes());
 
-  app.get("/api/public/ipos", async (context) => {
+  app.get("/api/public/ipos", authenticate, async (context) => {
     const environment = validateEnvironment(context.env ?? {});
     if (!environment.SUPABASE_URL || !environment.SUPABASE_ANON_KEY) {
       return context.json(
