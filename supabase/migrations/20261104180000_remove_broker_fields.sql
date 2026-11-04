@@ -85,7 +85,8 @@ security invoker
 set search_path = ''
 as $$
   with filtered_applications as materialized (
-    select a.*, i.company_name, i.symbol, d.holder_name, d.masked_demat_identifier,
+    select a.id, a.ipo_id, a.demat_account_id, a.application_status, a.created_at,
+      i.company_name, i.symbol, d.holder_name, d.masked_demat_identifier,
       coalesce(c.category, a.category_code) as category
     from public.applications a
     join public.ipos i on i.id = a.ipo_id and i.user_id = a.user_id
