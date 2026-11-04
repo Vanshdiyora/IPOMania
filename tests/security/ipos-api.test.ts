@@ -607,17 +607,20 @@ describe("IPO management API", () => {
     let inserted: Record<string, unknown> | undefined;
     const requests = installSupabaseMock(async (request) => {
       inserted = (await request.json()) as Record<string, unknown>;
-      return new Response(JSON.stringify({
-        ...catalogRow,
-        ...inserted,
-        id: ipoId,
-        issue_type: "mainboard",
-        ipo_status: "upcoming",
-        created_at: ipoRow.created_at,
-        updated_at: ipoRow.updated_at,
-      }), {
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          ...catalogRow,
+          ...inserted,
+          id: ipoId,
+          issue_type: "mainboard",
+          ipo_status: "upcoming",
+          created_at: ipoRow.created_at,
+          updated_at: ipoRow.updated_at,
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     });
     const response = await createApp().request(
       "/api/ipos",

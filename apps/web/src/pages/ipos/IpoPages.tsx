@@ -363,8 +363,8 @@ function IpoListContent({ personal }: { personal: boolean }) {
                     ? ipo.data_source === "USER_SUBMITTED"
                       ? "User-submitted"
                       : ipo.data_source === "IPO_GURU"
-                      ? "Admin-managed"
-                      : `Admin-managed · ${ipo.data_source === "MANUAL" ? "Manual entry" : ipo.data_source}`
+                        ? "Admin-managed"
+                        : `Admin-managed · ${ipo.data_source === "MANUAL" ? "Manual entry" : ipo.data_source}`
                     : ipo.data_source === "MANUAL"
                       ? ipo.last_verified_at
                         ? "Manual entry · user-marked verification date"

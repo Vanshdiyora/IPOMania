@@ -2,12 +2,12 @@
 
 ## Scope and ownership
 
-IPO records are **user-specific**, not shared master data. Every IPO row belongs to the
-authenticated user who created it. This remains the ownership model for the user-facing IPO
-manager. A separate administrator-managed IPO synchronization and master-catalog module is now
-approved; it may coexist with user-owned records when implemented through explicit shared/public
-access controls, provider provenance, field-level overrides, and admin authorization. It must not
-expose user-specific notes or calculation inputs, and it must not create fabricated market data.
+New IPO issue records are shared catalog data. A signed-in user can submit a complete IPO entry to
+the catalog under their verified identity, with explicit `USER_SUBMITTED` provenance; administrators
+can then maintain it alongside provider-synchronized data. User-owned IPO rows remain private
+application snapshots copied from that catalog, not a second source of issue facts. The catalog
+must not expose user-specific notes or calculation inputs, and it must not create fabricated
+market data.
 
 The manager stores manually entered IPO facts and issue-specific category rules. An eligible saved
 quota calculation may be recorded as a private application-tracking record; this does not submit
@@ -32,11 +32,14 @@ timestamp automatically. Status is selected by the user and is not inferred from
 
 ## User experience
 
-- **IPO list:** search by company or exact symbol, filter by status and exchange/date, and navigate
-  pages.
-- **IPO details:** review prices, dates, source/provenance, archive state, and category rule
-  versions.
-- **Add/edit:** validate the record before saving; edits cannot change its owner.
+- **IPO list:** search the shared catalog by company or exact symbol, filter by status and
+  exchange/date, and navigate pages. Existing private application snapshots remain under My IPOs.
+- **IPO details:** review catalog prices, dates, and source/provenance before preparing a private
+  application snapshot.
+- **Add:** validate the record before saving it to the shared catalog under the verified submitter.
+  A submitted record is not added to the submitter's private IPO collection.
+- **Edit:** existing private snapshot edits cannot change their owner. Administrators manage shared
+  catalog edits.
 - **Archive:** soft-archive the record; calculations retain their historical snapshots.
 - **Category configuration:** add a new immutable version for each category instead of changing an
   existing version.

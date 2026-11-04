@@ -369,10 +369,7 @@ iposRoutes.get("/", async (context) => {
   );
   let catalog: IpoCatalogDatabaseRow[] = [];
   let catalogCount = 0;
-  if (
-    query.source !== "personal" &&
-    (selectedStatuses.length === 0 || catalogStatuses.length > 0)
-  ) {
+  if (selectedStatuses.length === 0 || catalogStatuses.length > 0) {
     let catalogRequest = supabase
       .from("ipo_catalog")
       .select(catalogColumns, { count: "exact" })
@@ -411,10 +408,9 @@ iposRoutes.get("/", async (context) => {
     catalogCount = catalogResult.count ?? 0;
   }
 
-  const combinedIpos = [
-    ...ownedIpos.map((ipo) => ({ ...ipo, source: "PERSONAL" as const })),
-    ...catalog.map((ipo) => ({ ...catalogRecord(ipo), source: "CATALOG" as const })),
-  ];
+  const personalIpos = ownedIpos.map((ipo) => ({ ...ipo, source: "PERSONAL" as const }));
+  const catalogIpos = catalog.map((ipo) => ({ ...catalogRecord(ipo), source: "CATALOG" as const }));
+  const combinedIpos = [...personalIpos, ...catalogIpos];
   if (combinedList) {
     const compareNullable = (left: string | null, right: string | null) => {
       if (left === null) return right === null ? 0 : 1;
@@ -452,10 +448,20 @@ iposRoutes.get("/", async (context) => {
     });
   }
 
-  const total = ownedCount + catalogCount;
+  const total =
+    query.source === "all"
+      ? ownedCount + catalogCount
+      : query.source === "catalog"
+        ? catalogCount
+        : ownedCount;
+  const listedIpos = combinedList
+    ? combinedIpos.slice(offset, pageEnd + 1)
+    : query.source === "catalog"
+      ? catalogIpos
+      : personalIpos;
   return context.json({
     data: {
-      ipos: combinedList ? combinedIpos.slice(offset, pageEnd + 1) : combinedIpos,
+      ipos: listedIpos,
       catalog: catalog.map(catalogRecord),
       pagination: {
         page: query.page,
