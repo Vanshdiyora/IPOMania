@@ -34,8 +34,14 @@ describe("toast notifications", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create record" }));
 
     expect(await screen.findByText("Record created")).toBeInTheDocument();
+    const toast = screen.getByRole("status");
+    expect(toast).toHaveClass("p-3", "pr-2");
+    expect(toast.querySelector(".flex")).toHaveClass("items-center");
+    expect(toast.parentElement).toHaveClass("inset-x-3", "top-3", "sm:right-5");
     expect(screen.getByText("Your record is ready.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
+    const dismissButton = screen.getByRole("button", { name: "Dismiss notification" });
+    expect(dismissButton).toHaveClass("min-h-touch", "min-w-touch");
+    fireEvent.click(dismissButton);
     expect(screen.queryByText("Record created")).not.toBeInTheDocument();
   });
 });

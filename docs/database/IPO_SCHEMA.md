@@ -24,7 +24,7 @@ are database-enforced. Archiving preserves the row and its linked rule/calculati
 Stores immutable issue/category rule versions. It includes:
 
 - Category and database-assigned version.
-- Explicit lot and investment limit states plus their bounds.
+- Configured initial lots, plus explicit lot and investment limit states and their bounds.
 - Lot increment; reserved shares/percentage.
 - Shareholder record date and minimum shareholding.
 - Allowed price modes, minimum price increment, source and verification metadata.
@@ -64,7 +64,10 @@ their details and RLS are documented in [CAPITAL_LEDGER.md](./CAPITAL_LEDGER.md)
 
 RLS is enabled and forced on personal and shared IPO tables. Personal IPO operations are
 owner-filtered; shared catalog rules are publicly readable only for active catalog IPOs and
-admin-writable. Personal category and calculation records inherit ownership through
+admin-writable. Each category rule stores an initial lot quantity constrained by its lot bounds
+and increment. The IPO record's `lot_size` stores shares in one lot; application calculations
+derive total shares and amount from lots, share price, and that issue-level lot size. Personal
+category and calculation records inherit ownership through
 `(record_id, user_id)` foreign keys. The API
 authenticates with Supabase Auth and uses the caller's JWT with the anon key. It never uses the
 service-role key for user-scoped access.

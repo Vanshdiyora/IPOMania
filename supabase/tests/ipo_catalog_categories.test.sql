@@ -1,6 +1,6 @@
 begin;
 
-select plan(5);
+select plan(6);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -64,6 +64,13 @@ select is(
      and category = 'RETAIL'),
   1,
   'Admins create shared category rules with database-assigned versions'
+);
+select is(
+  (select default_lots from public.ipo_catalog_categories
+   where ipo_catalog_id = '80808080-8080-4080-8080-808080808080'
+     and category = 'RETAIL'),
+  1,
+  'Shared category rules store an initial lots value'
 );
 
 set local role authenticated;

@@ -1,6 +1,6 @@
 begin;
 
-select plan(24);
+select plan(25);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -134,6 +134,12 @@ select is(
   (select count(*) from public.ipo_categories),
   1::bigint,
   'User A reads only their category rule versions'
+);
+select is(
+  (select default_lots from public.ipo_categories
+   where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+  1,
+  'Category rules store an initial lots value'
 );
 select lives_ok(
   $$insert into public.ipo_categories (

@@ -97,7 +97,7 @@ async function prepareAuthenticatedPage(page: Page) {
       }),
     );
   });
-  await page.route("**/api/ipos?*", (route) =>
+  await page.route(/\/api\/ipos(?:\?|$)/, (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -109,7 +109,7 @@ async function prepareAuthenticatedPage(page: Page) {
       }),
     }),
   );
-  await page.route("**/api/ipos/catalog?*", (route) =>
+  await page.route(/\/api\/ipos\/catalog(?:\?|$)/, (route) =>
     route.fulfill({
       json: {
         data: {
@@ -136,7 +136,7 @@ async function prepareAuthenticatedPage(page: Page) {
       body: JSON.stringify({ data: { configurations: [] } }),
     }),
   );
-  await page.route("**/api/applications?*", (route) =>
+  await page.route(/\/api\/applications(?:\?|$)/, (route) =>
     route.fulfill({
       json: {
         data: {

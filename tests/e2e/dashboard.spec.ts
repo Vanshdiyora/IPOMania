@@ -227,7 +227,7 @@ async function prepareDashboard(page: Page) {
       json: { data: { ipos: [{ id: ipoId, company_name: "Dashboard Test IPO", symbol: "DASH" }] } },
     }),
   );
-  await page.route("**/api/accounts?*", (route) =>
+  await page.route(/\/api\/accounts(?:\?|$)/, (route) =>
     route.fulfill({
       json: {
         data: {

@@ -120,6 +120,7 @@ export interface IpoCategoryConfiguration {
   category: IpoCategoryCode;
   rule_version: number;
   lot_limit_status: "CONFIGURED" | "NO_PUBLISHED_LIMIT" | "UNCONFIGURED";
+  default_lots: number;
   minimum_lots: number | null;
   maximum_lots: number | null;
   lot_increment: number;

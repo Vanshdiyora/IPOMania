@@ -54,7 +54,7 @@ type IpoCatalogCategoryResponse = {
   data: { configurations: IpoCatalogCategoryConfiguration[] };
 };
 type IpoCategoryPageResponse = {
-  data: { id: string; company_name: string; symbol: string | null };
+  data: { id: string; company_name: string; symbol: string | null; lot_size: number | null };
 };
 type IpoCategoryPageRulesResponse = {
   data: {
@@ -880,7 +880,12 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
             <TextField form={form} name="issue_price_min" label="Issue price minimum" />
             <TextField form={form} name="issue_price_max" label="Issue price maximum" />
             <TextField form={form} name="cut_off_price" label="Cut-off price (optional)" />
-            <TextField form={form} name="lot_size" label="Lot size" inputMode="numeric" />
+            <TextField
+              form={form}
+              name="lot_size"
+              label="Shares in one lot (lot size)"
+              inputMode="numeric"
+            />
             <TextField form={form} name="issue_size" label="Issue size" />
             <SelectField form={form} name="status" label="Status">
               <option value="" disabled>
@@ -964,6 +969,7 @@ export function IpoCategoryConfigurationPage({
           id: response.data.id,
           company_name: response.data.company_name,
           symbol: response.data.symbol,
+          lot_size: response.data.lot_size,
         },
       };
     },
@@ -1032,6 +1038,7 @@ export function IpoCategoryConfigurationPage({
     const parsed = ipoCategoryConfigurationSchema.safeParse({
       category,
       lot_limit_status: form.lot_limit_status,
+      default_lots: parseOptionalInteger(form.default_lots) ?? 0,
       minimum_lots: parseOptionalInteger(form.minimum_lots),
       maximum_lots: parseOptionalInteger(form.maximum_lots),
       lot_increment: parseOptionalInteger(form.lot_increment) ?? 0,
@@ -1092,6 +1099,11 @@ export function IpoCategoryConfigurationPage({
         Enter issue-specific values you have sourced. Unknown limits stay unconfigured; they are
         never treated as unlimited. Saving creates a new immutable rule version.
       </p>
+      <p className="mb-4 rounded-lg border border-border bg-canvas p-3 text-sm text-muted">
+        {ipo.lot_size
+          ? `This IPO is configured for ${ipo.lot_size.toLocaleString("en-IN")} shares in one lot.`
+          : "Set the number of shares in one lot in the IPO details before recording applications."}
+      </p>
       <Card>
         <FormSelect
           label="Category"
@@ -1148,6 +1160,14 @@ export function IpoCategoryConfigurationPage({
                 ...(value !== "CONFIGURED" ? { minimum_lots: "", maximum_lots: "" } : {}),
               }))
             }
+          />
+          <TextRuleField
+            errors={fieldErrors}
+            form={form}
+            setForm={setForm}
+            name="default_lots"
+            label="Initial lots"
+            type="number"
           />
           <TextRuleField
             errors={fieldErrors}
@@ -1728,6 +1748,7 @@ export function QuotaCalculatorPage() {
 
 type RuleForm = {
   lot_limit_status: "CONFIGURED" | "NO_PUBLISHED_LIMIT" | "UNCONFIGURED";
+  default_lots: string;
   minimum_lots: string;
   maximum_lots: string;
   lot_increment: string;
@@ -1749,6 +1770,7 @@ type RuleForm = {
 function emptyRuleForm(): RuleForm {
   return {
     lot_limit_status: "UNCONFIGURED",
+    default_lots: "1",
     minimum_lots: "",
     maximum_lots: "",
     lot_increment: "",
@@ -1773,6 +1795,7 @@ function toRuleForm(
 ): RuleForm {
   return {
     lot_limit_status: configuration.lot_limit_status,
+    default_lots: configuration.default_lots.toString(),
     minimum_lots: configuration.minimum_lots?.toString() ?? "",
     maximum_lots: configuration.maximum_lots?.toString() ?? "",
     lot_increment: configuration.lot_increment.toString(),

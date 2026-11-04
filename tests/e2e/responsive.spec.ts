@@ -71,7 +71,7 @@ async function seedAuthenticatedUser(page: Page) {
       }),
     );
   });
-  await page.route("**/api/ipos?*", (route) =>
+  await page.route(/\/api\/ipos(?:\?|$)/, (route) =>
     route.fulfill({
       json: {
         data: {
@@ -81,7 +81,7 @@ async function seedAuthenticatedUser(page: Page) {
       },
     }),
   );
-  await page.route("**/api/ipos/catalog?*", (route) =>
+  await page.route(/\/api\/ipos\/catalog(?:\?|$)/, (route) =>
     route.fulfill({
       json: {
         data: {

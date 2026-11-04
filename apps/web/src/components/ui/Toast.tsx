@@ -76,23 +76,23 @@ export function Toast({
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
-      className="pointer-events-auto relative isolate w-full overflow-hidden rounded-2xl border border-border bg-surface p-4 pr-3 shadow-[0_18px_42px_-20px_rgba(15,23,42,0.35)] animate-fade-in"
+      className="pointer-events-auto relative isolate w-full overflow-hidden rounded-2xl border border-border bg-surface p-3 pr-2 shadow-[0_18px_42px_-20px_rgba(15,23,42,0.35)] animate-fade-in"
     >
       <span className={`absolute inset-y-0 left-0 w-1 ${toneStyles.accent}`} aria-hidden="true" />
-      <div className="flex gap-3 pl-1">
+      <div className="flex items-center gap-3 pl-1">
         <span
-          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${toneStyles.icon}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${toneStyles.icon}`}
         >
           <Icon className="h-5 w-5" aria-hidden="true" />
         </span>
-        <div className="min-w-0 flex-1 py-0.5">
+        <div className="min-w-0 flex-1">
           <p className="text-[15px] font-semibold leading-5 text-ink">{title}</p>
           {description && <div className="mt-1 text-sm leading-5 text-muted">{description}</div>}
         </div>
         <button
           type="button"
           onClick={() => onDismiss(id)}
-          className="-mt-1 flex min-h-touch min-w-touch shrink-0 items-center justify-center rounded-xl text-subtle transition-colors hover:bg-surface-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus"
+          className="flex min-h-touch min-w-touch shrink-0 items-center justify-center rounded-xl text-subtle transition-colors hover:bg-surface-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus"
           aria-label="Dismiss notification"
         >
           <X className="h-4 w-4" />
@@ -112,7 +112,7 @@ export function ToastViewport({ children }: { children: ReactNode }) {
   if (typeof document === "undefined") return null;
   return createPortal(
     <div
-      className="pointer-events-none fixed inset-x-4 top-4 z-[70] flex flex-col gap-3 sm:left-auto sm:right-5 sm:w-full sm:max-w-[25rem]"
+      className="pointer-events-none fixed inset-x-3 top-3 z-[70] flex flex-col gap-3 sm:left-auto sm:right-5 sm:top-4 sm:w-full sm:max-w-[25rem]"
       aria-live="polite"
     >
       {children}

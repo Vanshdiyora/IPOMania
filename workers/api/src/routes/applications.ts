@@ -65,6 +65,7 @@ type ApplicationRuleData = {
   category: string;
   rule_version: number;
   lot_limit_status: string;
+  default_lots: number;
   minimum_lots: number | null;
   maximum_lots: number | null;
   lot_increment: number;
@@ -613,7 +614,7 @@ async function prepareApplication(
       supabase
         .from("ipo_categories")
         .select(
-          "id, ipo_id, category, rule_version, lot_limit_status, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment",
+          "id, ipo_id, category, rule_version, lot_limit_status, default_lots, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment",
         )
         .eq("id", input.category_id)
         .eq("ipo_id", input.ipo_id)
@@ -851,7 +852,7 @@ async function previewImport(context: RouteContext) {
     supabase
       .from("ipo_categories")
       .select(
-        "id, ipo_id, category, rule_version, lot_limit_status, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment",
+        "id, ipo_id, category, rule_version, lot_limit_status, default_lots, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment",
       )
       .eq("user_id", userId)
       .order("rule_version", { ascending: false }),
