@@ -49,6 +49,7 @@ type IpoListResponse<T = IpoRecord> = {
   };
 };
 type IpoResponse = { data: IpoRecord };
+type IpoCatalogResponse = { data: IpoCatalogRecord };
 type IpoCategoryResponse = { data: { configurations: IpoCategoryConfiguration[] } };
 type IpoCatalogCategoryResponse = {
   data: { configurations: IpoCatalogCategoryConfiguration[] };
@@ -191,7 +192,7 @@ function IpoListContent({ personal }: { personal: boolean }) {
             className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-5 py-2 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
             to="/ipos/new"
           >
-            Add IPO
+            Add to catalog
           </DrawerRouteLink>
         }
       />
@@ -359,9 +360,11 @@ function IpoListContent({ personal }: { personal: boolean }) {
                 </td>
                 <td className="p-4 text-xs text-muted whitespace-nowrap">
                   {!personal
-                    ? ipo.data_source === "IPO_GURU"
-                      ? "Admin-managed"
-                      : `Admin-managed · ${ipo.data_source === "MANUAL" ? "Manual entry" : ipo.data_source}`
+                    ? ipo.data_source === "USER_SUBMITTED"
+                      ? "User-submitted"
+                      : ipo.data_source === "IPO_GURU"
+                        ? "Admin-managed"
+                        : `Admin-managed · ${ipo.data_source === "MANUAL" ? "Manual entry" : ipo.data_source}`
                     : ipo.data_source === "MANUAL"
                       ? ipo.last_verified_at
                         ? "Manual entry · user-marked verification date"
@@ -751,18 +754,18 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
       last_verified_at: verificationTime ? toIsoDateTime(verificationTime) : null,
     };
     try {
-      const response = await apiRequest<IpoResponse>(
+      const response = await apiRequest<IpoResponse | IpoCatalogResponse>(
         editing ? `/api/ipos/${ipoId}` : "/api/ipos",
         session,
         { method: editing ? "PATCH" : "POST", body: JSON.stringify(payload) },
       );
       await queryClient.invalidateQueries({ queryKey: ["ipos"] });
-      navigate(`/ipos/${response.data.id}`, {
-        state: { successMessage: editing ? "IPO updated." : "IPO created." },
+      navigate(`${editing ? "/ipos/" : "/ipos/catalog/"}${response.data.id}`, {
+        state: { successMessage: editing ? "IPO updated." : "IPO added to the shared catalog." },
       });
     } catch (error) {
       notify({
-        title: editing ? "IPO could not be updated" : "IPO could not be created",
+        title: editing ? "IPO could not be updated" : "IPO could not be added to the catalog",
         description: error instanceof Error ? error.message : "Please try again.",
         tone: "error",
       });
@@ -775,11 +778,15 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
 
   return (
     <RouteFormDrawer
-      title={editing ? "Edit IPO" : "Add IPO"}
-      description="Enter issue details from a source you can review. Manual values are never marked verified automatically."
-      cancelTo={editing ? `/ipos/${ipoId}` : "/ipos?source=personal"}
-      formId="personal-ipo-form"
-      submitLabel={editing ? "Save changes" : "Add IPO"}
+      title={editing ? "Edit IPO" : "Add to shared catalog"}
+      description={
+        editing
+          ? "Update this private IPO record. Manual values are never marked verified automatically."
+          : "Submit issue details to the shared IPO catalog. Include information you can review; administrators can maintain the record after submission."
+      }
+      cancelTo={editing ? `/ipos/${ipoId}` : "/ipos"}
+      formId="ipo-form"
+      submitLabel={editing ? "Save changes" : "Add to catalog"}
       busy={form.formState.isSubmitting}
       dirty={
         form.formState.isDirty ||
@@ -789,7 +796,7 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
             : "")
       }
     >
-      <form id="personal-ipo-form" className="space-y-5" onSubmit={submit} noValidate>
+      <form id="ipo-form" className="space-y-5" onSubmit={submit} noValidate>
         <FormSection title="Company details">
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField form={form} name="company_name" label="Company name" />
@@ -814,7 +821,7 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
               <option value="" disabled>
                 Choose a status
               </option>
-              {statuses.map((status) => (
+              {(editing ? statuses : catalogStatuses).map((status) => (
                 <option key={status} value={status}>
                   {label(status)}
                 </option>
@@ -853,7 +860,11 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
               type="datetime-local"
               value={verificationTime}
               onChange={(event) => setVerificationTime(event.target.value)}
-              hint="Leave blank unless you personally checked the referenced source."
+              hint={
+                editing
+                  ? "Leave blank unless you personally checked the referenced source."
+                  : "Leave blank unless you checked the referenced source. This entry will be visible in the shared catalog."
+              }
             />
           </div>
         </FormSection>
@@ -1916,7 +1927,9 @@ function IssueSummary({ ipo, personal }: { ipo: IpoRecord | IpoCatalogRecord; pe
         <p className="mt-5 rounded-lg border border-warning-border bg-warning-bg p-4 text-sm text-ink">
           {personal
             ? "This record and its source/verification date were entered by the user. The application does not automatically fetch or verify the source."
-            : "This IPO is maintained by the administrator. Missing details are shown as not published. Subscription, GMP, financial and listing performance data are not available in this record."}
+            : ipo.data_source === "USER_SUBMITTED"
+              ? "This shared IPO was submitted by a user and can be maintained by an administrator. Missing details are shown as not published; the application does not automatically verify the source."
+              : "This IPO is maintained by the administrator. Missing details are shown as not published. Subscription, GMP, financial and listing performance data are not available in this record."}
         </p>
       </Card>
     </div>

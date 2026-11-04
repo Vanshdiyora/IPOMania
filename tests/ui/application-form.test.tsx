@@ -50,6 +50,9 @@ describe("application form IPO selection", () => {
   it("preselects an imported shared IPO and shows its copied category rules", async () => {
     const ipoId = "88888888-8888-4888-8888-888888888888";
     apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      }
       if (path.startsWith("/api/ipos?")) {
         return {
           data: {
@@ -99,8 +102,11 @@ describe("application form IPO selection", () => {
     expect(await screen.findByRole("option", { name: "Retail (rules v1)" })).toBeInTheDocument();
   });
 
-  it("explains how to add the first personal IPO when no options are returned", async () => {
+  it("explains how to add an IPO to the catalog when no options are returned", async () => {
     apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      }
       if (path.startsWith("/api/ipos?")) {
         return {
           data: {
@@ -122,16 +128,86 @@ describe("application form IPO selection", () => {
 
     renderForm();
 
-    const addIpoLink = await screen.findByRole("link", { name: "Add an IPO" });
+    const addIpoLink = await screen.findByRole("link", { name: "Add to catalog" });
     expect(addIpoLink).toHaveAttribute("href", "/ipos/new");
     expect(addIpoLink.parentElement).toHaveTextContent(
-      "No personal IPOs are available. Add an IPO and configure its category before recording an application.",
+      "No IPOs are available in your records or the shared catalog. Add to catalog and configure its category before recording an application.",
+    );
+  });
+
+  it("lists shared catalog IPOs and imports the selected IPO for the user", async () => {
+    const catalogIpoId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const preparedIpoId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    apiRequestMock.mockImplementation(async (path: string, _session, init?: RequestInit) => {
+      if (path.startsWith("/api/ipos?")) {
+        return {
+          data: {
+            ipos: [],
+            pagination: { page: 1, page_size: 25, total: 0, total_pages: 0 },
+          },
+        };
+      }
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return {
+          data: {
+            ipos: [{ id: catalogIpoId, company_name: "Shared Catalog IPO", status: "OPEN" }],
+            pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+          },
+        };
+      }
+      if (path === `/api/ipos/catalog/${catalogIpoId}/import` && init?.method === "POST") {
+        return {
+          data: {
+            id: preparedIpoId,
+            company_name: "Shared Catalog IPO",
+            source_catalog_id: catalogIpoId,
+            lot_size: 10,
+          },
+        };
+      }
+      if (path === `/api/ipos/${preparedIpoId}/categories`) {
+        return { data: { configurations: [] } };
+      }
+      if (path.startsWith("/api/accounts?")) {
+        return {
+          data: {
+            accounts: [],
+            pagination: { page: 1, pageSize: 100, total: 0, totalPages: 1 },
+          },
+        };
+      }
+      throw new Error("Unexpected request: " + path);
+    });
+
+    renderForm();
+
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "IPO" })).not.toHaveAttribute(
+        "aria-busy",
+        "true",
+      ),
+    );
+    fireEvent.click(screen.getByRole("combobox", { name: "IPO" }));
+    fireEvent.click(await screen.findByRole("option", { name: /Shared Catalog IPO/ }));
+
+    await waitFor(() =>
+      expect(apiRequestMock).toHaveBeenCalledWith(
+        `/api/ipos/catalog/${catalogIpoId}/import`,
+        expect.anything(),
+        { method: "POST" },
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "IPO" })).toHaveTextContent("Shared Catalog IPO"),
     );
   });
 
   it("links to category setup when the selected IPO has no configured rules", async () => {
     const ipoId = "88888888-8888-4888-8888-888888888888";
     apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      }
       if (path.startsWith("/api/ipos?")) {
         return {
           data: {
@@ -166,6 +242,9 @@ describe("application form IPO selection", () => {
   it("shows only the latest rule version for each category", async () => {
     const ipoId = "88888888-8888-4888-8888-888888888888";
     apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      }
       if (path.startsWith("/api/ipos?")) {
         return {
           data: {
@@ -209,6 +288,9 @@ describe("application form IPO selection", () => {
   it("uses the category initial lots and shows the share count from the IPO lot size", async () => {
     const ipoId = "88888888-8888-4888-8888-888888888888";
     apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      }
       if (path === `/api/ipos/${ipoId}`) {
         return { data: { id: ipoId, company_name: "Lot Size IPO", lot_size: 25 } };
       }

@@ -65,6 +65,7 @@ const catalogRow = {
   listing_date: null,
   ipo_status: "upcoming",
   data_source: "IPO_GURU",
+  source_reference: null,
   last_synced_at: "2026-11-01T12:00:00.000Z",
   archived_at: null,
 };
@@ -602,13 +603,24 @@ describe("IPO management API", () => {
     expect(requests).toHaveLength(0);
   });
 
-  it("creates an IPO under the verified owner and rejects request-supplied ownership", async () => {
+  it("adds an IPO to the shared catalog under the verified submitter and rejects supplied ownership", async () => {
     let inserted: Record<string, unknown> | undefined;
     const requests = installSupabaseMock(async (request) => {
       inserted = (await request.json()) as Record<string, unknown>;
-      return new Response(JSON.stringify(ipoRow), {
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          ...catalogRow,
+          ...inserted,
+          id: ipoId,
+          issue_type: "mainboard",
+          ipo_status: "upcoming",
+          created_at: ipoRow.created_at,
+          updated_at: ipoRow.updated_at,
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     });
     const response = await createApp().request(
       "/api/ipos",
@@ -621,7 +633,15 @@ describe("IPO management API", () => {
     );
 
     expect(response.status).toBe(201);
-    expect(inserted?.user_id).toBe(userId);
+    expect(inserted).toMatchObject({
+      submitted_by: userId,
+      company_name: ipoInput.company_name,
+      symbol: ipoInput.symbol,
+      data_source: "USER_SUBMITTED",
+      source_reference: null,
+    });
+    expect(inserted?.user_id).toBeUndefined();
+    expect(new URL(requests[0]!.url).pathname).toBe("/rest/v1/ipo_catalog");
     expect(requests[0]?.headers.get("authorization")).toBe("Bearer user-session-token");
 
     const forgedRequests = installSupabaseMock();
@@ -636,6 +656,23 @@ describe("IPO management API", () => {
     );
     expect(forgedResponse.status).toBe(400);
     expect(forgedRequests).toHaveLength(0);
+  });
+
+  it("rejects statuses that cannot be represented in the shared catalog", async () => {
+    const requests = installSupabaseMock();
+    const response = await createApp().request(
+      "/api/ipos",
+      {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ ...ipoInput, status: "WITHDRAWN" }),
+      },
+      bindings,
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: "VALIDATION_ERROR" } });
+    expect(requests).toHaveLength(0);
   });
 
   it("filters IPO lists by the verified owner, status, and exact symbol", async () => {

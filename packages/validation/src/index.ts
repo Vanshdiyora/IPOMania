@@ -298,6 +298,7 @@ export const ipoListQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).default(1),
     page_size: z.coerce.number().int().min(1).max(100).default(25),
+    source: z.enum(["all", "personal", "catalog"]).default("personal"),
     search: z.string().trim().max(160).optional(),
     status: z
       .union([

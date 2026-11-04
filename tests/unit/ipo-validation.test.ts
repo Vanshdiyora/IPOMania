@@ -51,7 +51,10 @@ const categoryRules = {
 
 describe("IPO boundary validation", () => {
   it("validates catalog pagination and only accepts catalog statuses", () => {
-    expect(ipoListQuerySchema.parse({}).sort).toBe("date_desc");
+    expect(ipoListQuerySchema.parse({})).toMatchObject({
+      source: "personal",
+      sort: "date_desc",
+    });
     expect(ipoCatalogListQuerySchema.parse({})).toEqual({
       page: 1,
       page_size: 25,

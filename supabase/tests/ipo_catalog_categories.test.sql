@@ -1,6 +1,6 @@
 begin;
 
-select plan(6);
+select plan(8);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -101,6 +101,26 @@ select throws_ok(
   '42501',
   'new row violates row-level security policy for table "ipo_catalog_categories"',
   'Regular users cannot create shared category rules'
+);
+
+select lives_ok(
+  $$insert into public.ipo_catalog (
+    submitted_by, company_name, symbol, issue_type, ipo_status, exchange, data_source
+  ) values (
+    '70707070-7070-4070-8070-707070707070',
+    'User submitted catalog policy test',
+    'USERCAT',
+    'mainboard',
+    'upcoming',
+    'NSE',
+    'USER_SUBMITTED'
+  )$$,
+  'Regular users can submit a shared IPO catalog entry under their verified identity'
+);
+select is(
+  (select count(*) from public.ipo_catalog where symbol = 'USERCAT'),
+  1::bigint,
+  'User-submitted IPO catalog entries are visible to other signed-in users'
 );
 
 select * from finish();
