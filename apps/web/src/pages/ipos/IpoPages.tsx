@@ -1101,8 +1101,8 @@ export function IpoCategoryConfigurationPage({
       </p>
       <p className="mb-4 rounded-lg border border-border bg-canvas p-3 text-sm text-muted">
         {ipo.lot_size
-          ? `This IPO is configured for ${ipo.lot_size.toLocaleString("en-IN")} shares in one lot.`
-          : "Set the number of shares in one lot in the IPO details before recording applications."}
+          ? `Lot size: ${ipo.lot_size.toLocaleString("en-IN")} shares in one lot.`
+          : "Lot size is the number of shares in one lot; applications require this IPO value to be available."}
       </p>
       <Card>
         <FormSelect

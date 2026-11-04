@@ -45,6 +45,7 @@ const category = {
   category: "RETAIL",
   rule_version: 3,
   lot_limit_status: "CONFIGURED",
+  default_lots: 1,
   minimum_lots: 1,
   maximum_lots: 2,
   lot_increment: 1,

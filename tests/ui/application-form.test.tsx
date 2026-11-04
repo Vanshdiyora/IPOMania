@@ -72,7 +72,14 @@ describe("application form IPO selection", () => {
       if (path === `/api/ipos/${ipoId}/categories`) {
         return {
           data: {
-            configurations: [{ id: "copied-retail-rule", category: "RETAIL", rule_version: 1 }],
+            configurations: [
+              {
+                id: "copied-retail-rule",
+                category: "RETAIL",
+                rule_version: 1,
+                default_lots: 1,
+              },
+            ],
           },
         };
       }
@@ -179,9 +186,9 @@ describe("application form IPO selection", () => {
         return {
           data: {
             configurations: [
-              { id: "first-rule", category: "RETAIL", rule_version: 1 },
-              { id: "current-rule", category: "RETAIL", rule_version: 2 },
-              { id: "hni-rule", category: "SHNI", rule_version: 1 },
+              { id: "first-rule", category: "RETAIL", rule_version: 1, default_lots: 1 },
+              { id: "current-rule", category: "RETAIL", rule_version: 2, default_lots: 2 },
+              { id: "hni-rule", category: "SHNI", rule_version: 1, default_lots: 3 },
             ],
           },
         };
@@ -197,5 +204,68 @@ describe("application form IPO selection", () => {
     expect(await screen.findByRole("option", { name: "Retail (rules v2)" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Retail (rules v1)" })).not.toBeInTheDocument();
     expect(screen.getByRole("option", { name: "sHNI (rules v1)" })).toBeInTheDocument();
+  });
+
+  it("uses the category initial lots and shows the share count from the IPO lot size", async () => {
+    const ipoId = "88888888-8888-4888-8888-888888888888";
+    apiRequestMock.mockImplementation(async (path: string) => {
+      if (path === `/api/ipos/${ipoId}`) {
+        return { data: { id: ipoId, company_name: "Lot Size IPO", lot_size: 25 } };
+      }
+      if (path.startsWith("/api/ipos?")) {
+        return {
+          data: {
+            ipos: [
+              {
+                id: ipoId,
+                company_name: "Lot Size IPO",
+                status: "OPEN",
+                lot_size: 25,
+              },
+            ],
+            pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+          },
+        };
+      }
+      if (path.startsWith("/api/accounts?")) {
+        return {
+          data: {
+            accounts: [],
+            pagination: { page: 1, pageSize: 100, total: 0, totalPages: 1 },
+          },
+        };
+      }
+      if (path === `/api/ipos/${ipoId}/categories`) {
+        return {
+          data: {
+            configurations: [
+              {
+                id: "retail-rule",
+                category: "RETAIL",
+                rule_version: 1,
+                default_lots: 3,
+                allowed_price_types: ["BID"],
+              },
+            ],
+          },
+        };
+      }
+      throw new Error("Unexpected request: " + path);
+    });
+
+    const { container } = renderForm(`/applications/new?ipo_id=${ipoId}`);
+    await waitFor(() =>
+      expect(container.querySelector('option[value="retail-rule"]')).not.toBeNull(),
+    );
+    const categorySelect = container
+      .querySelector<HTMLOptionElement>('option[value="retail-rule"]')
+      ?.closest("select");
+    if (!categorySelect) throw new Error("The category selector was not rendered.");
+    fireEvent.change(categorySelect, { target: { value: "retail-rule" } });
+
+    expect(screen.getByRole("spinbutton", { name: "Lots" })).toHaveValue(3);
+    expect(
+      screen.getByText("One lot contains 25 shares. 3 lot(s) = 75 shares."),
+    ).toBeInTheDocument();
   });
 });

@@ -701,6 +701,14 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const selectedIpo =
     lists.ipos.find((item) => item.id === ipoId) ??
     (preselectedIpo.data?.data.id === ipoId ? preselectedIpo.data.data : null);
+  const enteredLots = Number(lots);
+  const estimatedTotalShares =
+    selectedIpo &&
+    Number.isSafeInteger(enteredLots) &&
+    enteredLots > 0 &&
+    Number.isSafeInteger(selectedIpo.lot_size * enteredLots)
+      ? selectedIpo.lot_size * enteredLots
+      : null;
   useEffect(() => {
     if (editing || dirty || ipoId || !preselectedIpo.data?.data.id) return;
     setIpoId(preselectedIpo.data.data.id);
@@ -975,8 +983,8 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                 {selectedIpo?.lot_size ? (
                   <p className="text-sm text-muted sm:col-span-2">
                     One lot contains {selectedIpo.lot_size.toLocaleString("en-IN")} shares.
-                    {Number.isSafeInteger(Number(lots)) && Number(lots) > 0
-                      ? ` ${Number(lots).toLocaleString("en-IN")} lot(s) = ${(selectedIpo.lot_size * Number(lots)).toLocaleString("en-IN")} shares.`
+                    {estimatedTotalShares !== null
+                      ? ` ${enteredLots.toLocaleString("en-IN")} lot(s) = ${estimatedTotalShares.toLocaleString("en-IN")} shares.`
                       : ""}
                   </p>
                 ) : null}

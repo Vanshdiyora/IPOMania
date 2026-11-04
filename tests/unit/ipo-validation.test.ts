@@ -30,6 +30,7 @@ const ipo = {
 const categoryRules = {
   category: "RETAIL",
   lot_limit_status: "CONFIGURED",
+  default_lots: 1,
   minimum_lots: 1,
   maximum_lots: 4,
   lot_increment: 1,
@@ -127,6 +128,31 @@ describe("IPO boundary validation", () => {
         maximum_lots: null,
       }).success,
     ).toBe(true);
+    expect(
+      ipoCategoryConfigurationSchema.safeParse({
+        ...categoryRules,
+        minimum_lots: 2,
+        default_lots: 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      ipoCategoryConfigurationSchema.safeParse({
+        ...categoryRules,
+        minimum_lots: 2,
+        maximum_lots: 8,
+        lot_increment: 3,
+        default_lots: 5,
+      }).success,
+    ).toBe(true);
+    expect(
+      ipoCategoryConfigurationSchema.safeParse({
+        ...categoryRules,
+        minimum_lots: 2,
+        maximum_lots: 8,
+        lot_increment: 3,
+        default_lots: 4,
+      }).success,
+    ).toBe(false);
   });
 
   it("requires structured shareholder evidence inputs but does not claim verification", () => {

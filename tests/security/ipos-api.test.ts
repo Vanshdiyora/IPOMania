@@ -74,6 +74,7 @@ const categoryRow = {
   category: "RETAIL",
   rule_version: 2,
   lot_limit_status: "CONFIGURED",
+  default_lots: 1,
   minimum_lots: 1,
   maximum_lots: 2,
   lot_increment: 1,
@@ -247,6 +248,7 @@ describe("IPO management API", () => {
     const configuration = {
       category: "RETAIL",
       lot_limit_status: "UNCONFIGURED",
+      default_lots: 1,
       minimum_lots: null,
       maximum_lots: null,
       lot_increment: 1,
@@ -657,6 +659,7 @@ describe("IPO management API", () => {
     const configuration = {
       category: "RETAIL",
       lot_limit_status: "CONFIGURED",
+      default_lots: 1,
       minimum_lots: 1,
       maximum_lots: 3,
       lot_increment: 1,
@@ -687,6 +690,7 @@ describe("IPO management API", () => {
     expect(response.status).toBe(201);
     expect(inserted?.user_id).toBe(userId);
     expect(inserted?.rule_version).toBeUndefined();
+    expect(inserted?.default_lots).toBe(1);
     expect(inserted?.eligibility_conditions).toEqual(configuration.eligibility_conditions);
     expect(
       requests.some(

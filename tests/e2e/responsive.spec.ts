@@ -149,14 +149,16 @@ for (const viewport of viewports) {
     ).toBeVisible();
     await expect(page.getByRole("combobox", { name: "Sort IPOs" })).toBeVisible();
     await page.getByRole("textbox", { name: "Search company or exact symbol" }).fill("IPO Test");
-    await expect(page.getByRole("link", { name: "IPO Test Company" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "IPO Test Company", exact: true }),
+    ).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await testInfo.attach(`ipo-list-${viewport.width}.png`, {
       body: await page.screenshot(),
       contentType: "image/png",
     });
 
-    await page.getByRole("link", { name: "IPO Test Company" }).click();
+    await page.getByRole("link", { name: "IPO Test Company", exact: true }).click();
     await expect(page.getByRole("heading", { name: "IPO Test Company" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await testInfo.attach(`ipo-details-${viewport.width}.png`, {

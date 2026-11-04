@@ -27,13 +27,15 @@ an issue-specific category configuration, positive whole lots, and price. Shared
 category rules into the caller's **My IPOs** before opening the form. Unknown market values are not
 filled with defaults; incomplete shared records cannot be imported for application calculations.
 Personal IPO records and their independently configured rules are unchanged. If an IPO has no
-configured category rules, configure a sourced rule before recording an application. It shows the calculated
-total amount without exposing a price-type field; the application service selects an allowed price
-mode from the configured issue rules. The server records the submission date and time when the
-form is saved, rather than accepting a user-entered timestamp. The same decimal financial engine
-checks the selected issue rules. Unknown or unconfigured lot, investment, and price rules remain
-errors. A saved application remains a tracking record, not issuer eligibility verification or
-investment advice.
+configured category rules, configure a sourced rule before recording an application. Selecting a
+category prefills its configured initial lots, which can be adjusted. The form states the shares in
+one lot and shows the corresponding total shares; the server preview calculates the total amount
+from price, lots, and IPO lot size without exposing a price-type field. The application service
+selects an allowed price mode from the configured issue rules. The server records the submission
+date and time when the form is saved, rather than accepting a user-entered timestamp. The same
+decimal financial engine checks the selected issue rules. Unknown or unconfigured lot, investment,
+and price rules remain errors. A saved application remains a tracking record, not issuer eligibility
+verification or investment advice.
 
 The saved record includes exact application amount, total shares, rule version, a server-recorded
 submission timestamp, and a snapshot of the IPO pricing/lot-size inputs, category rule, applicant

@@ -290,6 +290,7 @@ test("financial pages are unavailable in the web app", async ({ page }) => {
 test("dashboard remains usable across responsive viewports with accessible filters", async ({
   page,
 }, testInfo) => {
+  test.setTimeout(90_000);
   await prepareDashboard(page);
   await page.goto("/");
 

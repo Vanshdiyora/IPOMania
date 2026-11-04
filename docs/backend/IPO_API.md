@@ -35,7 +35,8 @@ Responses use `{ data }` or `{ error: { code, message } }`.
 
 IPO list filters include company search (or exact symbol), status, exchange, opening-date bounds,
 and archive inclusion. Category POST bodies are strict structured objects; unknown fields and
-invalid limit states are rejected.
+invalid limit states are rejected. Category rules require `default_lots`, which is checked against
+the configured minimum, maximum, and increment. The IPO's `lot_size` is its shares-per-lot value.
 
 The shared catalog accepts `page`, `page_size` (maximum 100), `search`, and uppercase `status`
 (`UPCOMING`, `OPEN`, `CLOSED`, or `LISTED`). It always excludes archived entries, including when
