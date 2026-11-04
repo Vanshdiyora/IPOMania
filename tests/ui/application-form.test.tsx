@@ -96,10 +96,10 @@ describe("application form IPO selection", () => {
         "Imported Catalog IPO",
       ),
     );
-    const categorySelect = await screen.findByRole("combobox", { name: "Application category" });
+    const categorySelect = await screen.findByRole("combobox", { name: "Investor category" });
     await waitFor(() => expect(categorySelect).not.toBeDisabled());
     fireEvent.click(categorySelect);
-    expect(await screen.findByRole("option", { name: "Retail (rules v1)" })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: /Retail — .*rules v1/ })).toBeInTheDocument();
   });
 
   it("explains how to add an IPO to the catalog when no options are returned", async () => {
@@ -353,10 +353,10 @@ describe("application form IPO selection", () => {
 
     await chooseIpo("Versioned IPO");
 
-    fireEvent.click(await screen.findByRole("combobox", { name: "Application category" }));
-    expect(await screen.findByRole("option", { name: "Retail (rules v2)" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Retail (rules v1)" })).not.toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "sHNI (rules v1)" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("combobox", { name: "Investor category" }));
+    expect(await screen.findByRole("option", { name: /Retail — .*rules v2/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Retail — .*rules v1/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /sHNI — .*rules v1/ })).toBeInTheDocument();
   });
 
   it("uses the category initial lots and shows the share count from the IPO lot size", async () => {

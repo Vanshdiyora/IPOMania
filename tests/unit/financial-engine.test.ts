@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateApplicationAmount,
   calculateMaximumEligibleLots,
+  calculateMinimumEligibleLots,
   calculateTotalShares,
   checkShareholderEligibility,
   validateApplicationConfiguration,
@@ -157,6 +158,21 @@ describe("financial engine", () => {
       expect.arrayContaining(["LOT_RULES_UNCONFIGURED", "INVESTMENT_RULES_UNCONFIGURED"]),
     );
     expect(calculateMaximumEligibleLots(makeInput().ipo, rules, "10.05")).toBeNull();
+    expect(calculateMinimumEligibleLots(makeInput().ipo, rules, "10.05")).toBeNull();
+  });
+
+  it("calculates configured investment minimums and aligns them to the lot increment", () => {
+    const input = makeInput();
+    const rules = {
+      ...baseRules,
+      minimum_lots: 2,
+      lot_increment: 3,
+      minimum_investment: "402",
+    };
+    expect(calculateMinimumEligibleLots(input.ipo, rules, "10.05")).toBe(5);
+    expect(
+      calculateMinimumEligibleLots(input.ipo, { ...rules, minimum_investment: null }, "10.05"),
+    ).toBe(2);
   });
 
   it("checks shareholder record-date holding criteria without inferring eligibility", () => {

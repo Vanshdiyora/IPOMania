@@ -331,6 +331,22 @@ describe("user IPO catalog", () => {
   it("shows applications recorded for a personal IPO", async () => {
     const applicationId = "77777777-7777-4777-8777-777777777777";
     apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/accounts?")) {
+        return {
+          data: {
+            accounts: [
+              {
+                id: "66666666-6666-4666-8666-666666666666",
+                holder_name: "Test Holder",
+                broker_name: "Test Broker",
+                account_status: "active",
+                archived_at: null,
+              },
+            ],
+            pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
+          },
+        };
+      }
       if (path.startsWith("/api/applications?")) {
         return {
           data: {
@@ -338,6 +354,7 @@ describe("user IPO catalog", () => {
               {
                 id: applicationId,
                 ipo_id: catalogIpo.id,
+                demat_account_id: "66666666-6666-4666-8666-666666666666",
                 lots: 2,
                 total_shares: 20,
                 application_amount: "400.00",
@@ -347,6 +364,9 @@ describe("user IPO catalog", () => {
                 application_status: "SUBMITTED",
                 demat_accounts: { holder_name: "Test Holder", broker_name: "Test Broker" },
                 ipo_categories: { category: "RETAIL" },
+                calculation_snapshot: {
+                  calculation_input: { price: "200.00", price_type: "BID" },
+                },
               },
             ],
             pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
@@ -360,17 +380,72 @@ describe("user IPO catalog", () => {
     });
     renderPage(`/ipos/${catalogIpo.id}`);
     expect(
-      await screen.findByRole("heading", { name: "Applications for this IPO" }),
+      await screen.findByRole("heading", { name: "Demat account applications" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "APP-2026-001" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Edit" })).toHaveAttribute(
       "href",
-      `/applications/${applicationId}`,
+      `/applications/${applicationId}/edit?return_to=%2Fipos%2F${catalogIpo.id}`,
     );
     expect(screen.getByText("Test Holder")).toBeInTheDocument();
     expect(screen.getByRole("row", { name: /APP-2026-001/ })).toHaveTextContent("RETAIL");
+    expect(screen.getByRole("row", { name: /APP-2026-001/ })).toHaveTextContent("₹200");
     expect(apiRequestMock).toHaveBeenCalledWith(
       `/api/applications?ipo_id=${catalogIpo.id}&page=1&page_size=25`,
       expect.anything(),
+    );
+  });
+
+  it("lists an un-applied active demat account with an IPO-specific drawer link", async () => {
+    const accountId = "66666666-6666-4666-8666-666666666666";
+    apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/accounts?")) {
+        return {
+          data: {
+            accounts: [
+              {
+                id: accountId,
+                holder_name: "Ready Holder",
+                broker_name: "Quick Broker",
+                account_status: "active",
+                archived_at: null,
+              },
+            ],
+            pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
+          },
+        };
+      }
+      if (path.startsWith("/api/applications?")) {
+        return {
+          data: {
+            applications: [],
+            pagination: { page: 1, page_size: 25, total: 0, total_pages: 1 },
+          },
+        };
+      }
+      if (path === `/api/ipos/${catalogIpo.id}/categories`) {
+        return { data: { configurations: [] } };
+      }
+      return {
+        data: {
+          ...catalogIpo,
+          exchange: "NSE",
+          issue_price_min: "100",
+          issue_price_max: "110",
+          issue_size: "100000",
+          lot_size: 10,
+          opening_date: "2026-11-01",
+          closing_date: "2026-11-03",
+        },
+      };
+    });
+
+    renderPage(`/ipos/${catalogIpo.id}`);
+
+    expect(await screen.findByText("Ready Holder")).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /Ready Holder/ })).toHaveTextContent("Not applied");
+    expect(screen.getByRole("link", { name: "Apply" })).toHaveAttribute(
+      "href",
+      `/applications/new?demat_account_id=${accountId}&ipo_id=${catalogIpo.id}&return_to=%2Fipos%2F${catalogIpo.id}`,
     );
   });
 

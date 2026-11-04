@@ -67,6 +67,9 @@ accounts is never treated as proof of eligibility.
 - `/applications/list`: searchable, filterable table with pagination and filtered CSV export.
 - `/applications/new`, `/applications/:applicationId`, and `/applications/:applicationId/edit`:
   creation, historical details, and editable operational fields.
+- `/ipos/:ipoId`: an account-first table of active demat accounts and recorded applications for
+  that IPO. It shows the selected category and recorded bid price, opens the application form in a
+  drawer with the IPO and account preselected, and returns to the table after save or edit.
 - `/applications/bulk`: per-account validation and confirmed bulk creation.
 - `/applications/import`: CSV/XLSX mapping, validation, duplicate review, and confirmation.
 - `/applications/import-history` and `/applications/import-history/:importId`: batch history and

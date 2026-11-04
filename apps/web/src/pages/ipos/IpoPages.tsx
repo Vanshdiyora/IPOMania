@@ -41,6 +41,7 @@ import {
   Skeleton,
 } from "../../components/ui/Skeleton";
 import { ApiRequestError, apiRequest } from "../../lib/api";
+import { applicationDrawerPath } from "../../lib/applicationDrawer";
 import { DataTable } from "../../components/ui/DataTable";
 
 type IpoListResponse<T = IpoRecord> = {
@@ -74,9 +75,19 @@ type IpoApplicationsResponse = {
     pagination: { page: number; page_size: number; total: number; total_pages: number };
   };
 };
+type IpoApplicationWithRelations = IpoApplicationsResponse["data"]["applications"][number];
+type IpoApplicationTableRow = {
+  account: DematAccount | null;
+  application: IpoApplicationWithRelations | null;
+};
 type IpoValues = z.input<typeof ipoSchema>;
 type IpoOutput = z.output<typeof ipoSchema>;
-type AccountListResponse = { data: { accounts: DematAccount[] } };
+type AccountListResponse = {
+  data: {
+    accounts: DematAccount[];
+    pagination?: { page: number; pageSize: number; total: number; totalPages: number };
+  };
+};
 type CalculationResponse = {
   data: {
     eligible: boolean;
@@ -522,6 +533,26 @@ export function IpoDetailsPage() {
         session!,
       ),
   });
+  const accountsQuery = useQuery({
+    queryKey: ["accounts", "ipo-application-table"],
+    enabled: Boolean(session),
+    queryFn: async () => {
+      const first = await apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!);
+      const totalPages = first.data.pagination?.totalPages ?? 1;
+      if (totalPages <= 1) return first;
+      const pages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) =>
+          apiRequest<AccountListResponse>(`/api/accounts?page=${index + 2}&pageSize=100`, session!),
+        ),
+      );
+      return {
+        data: {
+          ...first.data,
+          accounts: [first.data.accounts, ...pages.map((page) => page.data.accounts)].flat(),
+        },
+      };
+    },
+  });
   const archive = useMutation({
     mutationFn: () =>
       apiRequest<IpoResponse>(`/api/ipos/${ipoId}/archive`, session!, { method: "POST" }),
@@ -545,6 +576,25 @@ export function IpoDetailsPage() {
   if (!ipo) return <p role="alert">IPO record not found.</p>;
 
   const latestCategories = latestByCategory(categoriesQuery.data?.data.configurations ?? []);
+  const applicationReady = isIpoReadyForApplication(ipo);
+  const applications = applicationsQuery.data?.data.applications ?? [];
+  const applicationPagination = applicationsQuery.data?.data.pagination;
+  const activeAccounts = (accountsQuery.data?.data.accounts ?? []).filter(
+    (account) => account.account_status === "active" && !account.archived_at,
+  );
+  const activeAccountIds = new Set(activeAccounts.map((account) => account.id));
+  const applicationRows = activeAccounts.flatMap<IpoApplicationTableRow>((account) => {
+    const accountApplications = applications.filter(
+      (application) => application.demat_account_id === account.id,
+    );
+    return accountApplications.length
+      ? accountApplications.map((application) => ({ account, application }))
+      : [{ account, application: null }];
+  });
+  const historicalApplicationRows: IpoApplicationTableRow[] = applications
+    .filter((application) => !activeAccountIds.has(application.demat_account_id))
+    .map((application) => ({ account: null, application }));
+  const returnTo = `/ipos/${ipo.id}`;
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -637,83 +687,134 @@ export function IpoDetailsPage() {
         )}
       </Card>
       <Card>
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-ink">Applications for this IPO</h2>
-          <p className="mt-1 text-sm text-muted">Applications you have recorded for this IPO.</p>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-ink">Demat account applications</h2>
+            <p className="mt-1 text-sm text-muted">
+              Start an application from an active demat account, then return here to review or edit
+              its tracking details.
+            </p>
+          </div>
+          <DrawerRouteLink
+            className={secondaryLinkClass}
+            to={`/applications/new?${new URLSearchParams({ ipo_id: ipo.id, return_to: returnTo }).toString()}`}
+          >
+            Add application
+          </DrawerRouteLink>
         </div>
-        {applicationsQuery.error ? (
+        {!applicationReady ? (
+          <p className="mb-4 text-sm text-muted">
+            Complete this IPO's issue and bidding details before recording an application.
+          </p>
+        ) : null}
+        {applicationsQuery.error || accountsQuery.error ? (
           <ErrorNotice
-            error={applicationsQuery.error}
-            onRetry={() => void applicationsQuery.refetch()}
+            error={applicationsQuery.error ?? accountsQuery.error}
+            onRetry={() => void Promise.all([applicationsQuery.refetch(), accountsQuery.refetch()])}
           />
-        ) : applicationsQuery.isLoading ? (
+        ) : applicationsQuery.isLoading || accountsQuery.isLoading ? (
           <p role="status">Loading applications…</p>
-        ) : applicationsQuery.data?.data.applications.length ? (
+        ) : applicationRows.length || historicalApplicationRows.length ? (
           <>
-            <DataTable minWidth="760px">
+            <DataTable minWidth="980px">
               <thead>
                 <tr className="border-b border-border text-sm text-muted">
                   <th scope="col" className="p-3 text-left">
-                    Application
-                  </th>
-                  <th scope="col" className="p-3 text-left">
-                    Account
+                    Demat account
                   </th>
                   <th scope="col" className="p-3 text-left">
                     Category
                   </th>
                   <th scope="col" className="p-3 text-right">
-                    Lots / amount
+                    Price
                   </th>
-                  <th scope="col" className="p-3 text-left">
-                    Submitted
+                  <th scope="col" className="p-3 text-right">
+                    Lots / amount
                   </th>
                   <th scope="col" className="p-3 text-center">
                     Status
                   </th>
+                  <th scope="col" className="p-3 text-right">
+                    Action
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {applicationsQuery.data.data.applications.map((application) => (
-                  <tr key={application.id} className="border-b border-border">
-                    <td className="p-3">
-                      <Link
-                        className="font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
-                        to={`/applications/${application.id}`}
+                {[...applicationRows, ...historicalApplicationRows].map(
+                  ({ account, application }) => {
+                    const accountName =
+                      account?.holder_name ?? application?.demat_accounts?.holder_name ?? "Account";
+                    const brokerName =
+                      account?.broker_name ??
+                      application?.demat_accounts?.broker_name ??
+                      "Broker not available";
+                    return (
+                      <tr
+                        key={application?.id ?? account?.id}
+                        className="border-b border-border transition-colors hover:bg-canvas/60"
                       >
-                        {application.application_number ?? "View application"}
-                      </Link>
-                    </td>
-                    <td className="p-3">
-                      {application.demat_accounts?.holder_name ?? "Account"}
-                      <br />
-                      <span className="text-sm text-muted">
-                        {application.demat_accounts?.broker_name ?? "Broker not available"}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      {application.ipo_categories?.category ?? "Not available"}
-                    </td>
-                    <td className="p-3 text-right tabular-nums whitespace-nowrap">
-                      {application.lots} lots · {formatRupees(application.application_amount)}
-                    </td>
-                    <td className="p-3 text-sm tabular-nums whitespace-nowrap">
-                      {formatDateTime(application.submission_date ?? application.created_at)}
-                    </td>
-                    <td className="p-3 text-center">
-                      <StatusBadge status={application.application_status} />
-                    </td>
-                  </tr>
-                ))}
+                        <td className="p-3">
+                          <span className="font-semibold text-ink">{accountName}</span>
+                          <br />
+                          <span className="text-sm text-muted">{brokerName}</span>
+                          {application?.application_number ? (
+                            <span className="block text-xs text-muted">
+                              Application {application.application_number}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="p-3">
+                          {application?.ipo_categories?.category ?? "Not applied"}
+                        </td>
+                        <td className="p-3 text-right tabular-nums whitespace-nowrap">
+                          {application ? formatApplicationPrice(application) : "—"}
+                        </td>
+                        <td className="p-3 text-right tabular-nums whitespace-nowrap">
+                          {application
+                            ? `${application.lots} lots · ${formatRupees(application.application_amount)}`
+                            : "—"}
+                        </td>
+                        <td className="p-3 text-center">
+                          {application ? (
+                            <StatusBadge status={application.application_status} />
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          {application ? (
+                            <DrawerRouteLink
+                              className="font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
+                              to={`/applications/${application.id}/edit?${new URLSearchParams({ return_to: returnTo }).toString()}`}
+                            >
+                              Edit
+                            </DrawerRouteLink>
+                          ) : account ? (
+                            <DrawerRouteLink
+                              className="font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
+                              to={applicationDrawerPath(account.id, ipo.id, returnTo)}
+                              aria-disabled={!applicationReady}
+                              onClick={(event) => {
+                                if (!applicationReady) event.preventDefault();
+                              }}
+                            >
+                              Apply
+                            </DrawerRouteLink>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  },
+                )}
               </tbody>
             </DataTable>
-            {applicationsQuery.data.data.pagination.total_pages > 1 ? (
+            {applicationPagination && applicationPagination.total_pages > 1 ? (
               <div className="mt-4">
                 <Pagination
                   label="IPO application pages"
                   page={applicationPage}
-                  totalPages={applicationsQuery.data.data.pagination.total_pages}
-                  total={applicationsQuery.data.data.pagination.total}
+                  totalPages={applicationPagination.total_pages}
+                  total={applicationPagination.total}
                   onPageChange={setApplicationPage}
                 />
               </div>
@@ -721,7 +822,7 @@ export function IpoDetailsPage() {
           </>
         ) : (
           <p className="py-6 text-center font-semibold text-muted">
-            No applications recorded for this IPO.
+            Add an active demat account to start tracking an application for this IPO.
           </p>
         )}
       </Card>
@@ -1959,6 +2060,15 @@ function formatRupees(value: string) {
     currency: "INR",
     maximumFractionDigits: 2,
   }).format(number);
+}
+
+function formatApplicationPrice(application: IpoApplication) {
+  const input = application.calculation_snapshot.calculation_input;
+  if (!input || typeof input !== "object") return "Not recorded";
+  const price = "price" in input ? input.price : null;
+  const priceType = "price_type" in input ? input.price_type : null;
+  if (typeof price !== "string") return "Not recorded";
+  return `${formatRupees(price)}${priceType === "CUT_OFF" ? " (cut-off)" : ""}`;
 }
 
 function formatPriceBand(minimum: string | null, maximum: string | null) {
