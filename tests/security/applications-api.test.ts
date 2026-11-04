@@ -247,7 +247,7 @@ describe("application API", () => {
         total_shares: 10,
         application_amount: "200.00",
         application_number: null,
-        external_reference: null,
+        external_reference: "",
         submission_date: null,
         application_status: "DRAFT",
         mandate_status: "UNKNOWN",
@@ -266,7 +266,7 @@ describe("application API", () => {
       {
         method: "PATCH",
         headers: { Authorization: "Bearer test-token", "Content-Type": "application/json" },
-        body: JSON.stringify({ category_id: categoryId, lots: 2, price: "20.00" }),
+        body: JSON.stringify({ category_id: categoryId, lots: 2, price: "19.00" }),
       },
       bindings,
     );
@@ -280,7 +280,7 @@ describe("application API", () => {
       category_code: "RETAIL",
       lots: 2,
       total_shares: 20,
-      application_amount: "400",
+      application_amount: "380",
     });
     expect(body).not.toHaveProperty("application_number");
     expect(body).not.toHaveProperty("external_reference");

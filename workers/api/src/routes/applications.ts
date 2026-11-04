@@ -533,13 +533,6 @@ applicationsRoutes.patch(
         price: price ?? existingPrice,
         shareholder_shares: null,
         eligibility_answers: {},
-        application_number: existing.application_number,
-        external_reference: existing.external_reference,
-        submission_date: existing.submission_date,
-        application_status: existing.application_status,
-        mandate_status: existing.mandate_status,
-        allotment_status: existing.allotment_status,
-        notes: existing.notes,
       });
       if (!parsed.success) return validationError(context, "The application terms are invalid.");
       const prepared = await prepareApplication(context, parsed.data, undefined, {

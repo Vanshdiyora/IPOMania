@@ -68,7 +68,7 @@ accountsRoutes.get("/", async (context) => {
   if (query.archived === "true") accountsQuery = accountsQuery.not("archived_at", "is", null);
   if (query.archived === "false") accountsQuery = accountsQuery.is("archived_at", null);
   if (query.holder_name) {
-    accountsQuery = accountsQuery.ilike("holder_name", `${escapeLike(query.holder_name)}%`);
+    accountsQuery = accountsQuery.ilike("holder_name", `%${escapeLike(query.holder_name)}%`);
   }
   if (query.status) accountsQuery = accountsQuery.eq("account_status", query.status);
   if (query.created_from) accountsQuery = accountsQuery.gte("created_at", query.created_from);
