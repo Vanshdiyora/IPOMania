@@ -32,6 +32,9 @@ The password route returns plaintext only after bearer-token verification and ow
 and responds with `Cache-Control: no-store`. Configure `ACCOUNT_CREDENTIAL_ENCRYPTION_KEY` as a
 base64-encoded 32-byte Worker secret; password writes and reveals return
 `503 CREDENTIAL_ENCRYPTION_UNAVAILABLE` until it is configured.
+For local development, set it only in the ignored `.env.local` file. Generate a key with
+`node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`; configure
+production with `npx wrangler secret put ACCOUNT_CREDENTIAL_ENCRYPTION_KEY`.
 
 ### List parameters
 
@@ -74,14 +77,14 @@ instead of inserting a second set of accounts. Reversal is all-or-nothing and fa
 
 ## Error codes
 
-| HTTP | Codes                                                                                          |
-| ---- | ---------------------------------------------------------------------------------------------- |
+| HTTP | Codes                                                                                                       |
+| ---- | ----------------------------------------------------------------------------------------------------------- |
 | 400  | `VALIDATION_ERROR`, `INVALID_HEADERS`, `INVALID_ROW_COUNT`, `INVALID_FILE`, `CREDENTIAL_COLUMN_NOT_ALLOWED` |
-| 401  | `UNAUTHORIZED`                                                                                 |
-| 404  | `ACCOUNT_NOT_FOUND`, `PASSWORD_NOT_SET`, `IMPORT_NOT_FOUND`                                     |
-| 409  | `DUPLICATE_ACCOUNT`, `ACCOUNT_HAS_HISTORY`, `IMPORT_NOT_REVERSIBLE`, `IMPORT_REVERSAL_BLOCKED` |
-| 503  | `CREDENTIAL_ENCRYPTION_UNAVAILABLE`                                                             |
-| 413  | `FILE_TOO_LARGE`                                                                               |
-| 415  | `UNSUPPORTED_FILE_TYPE`                                                                        |
+| 401  | `UNAUTHORIZED`                                                                                              |
+| 404  | `ACCOUNT_NOT_FOUND`, `PASSWORD_NOT_SET`, `IMPORT_NOT_FOUND`                                                 |
+| 409  | `DUPLICATE_ACCOUNT`, `ACCOUNT_HAS_HISTORY`, `IMPORT_NOT_REVERSIBLE`, `IMPORT_REVERSAL_BLOCKED`              |
+| 503  | `CREDENTIAL_ENCRYPTION_UNAVAILABLE`                                                                         |
+| 413  | `FILE_TOO_LARGE`                                                                                            |
+| 415  | `UNSUPPORTED_FILE_TYPE`                                                                                     |
 
 Errors contain no stack trace, bearer token, database connection information, or secrets.

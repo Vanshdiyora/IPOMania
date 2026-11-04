@@ -134,12 +134,15 @@ describe("demat account API", () => {
     const encrypted = await encryptAccountPassword(
       secret,
       bindings.ACCOUNT_CREDENTIAL_ENCRYPTION_KEY,
+      userId,
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     );
     expect(encrypted).not.toBeNull();
-    const requests = installSupabaseMock(async () =>
-      new Response(JSON.stringify({ password_encrypted: encrypted }), {
-        headers: { "Content-Type": "application/json" },
-      }),
+    const requests = installSupabaseMock(
+      async () =>
+        new Response(JSON.stringify({ password_encrypted: encrypted }), {
+          headers: { "Content-Type": "application/json" },
+        }),
     );
     const response = await createApp().request(
       "/api/accounts/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/password",
@@ -182,39 +185,6 @@ describe("demat account API", () => {
             headers: { "Content-Type": "application/json", "Content-Range": `*/${count}` },
           });
     });
-
-    it("omits encrypted password data from account list responses", async () => {
-      const ciphertext = "v1.dGVzdC1jaXBoZXJ0ZXh0";
-      installSupabaseMock(async (request) =>
-        request.method === "HEAD"
-          ? new Response(null, { headers: { "Content-Range": "*/1" } })
-          : new Response(
-              JSON.stringify([
-                {
-                  ...account,
-                  password_encrypted: ciphertext,
-                  id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-                  user_id: userId,
-                },
-              ]),
-              {
-                headers: { "Content-Type": "application/json", "Content-Range": "0-0/1" },
-              },
-            ),
-      );
-      const response = await createApp().request(
-        "/api/accounts",
-        { headers: bearerHeaders() },
-        bindings,
-      );
-
-      expect(response.status).toBe(200);
-      const body = await response.text();
-      expect(body).not.toContain(ciphertext);
-      expect(body).not.toContain('"password":');
-      expect(body).toContain('"password_saved":true');
-    });
-
     const response = await createApp().request(
       "/api/accounts",
       { headers: bearerHeaders() },
@@ -225,6 +195,38 @@ describe("demat account API", () => {
     const body = (await response.json()) as { data: { summary: Record<string, number> } };
     expect(body.data.summary).toEqual({ total: 501, active: 501, archived: 0 });
     expect(body.data.summary).not.toHaveProperty("remainingCapacity");
+  });
+
+  it("omits encrypted password data from account list responses", async () => {
+    const ciphertext = "v1.dGVzdC1jaXBoZXJ0ZXh0";
+    installSupabaseMock(async (request) =>
+      request.method === "HEAD"
+        ? new Response(null, { headers: { "Content-Range": "*/1" } })
+        : new Response(
+            JSON.stringify([
+              {
+                ...account,
+                password_encrypted: ciphertext,
+                id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                user_id: userId,
+              },
+            ]),
+            {
+              headers: { "Content-Type": "application/json", "Content-Range": "0-0/1" },
+            },
+          ),
+    );
+    const response = await createApp().request(
+      "/api/accounts",
+      { headers: bearerHeaders() },
+      bindings,
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).not.toContain(ciphertext);
+    expect(body).not.toContain('"password":');
+    expect(body).toContain('"password_saved":true');
   });
 
   it("applies server-side search and pagination filters", async () => {

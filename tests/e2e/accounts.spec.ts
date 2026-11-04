@@ -49,8 +49,15 @@ async function prepareAccountPage(page: Page) {
       }),
     );
   });
-  await page.route("**/api/accounts**", (route) =>
-    route.fulfill({
+  await page.route("**/api/accounts**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/password")) {
+      return route.fulfill({ json: { data: { password: "example-bank-password" } } });
+    }
+    if (path.endsWith(`/${account.id}`)) {
+      return route.fulfill({ json: { data: account } });
+    }
+    return route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
@@ -60,8 +67,8 @@ async function prepareAccountPage(page: Page) {
           summary: { total: 1, active: 1, archived: 0 },
         },
       }),
-    }),
-  );
+    });
+  });
 }
 
 test("accounts tab shows readable cards without horizontal page overflow on mobile", async ({
@@ -90,6 +97,17 @@ test("accounts tab renders the account table on desktop", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Asha Mehta" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Bank" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Password" })).toBeVisible();
+});
+
+test("account detail masks the password until the user reveals it", async ({ page }) => {
+  await prepareAccountPage(page);
+  await page.goto(`/accounts/${account.id}`);
+
+  await expect(page.getByText("••••••••")).toBeVisible();
+  await page.getByRole("button", { name: "Reveal password" }).click();
+  await expect(page.getByText("example-bank-password")).toBeVisible();
+  await page.getByRole("button", { name: "Hide password" }).click();
+  await expect(page.getByText("••••••••")).toBeVisible();
 });
 
 test("account dashboard shows totals without a capacity limit", async ({ page }) => {

@@ -12,22 +12,29 @@ function decodeKey(encodedKey: string | undefined): Uint8Array | null {
 async function importKey(encodedKey: string | undefined): Promise<CryptoKey | null> {
   const rawKey = decodeKey(encodedKey);
   if (!rawKey) return null;
-  return crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, [
-    "encrypt",
-    "decrypt",
-  ]);
+  return crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }
 
 export async function encryptAccountPassword(
   password: string,
   encodedKey: string | undefined,
+  userId: string,
+  accountId: string,
 ): Promise<string | null> {
   const key = await importKey(encodedKey);
   if (!key) return null;
 
   const nonce = crypto.getRandomValues(new Uint8Array(nonceLength));
   const encrypted = new Uint8Array(
-    await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, key, new TextEncoder().encode(password)),
+    await crypto.subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv: nonce,
+        additionalData: new TextEncoder().encode(`${userId}:${accountId}`),
+      },
+      key,
+      new TextEncoder().encode(password),
+    ),
   );
   const combined = new Uint8Array(nonce.length + encrypted.length);
   combined.set(nonce);
@@ -38,6 +45,8 @@ export async function encryptAccountPassword(
 export async function decryptAccountPassword(
   encryptedPassword: string,
   encodedKey: string | undefined,
+  userId: string,
+  accountId: string,
 ): Promise<string | null> {
   const key = await importKey(encodedKey);
   if (!key) return null;
@@ -48,6 +57,14 @@ export async function decryptAccountPassword(
   if (combined.length <= nonceLength) throw new Error("Invalid account credential ciphertext.");
   const nonce = combined.slice(0, nonceLength);
   const ciphertext = combined.slice(nonceLength);
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce }, key, ciphertext);
+  const decrypted = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: nonce,
+      additionalData: new TextEncoder().encode(`${userId}:${accountId}`),
+    },
+    key,
+    ciphertext,
+  );
   return new TextDecoder().decode(decrypted);
 }

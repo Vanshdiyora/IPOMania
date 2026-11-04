@@ -7,9 +7,9 @@ The authenticated Worker accepts CSV and one-sheet XLSX, capped at 5 MiB, 500 da
 explicit column mapping, validates each row at the boundary, and resolves IPO, account, and
 category references only within the authenticated user's scope.
 
-IPO UUID/symbol, demat account UUID/masked identifier/masked client reference, and category code or
-rule UUID are resolved to owned rows. Ambiguous account matches are invalid. Price and price type
-must be supplied explicitly; amount, shares, rule version, and calculation snapshot are derived by
+IPO UUID/symbol, bank account UUID/username/bank-name-and-username pair, and category code or rule
+UUID are resolved to owned rows. Ambiguous account matches are invalid. Price and price type must be
+supplied explicitly; amount, shares, rule version, and calculation snapshot are derived by
 the financial engine from the selected issue-specific rules. The owner is always the authenticated
 caller. Each prepared row is saved as a preview row with errors/warnings and no application is
 created at preview.

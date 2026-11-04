@@ -201,10 +201,10 @@ select throws_ok(
 select throws_ok(
   $$insert into public.demat_accounts
     (user_id, holder_name, bank_name, username)
-    values ('44444444-4444-4444-8444-444444444444', 'Long Username', 'Bank', repeat('x', 161))$$,
-  '23514',
+    values ('44444444-4444-4444-8444-444444444444', 'Duplicate', 'User B Bank', 'user-b')$$,
+  '23505',
   null,
-  'Long usernames are rejected'
+  'Duplicate bank logins are rejected per user, including archived records'
 );
 select is(
   to_regclass('public.user_demat_account_capacity'),

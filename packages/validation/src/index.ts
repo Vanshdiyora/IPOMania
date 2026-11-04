@@ -72,12 +72,12 @@ export const preferencesUpdateSchema = z
 export const accountStatusSchema = z.enum(["active", "inactive", "closed"]);
 
 const dematAccountFieldsSchema = z.object({
-    holder_name: z.string().trim().min(1).max(160),
-    bank_name: z.string().trim().min(1).max(120),
-    username: z.string().trim().min(1).max(160),
-    account_status: accountStatusSchema.default("active"),
-    notes: z.string().trim().max(2000).nullable().optional(),
-  });
+  holder_name: z.string().trim().min(1).max(160),
+  bank_name: z.string().trim().min(1).max(120),
+  username: z.string().trim().min(1).max(160),
+  account_status: accountStatusSchema.default("active"),
+  notes: z.string().trim().max(2000).nullable().optional(),
+});
 
 export const accountPasswordSchema = z.string().min(1).max(1024);
 export const dematAccountSchema = dematAccountFieldsSchema

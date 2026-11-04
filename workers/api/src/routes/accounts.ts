@@ -26,10 +26,7 @@ type AccountContext = {
 type AccountRouteContext = Context<AccountContext>;
 
 type ColumnMapping = Partial<
-  Record<
-    "holder_name" | "bank_name" | "username" | "account_status" | "notes",
-    string
-  >
+  Record<"holder_name" | "bank_name" | "username" | "account_status" | "notes", string>
 >;
 type StoredDematAccount = Omit<DematAccount, "password_saved"> & {
   password_encrypted: string | null;
@@ -123,22 +120,27 @@ accountsRoutes.get("/", async (context) => {
 
 accountsRoutes.post("/", validateJson(dematAccountSchema), async (context) => {
   const payload = context.req.valid("json");
+  const userId = context.get("authenticatedUser").id;
+  const accountId = crypto.randomUUID();
   const passwordEncrypted = await encryptAccountPassword(
     payload.password,
     context.env?.ACCOUNT_CREDENTIAL_ENCRYPTION_KEY,
+    userId,
+    accountId,
   );
   if (!passwordEncrypted) return credentialEncryptionUnavailable(context);
   const { data, error } = await context
     .get("rlsSupabase")
     .from("demat_accounts")
     .insert({
+      id: accountId,
       holder_name: payload.holder_name,
       bank_name: payload.bank_name,
       username: payload.username,
       account_status: payload.account_status,
       notes: payload.notes ?? null,
       password_encrypted: passwordEncrypted,
-      user_id: context.get("authenticatedUser").id,
+      user_id: userId,
     })
     .select(accountColumns)
     .single();
@@ -185,6 +187,8 @@ accountsRoutes.get("/:accountId/password", async (context) => {
   const password = await decryptAccountPassword(
     data.password_encrypted,
     context.env?.ACCOUNT_CREDENTIAL_ENCRYPTION_KEY,
+    context.get("authenticatedUser").id,
+    accountId,
   );
   if (password === null) return credentialEncryptionUnavailable(context);
   return context.json({ data: { password } }, 200, { "Cache-Control": "no-store" });
@@ -199,6 +203,8 @@ accountsRoutes.patch("/:accountId", validateJson(dematAccountUpdateSchema), asyn
     const passwordEncrypted = await encryptAccountPassword(
       password,
       context.env?.ACCOUNT_CREDENTIAL_ENCRYPTION_KEY,
+      context.get("authenticatedUser").id,
+      accountId,
     );
     if (!passwordEncrypted) return credentialEncryptionUnavailable(context);
     updates.password_encrypted = passwordEncrypted;

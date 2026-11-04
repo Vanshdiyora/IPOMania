@@ -8,14 +8,14 @@ applications and do not implement an IPO quota, allocation, or investment workfl
 
 ## Account fields
 
-| Field                   | Rule                                                          |
-| ----------------------- | ------------------------------------------------------------- |
-| Holder name             | Required, 1–160 trimmed characters                            |
-| Bank name               | Required for new records, 1–120 trimmed characters             |
-| Username                | Required for new records, 1–160 trimmed characters             |
-| Password                | Required on creation; up to 1,024 characters, encrypted before persistence |
-| Account status          | `active`, `inactive`, or `closed`                               |
-| Notes                   | Optional, up to 2,000 characters                                |
+| Field          | Rule                                                                       |
+| -------------- | -------------------------------------------------------------------------- |
+| Holder name    | Required, 1–160 trimmed characters                                         |
+| Bank name      | Required for new records, 1–120 trimmed characters                         |
+| Username       | Required for new records, 1–160 trimmed characters                         |
+| Password       | Required on creation; up to 1,024 characters, encrypted before persistence |
+| Account status | `active`, `inactive`, or `closed`                                          |
+| Notes          | Optional, up to 2,000 characters                                           |
 
 Existing records may have missing bank credentials until edited. Passwords are never imported,
 included in ordinary account responses, or shown in account tables. The account detail view reveals

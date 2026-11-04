@@ -42,6 +42,9 @@ create index demat_accounts_owner_bank_idx
   on public.demat_accounts (user_id, bank_name_normalized);
 create index demat_accounts_owner_username_idx
   on public.demat_accounts (user_id, username_normalized);
+create unique index demat_accounts_unique_bank_login
+  on public.demat_accounts (user_id, bank_name_normalized, username_normalized)
+  where bank_name_normalized is not null and username_normalized is not null;
 
 grant insert (user_id, holder_name, bank_name, username, password_encrypted,
   account_status, notes, archived_at)

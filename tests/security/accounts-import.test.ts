@@ -123,14 +123,15 @@ describe("account import API", () => {
       "/api/accounts/import/preview",
       {
         method: "POST",
-        headers: { Authorization: "******" },
+        headers: { Authorization: "Bearer test-access-token" },
         body: fileForm(csv, "accounts.csv"),
       },
       bindings,
     );
 
-    expect(response.status).toBe(400);
-    expect(await response.text()).not.toContain("secret-value");
+    const responseText = await response.text();
+    expect(response.status, responseText).toBe(400);
+    expect(responseText).not.toContain("secret-value");
     expect(requests).toHaveLength(0);
   });
 

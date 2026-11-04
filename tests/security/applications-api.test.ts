@@ -179,7 +179,7 @@ function json(body: unknown, status = 200) {
 
 function csvFile(fileType = "text/csv") {
   return new Blob(
-    ["IPO,Account,Category,Lots,Price,Price Type\nTEST,XXXX1234,RETAIL,1,20.00,CUT_OFF\n"],
+    ["IPO,Account,Category,Lots,Price,Price Type\nTEST,test-user,RETAIL,1,20.00,CUT_OFF\n"],
     { type: fileType },
   );
 }
@@ -190,7 +190,7 @@ function xlsxFile() {
     workbook,
     XLSX.utils.aoa_to_sheet([
       ["IPO", "Account", "Category", "Lots", "Price", "Price Type"],
-      ["TEST", "XXXX1234", "RETAIL", "1", "20.00", "CUT_OFF"],
+      ["TEST", "test-user", "RETAIL", "1", "20.00", "CUT_OFF"],
     ]),
     "Applications",
   );
@@ -548,7 +548,7 @@ describe("application API", () => {
     const rows = Array.from(
       { length: 500 },
       (_, index) =>
-        `${index === 0 ? "UNKNOWN" : "TEST"},XXXX1234,RETAIL,1,20.00,CUT_OFF,APP-${index}`,
+        `${index === 0 ? "UNKNOWN" : "TEST"},test-user,RETAIL,1,20.00,CUT_OFF,APP-${index}`,
     );
     const csv = new Blob(
       [`IPO,Account,Category,Lots,Price,Price Type,Application Number\n${rows.join("\n")}\n`],
@@ -599,7 +599,7 @@ describe("application API", () => {
       "file",
       new Blob(
         [
-          "IPO,Account,Category,Lots,Price,Price Type,External\nTEST,XXXX1234,RETAIL,1,20.00,CUT_OFF,source-1\nTEST,XXXX1234,RETAIL,1,20.00,CUT_OFF,source-1\n",
+          "IPO,Account,Category,Lots,Price,Price Type,External\nTEST,test-user,RETAIL,1,20.00,CUT_OFF,source-1\nTEST,test-user,RETAIL,1,20.00,CUT_OFF,source-1\n",
         ],
         { type: "text/csv" },
       ),

@@ -1,6 +1,6 @@
 # Account database schema
 
-Current shape: `supabase/migrations/20261104220000_replace_demat_identifiers_with_bank_credentials.sql`.
+Current shape: `supabase/migrations/20261104220100_replace_demat_identifiers_with_bank_credentials.sql`.
 
 ## `public.demat_accounts`
 
@@ -16,11 +16,14 @@ The table stores one user's IPO-linked account record. `id` is a generated UUID 
 - `notes`: optional, at most 2,000 characters.
 - `created_at`, trigger-maintained `updated_at`, and nullable `archived_at`.
 
-Generated normalized bank-name and username columns support import duplicate checks. The old
+Generated normalized bank-name and username columns support import duplicate checks. The
 depository, masked identifier, and masked client-reference columns are removed by the migration.
+A unique index on `(user_id, bank_name_normalized, username_normalized)` prevents duplicate bank
+logins for a user, including archived records.
 
 Passwords are encrypted in the API Worker with AES-256-GCM and a fresh 96-bit nonce before any
-database write. The encryption key is configured as the Worker secret
+database write; the authenticated owner and account IDs are included as authenticated encryption
+data. The encryption key is configured as the Worker secret
 `ACCOUNT_CREDENTIAL_ENCRYPTION_KEY`; it must be a base64-encoded 32-byte key and must not be
 committed. The database stores ciphertext only. List, details, create, update, and lifecycle
 responses never contain ciphertext or plaintext. The explicit `GET /api/accounts/:accountId/password`

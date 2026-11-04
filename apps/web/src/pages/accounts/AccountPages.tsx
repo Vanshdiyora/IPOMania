@@ -851,9 +851,7 @@ export function AccountDetailsPage() {
               <dt className="text-sm font-semibold text-muted">Password</dt>
               <dd className="mt-1 flex flex-wrap items-center gap-3 text-base text-ink">
                 <span className="break-all font-mono">
-                  {!account.password_saved
-                    ? "Not set"
-                    : (revealedPassword ?? "••••••••")}
+                  {!account.password_saved ? "Not set" : (revealedPassword ?? "••••••••")}
                 </span>
                 {account.password_saved ? (
                   <Button
