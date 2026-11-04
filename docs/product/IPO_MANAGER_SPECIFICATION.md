@@ -46,7 +46,8 @@ timestamp automatically. Status is selected by the user and is not inferred from
 - **Quota calculator:** select an owned IPO and demat account, enter category, lot count, price,
   shareholder inputs, and explicit answers to published conditions.
 - **Application tracking:** record an eligible saved calculation for private mandate, allotment, and
-  capital tracking. Application facts remain tied to their saved issue/rule snapshot.
+  capital tracking. The IPO selector includes shared catalog records and prepares a private snapshot
+  on selection. Application facts remain tied to their saved issue/rule snapshot.
 
 An archived IPO cannot be used for a new calculation. Existing calculation snapshots remain
 retained and owner-scoped.

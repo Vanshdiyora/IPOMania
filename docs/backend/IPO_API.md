@@ -69,6 +69,10 @@ application** imports a caller-owned snapshot and its current category rules, th
 normal application form. This private snapshot preserves the existing owner-bound calculation and
 application audit constraints while the shared catalog remains the issue-data source of truth.
 
+The application form's IPO selector includes existing personal snapshots and active shared catalog
+IPOs. Choosing a shared record imports it through the same endpoint before category and application
+operations run, so those operations remain owner-bound.
+
 Calculation inputs include `ipo_id`, owned `demat_account_id`, category, lots, `BID` or `CUT_OFF`
 price type, decimal-string price, optional user-provided shareholder shares, and a map of explicit
 condition confirmations. A demat account's ownership does not imply shareholder eligibility.

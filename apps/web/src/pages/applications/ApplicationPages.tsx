@@ -941,7 +941,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                       ...personalIpos.map((item) => ({
                         value: item.id,
                         label: item.company_name,
-                        description: "My IPO",
                       })),
                       ...sharedCatalogIpos.map((item) => ({
                         value: `catalog:${item.id}`,

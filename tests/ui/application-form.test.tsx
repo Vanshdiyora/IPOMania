@@ -50,6 +50,9 @@ describe("application form IPO selection", () => {
   it("preselects an imported shared IPO and shows its copied category rules", async () => {
     const ipoId = "88888888-8888-4888-8888-888888888888";
     apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      }
       if (path.startsWith("/api/ipos?")) {
         return {
           data: {
@@ -101,15 +104,10 @@ describe("application form IPO selection", () => {
 
   it("explains how to add an IPO to the catalog when no options are returned", async () => {
     apiRequestMock.mockImplementation(async (path: string) => {
-      if (path.startsWith("/api/ipos?")) {
-        return {
-          data: {
-            ipos: [],
-            pagination: { page: 1, page_size: 25, total: 0, total_pages: 0 },
-          },
-        };
-      }
       if (path.startsWith("/api/ipos/catalog?")) {
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      }
+      if (path.startsWith("/api/ipos?")) {
         return {
           data: {
             ipos: [],
@@ -207,6 +205,9 @@ describe("application form IPO selection", () => {
   it("links to category setup when the selected IPO has no configured rules", async () => {
     const ipoId = "88888888-8888-4888-8888-888888888888";
     apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      }
       if (path.startsWith("/api/ipos?")) {
         return {
           data: {
@@ -241,6 +242,9 @@ describe("application form IPO selection", () => {
   it("shows only the latest rule version for each category", async () => {
     const ipoId = "88888888-8888-4888-8888-888888888888";
     apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      }
       if (path.startsWith("/api/ipos?")) {
         return {
           data: {
@@ -284,6 +288,9 @@ describe("application form IPO selection", () => {
   it("uses the category initial lots and shows the share count from the IPO lot size", async () => {
     const ipoId = "88888888-8888-4888-8888-888888888888";
     apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      }
       if (path === `/api/ipos/${ipoId}`) {
         return { data: { id: ipoId, company_name: "Lot Size IPO", lot_size: 25 } };
       }
