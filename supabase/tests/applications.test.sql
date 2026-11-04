@@ -1,6 +1,6 @@
 begin;
 
-select plan(17);
+select plan(18);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -169,12 +169,14 @@ select is(
   '200',
   'Status edits preserve the historical calculation snapshot'
 );
-select throws_ok(
-  $$update public.applications set calculation_snapshot = '{}'::jsonb
+select lives_ok(
+  $$update public.applications
+    set lots = 2,
+        total_shares = 20,
+        application_amount = 400,
+        calculation_snapshot = '{"calculation_result":{"application_amount":"400","total_shares":20},"category_rules":{"rule_version":1}}'::jsonb
     where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'$$,
-  '42501',
-  'permission denied for table applications',
-  'Application calculation snapshots cannot be overwritten by clients'
+  'Owners can update application terms with their recalculated snapshot'
 );
 select throws_ok(
   $$insert into public.applications (
