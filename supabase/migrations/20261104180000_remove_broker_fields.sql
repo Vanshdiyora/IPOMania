@@ -79,13 +79,33 @@ create function public.get_dashboard_analytics(
   p_limit integer default 10
 )
 returns jsonb
-language sql
+language plpgsql
 stable
 security invoker
 set search_path = ''
 as $$
+declare
+  result jsonb;
+begin
+  if p_date_from is not null and p_date_to is not null and p_date_from > p_date_to then
+    raise exception using errcode = '22023', message = 'date_from must not be after date_to';
+  end if;
+  if p_date_from is not null and p_date_to is not null and p_date_to - p_date_from > 3650 then
+    raise exception using errcode = '22023', message = 'date range cannot exceed 10 years';
+  end if;
+  if p_category is not null and p_category not in ('RETAIL', 'SHNI', 'BHNI', 'SHAREHOLDER', 'EMPLOYER') then
+    raise exception using errcode = '22023', message = 'category is invalid';
+  end if;
+  if p_limit is null or p_limit < 1 or p_limit > 50 then
+    raise exception using errcode = '22023', message = 'limit must be between 1 and 50';
+  end if;
+  if auth.uid() is null then
+    raise exception using errcode = '42501', message = 'authentication is required';
+  end if;
+
   with filtered_applications as materialized (
-    select a.*, i.company_name, i.symbol, d.holder_name, d.masked_demat_identifier,
+    select a.id, a.ipo_id, a.demat_account_id, a.application_status, a.created_at,
+      i.company_name, i.symbol, d.holder_name, d.masked_demat_identifier,
       coalesce(c.category, a.category_code) as category
     from public.applications a
     join public.ipos i on i.id = a.ipo_id and i.user_id = a.user_id
@@ -125,7 +145,11 @@ as $$
     'refund_performance', coalesce((select jsonb_build_object('total', count(*)::integer, 'pending', count(*) filter (where refund_status = 'PENDING')::integer, 'completed', count(*) filter (where refund_status = 'COMPLETED')::integer, 'pending_expected_amount', coalesce(sum(refund_amount) filter (where refund_status = 'PENDING'), 0)::text, 'completed_expected_amount', coalesce(sum(refund_amount) filter (where refund_status = 'COMPLETED'), 0)::text) from public.allotments where user_id = auth.uid() and application_id in (select id from filtered_applications)), jsonb_build_object('total', 0, 'pending', 0, 'completed', 0, 'pending_expected_amount', '0', 'completed_expected_amount', '0')),
     'recent_applications', coalesce((select jsonb_agg(jsonb_build_object('application_id', id, 'ipo_id', ipo_id, 'company_name', company_name, 'symbol', symbol, 'account_id', demat_account_id, 'holder_name', holder_name, 'masked_demat_identifier', masked_demat_identifier, 'category', category, 'status', application_status, 'created_at', created_at) order by created_at desc) from (select * from filtered_applications order by created_at desc limit p_limit) r), '[]'::jsonb),
     'upcoming_ipos', coalesce((select jsonb_agg(jsonb_build_object('ipo_id', id, 'company_name', company_name, 'symbol', symbol, 'status', status, 'closing_date', closing_date, 'data_source', data_source) order by closing_date, company_name) from (select id, company_name, symbol, status, closing_date, data_source from public.ipos where user_id = auth.uid() and archived_at is null and status in ('UPCOMING', 'OPEN') and closing_date >= current_date and (p_ipo_id is null or id = p_ipo_id) order by closing_date, company_name limit p_limit) upcoming), '[]'::jsonb)
-  );
+  )
+  into result;
+
+  return result;
+end;
 $$;
 
 revoke execute on function public.get_dashboard_analytics(date, date, uuid, text, uuid, integer) from public, anon;
