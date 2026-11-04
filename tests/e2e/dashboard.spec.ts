@@ -32,7 +32,7 @@ const dashboardData = {
     {
       account_id: accountId,
       holder_name: "Dashboard Holder",
-      masked_demat_identifier: "XXXX1234",
+      bank_name: "Dashboard Bank",
       count: 1,
     },
   ],
@@ -85,7 +85,7 @@ const dashboardData = {
       symbol: "DASH",
       account_id: accountId,
       holder_name: "Dashboard Holder",
-      masked_demat_identifier: "XXXX1234",
+      bank_name: "Dashboard Bank",
       category: "RETAIL",
       status: "SUBMITTED",
       created_at: "2026-10-31T12:00:00.000Z",
@@ -230,7 +230,13 @@ async function prepareDashboard(page: Page) {
       json: {
         data: {
           accounts: [
-            { id: accountId, holder_name: "Dashboard Holder", masked_demat_identifier: "XXXX1234" },
+            {
+              id: accountId,
+              holder_name: "Dashboard Holder",
+              bank_name: "Dashboard Bank",
+              username: "dashboard-user",
+              password_saved: true,
+            },
           ],
         },
       },
@@ -283,6 +289,31 @@ test("financial pages are unavailable in the web app", async ({ page }) => {
     await page.goto(path);
     await expect(page.getByRole("heading", { name: "We couldn't find this page" })).toBeVisible();
   }
+});
+
+test("dashboard handles recent applications without an IPO symbol", async ({ page }) => {
+  await prepareDashboard(page);
+  await page.route(/\/api\/analytics(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          ...dashboardData,
+          recent_applications: dashboardData.recent_applications.map((application) => ({
+            ...application,
+            symbol: null,
+          })),
+        },
+      },
+    }),
+  );
+  const pageErrors: Error[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
+
+  await page.goto("/dashboard");
+
+  await expect(page.getByRole("heading", { name: "Dashboard & analytics" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Dashboard Test IPO", exact: true })).toBeVisible();
+  expect(pageErrors).toEqual([]);
 });
 
 test("dashboard remains usable across responsive viewports with accessible filters", async ({

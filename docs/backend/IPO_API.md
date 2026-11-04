@@ -10,8 +10,8 @@ Responses use `{ data }` or `{ error: { code, message } }`.
 | `GET /api/ipos/catalog`                          | Read active admin-managed IPOs shared with users; paginated, searchable by company or exact symbol, and filterable by status. |
 | `GET /api/ipos/catalog/:ipoId`                   | Read one active shared IPO, including incomplete issue data.                                                                  |
 | `GET /api/ipos/catalog/:ipoId/categories`        | Read all published shared category-rule versions for an active catalog IPO.                                                   |
-| `POST /api/ipos/catalog/:ipoId/import`           | Copy complete shared issue data and the latest shared category rules into the caller's My IPOs.                               |
-| `POST /api/ipos`                                 | Add a verified user's complete IPO entry to the shared catalog.                                                               |
+| `POST /api/ipos/catalog/:ipoId/import`           | Copy complete shared issue data and the latest shared category rules into a private application snapshot.                     |
+| `POST /api/ipos`                                 | Reject user-submitted IPO creation with `403`; shared catalog creation is handled by the admin API.                           |
 | `GET /api/ipos/:ipoId`                           | Read one owned IPO.                                                                                                           |
 | `PATCH /api/ipos/:ipoId`                         | Update a non-archived owned IPO.                                                                                              |
 | `POST /api/ipos/:ipoId/archive`                  | Soft-archive an owned IPO.                                                                                                    |
@@ -61,12 +61,12 @@ without changing existing snapshots. Required issue data is never invented: an i
 IPO returns `IPO_DATA_INCOMPLETE` (422), and a personal IPO with the same symbol returns
 `DUPLICATE_IPO` (409).
 
-The user IPO list and calendar show the shared catalog by default. New entries submitted through
-`POST /api/ipos` are saved directly to that catalog with `USER_SUBMITTED` provenance and the
-verified submitter recorded in the database; they are not added to a personal IPO collection.
-`?source=personal` selects existing user-owned records. From shared IPO details, **Use for
-application** imports a caller-owned snapshot and its current category rules, then opens the
-normal application form. This private snapshot preserves the existing owner-bound calculation and
+The user IPO list shows the shared catalog only. Regular users cannot create catalog records through
+`POST /api/ipos`; the endpoint returns `403`, and administrators create catalog entries through the
+admin IPO API. Private IPO snapshots remain application data and are created from catalog issues
+when needed for application tracking. From shared IPO details, **Use for application** imports a
+caller-owned snapshot and its current category rules, then opens the normal application form. This
+private snapshot preserves the existing owner-bound calculation and
 application audit constraints while the shared catalog remains the issue-data source of truth.
 
 The application form's IPO selector includes existing personal snapshots and active shared catalog

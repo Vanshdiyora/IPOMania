@@ -12,14 +12,14 @@
 
 Required source fields:
 
-| Target        | Accepted values                                                                                         |
-| ------------- | ------------------------------------------------------------------------------------------------------- |
-| IPO           | Owned IPO UUID or symbol                                                                                |
-| Demat account | Owned account UUID, masked demat identifier, or masked client reference; must match exactly one account |
-| Category      | Configured category code (`RETAIL`, `SHNI`, `BHNI`, `SHAREHOLDER`) or rule UUID for the selected IPO    |
-| Lots          | Positive whole-number lot count                                                                         |
-| Price         | Explicit positive decimal price                                                                         |
-| Price type    | Explicit `BID` or `CUT_OFF`                                                                             |
+| Target       | Accepted values                                                                                      |
+| ------------ | ---------------------------------------------------------------------------------------------------- |
+| IPO          | Owned IPO UUID or symbol                                                                             |
+| Bank account | Owned account UUID, username, or `bank name:username`; must match exactly one account                |
+| Category     | Configured category code (`RETAIL`, `SHNI`, `BHNI`, `SHAREHOLDER`) or rule UUID for the selected IPO |
+| Lots         | Positive whole-number lot count                                                                      |
+| Price        | Explicit positive decimal price                                                                      |
+| Price type   | Explicit `BID` or `CUT_OFF`                                                                          |
 
 Price and price type are required in addition to the requested identifiers/status fields so a
 historical amount is never fabricated from today's price or guessed from an IPO cut-off value.
@@ -62,6 +62,6 @@ and create a new preview. The original preview remains auditable and is not chan
 
 The authenticated CSV export uses the active application filters, is capped at 50,000 rows per
 request, and quotes fields. Formula-leading values are prefixed to avoid spreadsheet formula
-execution. Export includes IPO/company, masked account, category, lots/shares/amount,
+execution. Export includes IPO/company, bank name and username, category, lots/shares/amount,
 external/application references, date, three independent statuses, rule version, and creation
-time. It does not expose unmasked account credentials.
+time. It does not export passwords or encrypted password data.

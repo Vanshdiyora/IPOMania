@@ -69,40 +69,37 @@ export const preferencesUpdateSchema = z
   })
   .strict();
 
-export const depositoryTypeSchema = z.enum(["NSDL", "CDSL"]);
 export const accountStatusSchema = z.enum(["active", "inactive", "closed"]);
 
-export const dematAccountSchema = z
-  .object({
-    holder_name: z.string().trim().min(1).max(160),
-    depository_type: depositoryTypeSchema,
-    masked_demat_identifier: z
-      .string()
-      .trim()
-      .min(3)
-      .max(80)
-      .regex(/[xX*]/, "Use a masked identifier containing X or * characters."),
-    masked_client_reference: z
-      .string()
-      .trim()
-      .min(3)
-      .max(80)
-      .regex(/[xX*]/, "Use a masked reference containing X or * characters.")
-      .nullable()
-      .optional(),
-    account_status: accountStatusSchema.default("active"),
-    notes: z.string().trim().max(2000).nullable().optional(),
-  })
-  .strict();
+const dematAccountFieldsSchema = z.object({
+  holder_name: z.string().trim().min(1).max(160),
+  bank_name: z.string().trim().min(1).max(120),
+  username: z.string().trim().min(1).max(160),
+  account_status: accountStatusSchema.default("active"),
+  notes: z.string().trim().max(2000).nullable().optional(),
+});
 
-export const dematAccountUpdateSchema = dematAccountSchema.partial().strict();
+export const accountPasswordSchema = z.string().min(1).max(1024);
+export const dematAccountSchema = dematAccountFieldsSchema
+  .extend({ password: accountPasswordSchema })
+  .strict();
+export const dematAccountFormSchema = dematAccountFieldsSchema
+  .extend({ password: z.union([accountPasswordSchema, z.literal("")]).optional() })
+  .strict();
+export const dematAccountUpdateSchema = dematAccountFieldsSchema
+  .partial()
+  .extend({ password: accountPasswordSchema.optional() })
+  .strict();
+export const dematAccountImportSchema = dematAccountFieldsSchema.strict();
+export const accountImportRowSchema = dematAccountImportSchema.extend({
+  row_number: z.number().int().min(1).max(500),
+});
 
 export const accountListQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(25),
     holder_name: z.string().trim().max(160).optional(),
-    depository: depositoryTypeSchema.optional(),
     status: accountStatusSchema.optional(),
     created_from: z.iso.datetime().optional(),
     created_to: z.iso.datetime().optional(),
@@ -116,10 +113,6 @@ export const accountListQuerySchema = z
       new Date(query.created_from) <= new Date(query.created_to),
     { message: "created_from must be earlier than created_to.", path: ["created_from"] },
   );
-
-export const accountImportRowSchema = dematAccountSchema.extend({
-  row_number: z.number().int().min(1).max(500),
-});
 
 export const accountImportPreviewSchema = z
   .object({
@@ -816,6 +809,10 @@ export const applicationUpdateSchema = z
     mandate_status: applicationMandateStatusSchema.optional(),
     allotment_status: applicationAllotmentStatusSchema.optional(),
     notes: z.string().trim().max(2000).nullable().optional(),
+    category_id: z.uuid().nullable().optional(),
+    category_code: ipoCategorySchema.optional(),
+    lots: z.number().int().positive().max(1_000_000).optional(),
+    price: positivePriceSchema.optional(),
   })
   .strict();
 export const applicationBulkStatusSchema = z

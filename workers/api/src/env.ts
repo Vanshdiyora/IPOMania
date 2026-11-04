@@ -5,6 +5,7 @@ const environmentSchema = z.object({
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_ANON_KEY: z.string().min(1).optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  ACCOUNT_CREDENTIAL_ENCRYPTION_KEY: z.string().optional(),
   WEB_APP_ORIGIN: z.string().url().optional(),
   IPO_GURU_API_URL: z.string().url().default("https://www.ipoguru.in/api/v2/ipos"),
   IPO_GURU_API_KEY: z.string().min(1).optional(),
@@ -16,6 +17,7 @@ export type EnvironmentBindings = {
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  ACCOUNT_CREDENTIAL_ENCRYPTION_KEY?: string;
   WEB_APP_ORIGIN?: string;
   IPO_GURU_API_URL?: string;
   IPO_GURU_API_KEY?: string;

@@ -55,12 +55,12 @@ values
   );
 
 insert into public.demat_accounts (
-  id, user_id, holder_name, depository_type, masked_demat_identifier
+  id, user_id, holder_name, bank_name, username
 )
 values
   (
     'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-    '66666666-6666-4666-8666-666666666666', 'IPO Holder A', 'NSDL', 'XXXXIPOA'
+    '66666666-6666-4666-8666-666666666666', 'IPO Holder A', 'IPO Bank A', 'ipo-a'
   ),
   (
     'dddddddd-dddd-4ddd-8ddd-dddddddddddd',

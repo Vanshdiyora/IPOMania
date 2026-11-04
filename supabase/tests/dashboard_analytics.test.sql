@@ -90,24 +90,48 @@ values
   );
 
 insert into public.demat_accounts (
-  id, user_id, holder_name, depository_type, masked_demat_identifier
+  id, user_id, holder_name, bank_name, username
 )
 values
   (
     '88888888-8888-4888-8888-888888888888',
     '11111111-1111-4111-8111-111111111111',
-    'Dashboard Holder A', 'NSDL', 'XXXXDASHA'
+    'Dashboard Holder A', 'Dashboard Bank A', 'dashboard-a'
   ),
   (
     '99999999-9999-4999-8999-999999999999',
     '22222222-2222-4222-8222-222222222222',
-    'Dashboard Holder B', 'NSDL', 'XXXXDASHB'
+    'Dashboard Holder B', 'Dashboard Bank B', 'dashboard-b'
   ),
   (
     '15151515-1515-4151-8151-151515151515',
     '12121212-1212-4121-8121-121212121212',
     'Dashboard Holder Large', 'NSDL', 'XXXXDASHL'
   );
+
+insert into public.ipos (
+  id, user_id, company_name, symbol, ipo_type, exchange, issue_price_min, issue_price_max,
+  lot_size, issue_size, opening_date, closing_date, status
+)
+select
+  md5('dashboard-large-ipo-' || generated.number)::uuid,
+  '12121212-1212-4121-8121-121212121212',
+  'Dashboard Large IPO ' || generated.number,
+  'DASHL-' || generated.number,
+  'Test', 'Test Exchange', 10, 20, 10, 100000,
+  current_date + 1, current_date + 3, 'UPCOMING'
+from generate_series(1, 5000) as generated(number);
+
+insert into public.ipo_categories (
+  id, user_id, ipo_id, category, lot_limit_status, minimum_lots, maximum_lots,
+  lot_increment, investment_limit_status, eligibility_conditions, allowed_price_types, rule_source
+)
+select
+  md5('dashboard-large-category-' || generated.number)::uuid,
+  '12121212-1212-4121-8121-121212121212',
+  md5('dashboard-large-ipo-' || generated.number)::uuid,
+  'RETAIL', 'CONFIGURED', 1, 2, 1, 'NO_PUBLISHED_LIMIT', '[]', array['BID'], 'MANUAL'
+from generate_series(1, 5000) as generated(number);
 
 insert into public.applications (
   id, user_id, ipo_id, demat_account_id, category_id, lots, total_shares, application_amount,
@@ -139,9 +163,9 @@ insert into public.applications (
 )
 select
   '12121212-1212-4121-8121-121212121212',
-  '13131313-1313-4131-8131-131313131313',
+  md5('dashboard-large-ipo-' || generated.number)::uuid,
   '15151515-1515-4151-8151-151515151515',
-  '14141414-1414-4141-8141-141414141414',
+  md5('dashboard-large-category-' || generated.number)::uuid,
   1, 10, 100.000001,
   case when generated.number % 2 = 0 then 'DRAFT' else 'SUBMITTED' end,
   1, '{}',

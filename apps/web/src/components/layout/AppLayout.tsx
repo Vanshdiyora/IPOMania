@@ -184,10 +184,8 @@ function getPageTitle(pathname: string) {
   if (pathname === "/ipos") return "IPOs";
   if (pathname === "/quota-calculator") return "Quota calculator";
   if (/^\/ipos\/[^/]+\/categories$/.test(pathname)) return "IPO categories";
-  if (/^\/ipos\/[^/]+\/edit$/.test(pathname)) return "Edit IPO";
   if (/^\/ipos\/catalog/.test(pathname)) return "IPO catalog";
   if (/^\/ipos\/[^/]+$/.test(pathname)) return "IPO details";
-  if (pathname === "/ipos/new") return "Add IPO";
   if (pathname === "/admin") return "Admin overview";
   if (pathname === "/admin/ipos") return "IPO catalog";
   if (pathname === "/admin/sync") return "IPO synchronization";

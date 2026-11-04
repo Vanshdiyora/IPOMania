@@ -42,23 +42,23 @@ select is(
 );
 
 insert into public.demat_accounts (
-  user_id, holder_name, depository_type, masked_demat_identifier
+  user_id, holder_name, bank_name, username
 )
 select
   '33333333-3333-4333-8333-333333333333',
   'Seed Account ' || n,
-  'NSDL',
-  'XXXX' || lpad(n::text, 6, '0')
+  'Seed Bank',
+  'seed-' || lpad(n::text, 6, '0')
 from generate_series(1, 499) as n;
 
 insert into public.demat_accounts (
-  user_id, holder_name, depository_type, masked_demat_identifier
+  user_id, holder_name, bank_name, username
 )
 values (
   '44444444-4444-4444-8444-444444444444',
   'User B Account',
-  'CDSL',
-  'XXXXB000001'
+  'User B Bank',
+  'user-b'
 );
 
 set local role authenticated;
@@ -79,8 +79,8 @@ select is(
 
 select lives_ok(
   $$insert into public.demat_accounts
-    (user_id, holder_name, depository_type, masked_demat_identifier)
-    values ('33333333-3333-4333-8333-333333333333', 'Account 500', 'CDSL', 'XXXXCAPACITY500')$$,
+    (user_id, holder_name, bank_name, username)
+    values ('33333333-3333-4333-8333-333333333333', 'Account 500', 'Test Bank', 'user-a-500')$$,
   'User A can create a 500th active account'
 );
 select is(
@@ -92,15 +92,15 @@ select is(
 );
 select lives_ok(
   $$insert into public.demat_accounts
-    (user_id, holder_name, depository_type, masked_demat_identifier)
-    values ('33333333-3333-4333-8333-333333333333', 'Account 501', 'CDSL', 'XXXXCAPACITY501')$$,
+    (user_id, holder_name, bank_name, username)
+    values ('33333333-3333-4333-8333-333333333333', 'Account 501', 'Test Bank', 'user-a-501')$$,
   'User A can create a 501st active account'
 );
 
 select lives_ok(
   $$update public.demat_accounts set archived_at = now()
     where user_id = '33333333-3333-4333-8333-333333333333'
-      and masked_demat_identifier = 'XXXX000001'$$,
+      and username = 'seed-000001'$$,
   'Archiving an account is allowed with over 500 accounts'
 );
 select is(
@@ -112,33 +112,33 @@ select is(
 );
 select lives_ok(
   $$insert into public.demat_accounts
-    (user_id, holder_name, depository_type, masked_demat_identifier)
-    values ('33333333-3333-4333-8333-333333333333', 'Replacement at Capacity', 'CDSL', 'XXXXREPLACEMENT500')$$,
+    (user_id, holder_name, bank_name, username)
+    values ('33333333-3333-4333-8333-333333333333', 'Replacement at Capacity', 'Test Bank', 'user-a-replacement')$$,
   'A new active account can be created after archiving'
 );
 select lives_ok(
   $$update public.demat_accounts set archived_at = null
     where user_id = '33333333-3333-4333-8333-333333333333'
-      and masked_demat_identifier = 'XXXX000001'$$,
+      and username = 'seed-000001'$$,
   'An active account can be restored with over 500 active accounts'
 );
 select lives_ok(
   $$update public.demat_accounts set account_status = 'inactive', archived_at = now()
     where user_id = '33333333-3333-4333-8333-333333333333'
-      and masked_demat_identifier = 'XXXX000001'$$,
+      and username = 'seed-000001'$$,
   'An active account can be archived and marked inactive'
 );
 select lives_ok(
   $$update public.demat_accounts
     set account_status = 'inactive', archived_at = null
     where user_id = '33333333-3333-4333-8333-333333333333'
-      and masked_demat_identifier = 'XXXX000001'$$,
+      and username = 'seed-000001'$$,
   'An inactive account can also be restored'
 );
 select lives_ok(
   $$update public.demat_accounts set account_status = 'inactive'
     where user_id = '33333333-3333-4333-8333-333333333333'
-      and masked_demat_identifier = 'XXXXREPLACEMENT500'$$,
+      and username = 'user-a-replacement'$$,
   'Changing an account to inactive removes it from the active total'
 );
 select is(
@@ -151,13 +151,13 @@ select is(
 select lives_ok(
   $$update public.demat_accounts set archived_at = now()
     where user_id = '33333333-3333-4333-8333-333333333333'
-      and masked_demat_identifier = 'XXXX000001'$$,
+      and username = 'seed-000001'$$,
   'Inactive account can be archived'
 );
 select lives_ok(
   $$delete from public.demat_accounts
     where user_id = '33333333-3333-4333-8333-333333333333'
-      and masked_demat_identifier = 'XXXX000001'$$,
+      and username = 'seed-000001'$$,
   'An archived account can be permanently deleted'
 );
 
@@ -184,27 +184,27 @@ select throws_ok(
 );
 select throws_ok(
   $$insert into public.demat_accounts
-    (user_id, holder_name, depository_type, masked_demat_identifier)
-    values ('44444444-4444-4444-8444-444444444444', 'Bad Depository', 'INVALID', 'INVALIDDEP')$$,
+    (user_id, holder_name, bank_name, username)
+    values ('44444444-4444-4444-8444-444444444444', 'Bad Bank', '', 'user-bad')$$,
   '23514',
   null,
-  'Invalid depository values are rejected'
+  'Blank bank names are rejected'
 );
 select throws_ok(
   $$insert into public.demat_accounts
-    (user_id, holder_name, depository_type, masked_demat_identifier)
-    values ('44444444-4444-4444-8444-444444444444', 'Unmasked Account', 'NSDL', '12345678')$$,
+    (user_id, holder_name, bank_name, username, password_encrypted)
+    values ('44444444-4444-4444-8444-444444444444', 'Plain Password', 'Bank', 'user-bad', 'plaintext')$$,
   '23514',
   null,
-  'Unmasked identifiers are rejected'
+  'Plaintext passwords are rejected by the database constraint'
 );
 select throws_ok(
   $$insert into public.demat_accounts
-    (user_id, holder_name, depository_type, masked_demat_identifier)
-    values ('44444444-4444-4444-8444-444444444444', 'Duplicate', 'CDSL', 'XXXXB000001')$$,
+    (user_id, holder_name, bank_name, username)
+    values ('44444444-4444-4444-8444-444444444444', 'Duplicate', 'User B Bank', 'user-b')$$,
   '23505',
   null,
-  'Duplicate masked demat identifiers are rejected per user and depository'
+  'Duplicate bank logins are rejected per user, including archived records'
 );
 select is(
   to_regclass('public.user_demat_account_capacity'),
@@ -229,7 +229,7 @@ select lives_ok(
        where user_id = '33333333-3333-4333-8333-333333333333'
          and file_name = 'accounts.csv'),
       1,
-      '{"holder_name":"Imported Holder","depository_type":"CDSL","masked_demat_identifier":"XXXXIMPORT0001","account_status":"active"}',
+      '{"holder_name":"Imported Holder","bank_name":"Imported Bank","username":"imported-user","account_status":"active"}',
       'ready'
     )$$,
   'User A can stage a validated import row'

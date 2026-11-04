@@ -5,9 +5,9 @@ const account = {
   id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   user_id: "11111111-1111-4111-8111-111111111111",
   holder_name: "Asha Mehta",
-  depository_type: "CDSL",
-  masked_demat_identifier: "XXXX1234",
-  masked_client_reference: null,
+  bank_name: "Example Bank",
+  username: "asha.mehta",
+  password_saved: true,
   account_status: "active",
   notes: null,
   created_at: "2026-01-01T00:00:00.000Z",
@@ -49,8 +49,15 @@ async function prepareAccountPage(page: Page) {
       }),
     );
   });
-  await page.route("**/api/accounts**", (route) =>
-    route.fulfill({
+  await page.route("**/api/accounts**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/password")) {
+      return route.fulfill({ json: { data: { password: "example-bank-password" } } });
+    }
+    if (path.endsWith(`/${account.id}`)) {
+      return route.fulfill({ json: { data: account } });
+    }
+    return route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
@@ -60,8 +67,8 @@ async function prepareAccountPage(page: Page) {
           summary: { total: 1, active: 1, archived: 0 },
         },
       }),
-    }),
-  );
+    });
+  });
 }
 
 test("accounts tab shows readable cards without horizontal page overflow on mobile", async ({
@@ -73,7 +80,8 @@ test("accounts tab shows readable cards without horizontal page overflow on mobi
 
   await expect(page.getByRole("heading", { name: "Demat accounts" })).toBeVisible();
   await expect(page.getByRole("article")).toContainText("Asha Mehta");
-  await expect(page.getByRole("article")).toContainText("XXXX1234");
+  await expect(page.getByRole("article")).toContainText("Example Bank");
+  await expect(page.getByRole("article")).toContainText("••••••••");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
@@ -87,6 +95,19 @@ test("accounts tab renders the account table on desktop", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Demat accounts" })).toBeVisible();
   await expect(page.getByRole("table").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Asha Mehta" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Bank" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Password" })).toBeVisible();
+});
+
+test("account detail masks the password until the user reveals it", async ({ page }) => {
+  await prepareAccountPage(page);
+  await page.goto(`/accounts/${account.id}`);
+
+  await expect(page.getByText("••••••••")).toBeVisible();
+  await page.getByRole("button", { name: "Reveal password" }).click();
+  await expect(page.getByText("example-bank-password")).toBeVisible();
+  await page.getByRole("button", { name: "Hide password" }).click();
+  await expect(page.getByText("••••••••")).toBeVisible();
 });
 
 test("account dashboard shows totals without a capacity limit", async ({ page }) => {

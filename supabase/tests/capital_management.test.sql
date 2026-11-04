@@ -58,13 +58,13 @@ values
   );
 
 insert into public.demat_accounts (
-  id, user_id, holder_name, depository_type, masked_demat_identifier
+  id, user_id, holder_name, bank_name, username
 )
 values
   (
     '78787878-7878-4787-8787-787878787878',
     '12121212-1212-4121-8121-121212121212',
-    'Capital Holder A', 'NSDL', 'XXXXCAPA'
+    'Capital Holder A', 'Capital Bank A', 'capital-a'
   ),
   (
     '89898989-8989-4898-8989-898989898989',

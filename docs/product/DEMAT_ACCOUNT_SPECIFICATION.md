@@ -2,24 +2,25 @@
 
 ## Scope
 
-The module lets an authenticated user record and manage their own demat accounts. It does not
-store full demat identifiers, passwords, or credentials. Account records
-are not IPO applications and do not implement an IPO quota, allocation, or investment workflow.
+The module lets an authenticated user manage their own IPO-linked account records. It stores bank
+name and username and supports encrypted bank-password storage. Account records are not IPO
+applications and do not implement an IPO quota, allocation, or investment workflow.
 
 ## Account fields
 
-| Field                   | Rule                                                          |
-| ----------------------- | ------------------------------------------------------------- |
-| Holder name             | Required, 1–160 trimmed characters                            |
-| Depository              | Required; `NSDL` or `CDSL`                                    |
-| Masked demat identifier | Required, 3–80 characters; masked value containing `X` or `*` |
-| Masked client reference | Optional, 3–80 characters; if provided, containing `X` or `*` |
-| Account status          | `active`, `inactive`, or `closed`                             |
-| Notes                   | Optional, up to 2,000 characters                              |
+| Field          | Rule                                                                       |
+| -------------- | -------------------------------------------------------------------------- |
+| Holder name    | Required, 1–160 trimmed characters                                         |
+| Bank name      | Required for new records, 1–120 trimmed characters                         |
+| Username       | Required for new records, 1–160 trimmed characters                         |
+| Password       | Required on creation; up to 1,024 characters, encrypted before persistence |
+| Account status | `active`, `inactive`, or `closed`                                          |
+| Notes          | Optional, up to 2,000 characters                                           |
 
-The same user cannot register the same normalized masked demat identifier twice for the same
-depository, including while an earlier record is archived. Masked client references are not used
-as unique identity.
+Existing records may have missing bank credentials until edited. Passwords are never imported,
+included in ordinary account responses, or shown in account tables. The account detail view reveals
+the password only after an explicit user action. A blank password during edit preserves the saved
+password.
 
 ## Archive behavior
 
@@ -36,8 +37,8 @@ and still unarchived; reversal archives those accounts rather than deleting them
 - **Dashboard:** total, active, and archived account counts.
 - **Account list:** server-side search, filters, pagination, a virtualized desktop table, and
   readable mobile cards.
-- **Add, edit, and details:** validated masked account fields, lifecycle actions, and ownership
-  protected detail display.
+- **Add, edit, and details:** validated account fields, lifecycle actions, and owner-protected
+  password reveal.
 - **Bulk import and import history:** column mapping, row-by-row preview, confirmation, reports,
   and safe reversal where possible.
 
@@ -47,8 +48,8 @@ scrolling for ordinary account details.
 
 ## Search and pagination
 
-Holder searches are case-insensitive prefix searches. Filters include depository,
-account status, archived state, and creation-date bounds. The API returns at most 100 records per
+Holder searches are case-insensitive prefix searches. Filters include account status, archived
+state, and creation-date bounds. The API returns at most 100 records per
 page; the UI requests 50 at a time. Sorting is newest first with a stable ID tie-breaker.
 
 ## Authorization and privacy
@@ -57,6 +58,8 @@ Every page and endpoint requires a Supabase-authenticated user. The API derives 
 from the identity verified by Supabase Auth and uses the caller's JWT with the anon project key.
 PostgreSQL RLS is the final ownership boundary. Clients cannot supply or update `user_id`.
 
-Only masked identifiers should be entered. Validation is performed in the browser and API, with
-database constraints as the final shape guard. Do not put credentials or unmasked
-account identifiers in notes or uploaded files.
+The API encrypts passwords with AES-256-GCM using a deployment-managed 32-byte secret before
+writing to the database. The password-reveal route verifies the caller and account owner, and
+returns `Cache-Control: no-store`. The account page masks passwords by default. Configure and
+protect `ACCOUNT_CREDENTIAL_ENCRYPTION_KEY`; losing it makes saved passwords unrecoverable. Do not
+put passwords in notes or uploaded files.

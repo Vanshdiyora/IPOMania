@@ -11,7 +11,6 @@ import {
   ipoCatalogListQuerySchema,
   ipoCategoryConfigurationSchema,
   ipoListQuerySchema,
-  ipoSchema,
   ipoUpdateSchema,
   z,
 } from "@ipo-mania/validation";
@@ -100,6 +99,40 @@ function catalogRecord(row: IpoCatalogDatabaseRow): IpoCatalogRecord {
   };
 }
 
+type ApplicationAwareIpo<T extends IpoRecord | IpoCatalogRecord> = T & {
+  source: "PERSONAL" | "CATALOG";
+  alreadyApplied: boolean;
+  applicationStatus: string | null;
+};
+
+async function hydrateApplicationFlags(
+  _supabase: SupabaseClient,
+  _userId: string,
+  personalIpos: IpoRecord[],
+  catalogIpos: Array<IpoCatalogRecord & { source: "CATALOG" }>,
+) {
+  const appliedCatalogIds = new Set(
+    personalIpos
+      .map((ipo) => ipo.source_catalog_id)
+      .filter((sourceCatalogId): sourceCatalogId is string => typeof sourceCatalogId === "string"),
+  );
+
+  const hydratedPersonal: ApplicationAwareIpo<IpoRecord>[] = personalIpos.map((ipo) => ({
+    ...ipo,
+    source: "PERSONAL",
+    alreadyApplied: true,
+    applicationStatus: null,
+  }));
+  const hydratedCatalog: ApplicationAwareIpo<IpoCatalogRecord>[] = catalogIpos.map((ipo) => ({
+    ...ipo,
+    source: "CATALOG",
+    alreadyApplied: appliedCatalogIds.has(ipo.id),
+    applicationStatus: null,
+  }));
+
+  return { personal: hydratedPersonal, catalog: hydratedCatalog };
+}
+
 export const iposRoutes = new Hono<IpoContext>();
 iposRoutes.use("*", authenticate);
 
@@ -145,9 +178,66 @@ iposRoutes.get("/catalog", async (context) => {
     query.page * query.page_size - 1,
   );
   if (error) throw error;
+  const catalogRows = (data ?? []).map(catalogRecord);
+  if (catalogRows.length === 0) {
+    return context.json({
+      data: {
+        ipos: [],
+        pagination: {
+          page: query.page,
+          page_size: query.page_size,
+          total: count ?? 0,
+          total_pages: Math.ceil((count ?? 0) / query.page_size),
+        },
+      },
+    });
+  }
+  const userOwnedRows = await context
+    .get("rlsSupabase")
+    .from("ipos")
+    .select(ipoColumns)
+    .eq("user_id", context.get("authenticatedUser").id)
+    .in(
+      "source_catalog_id",
+      catalogRows.map((ipo) => ipo.id),
+    )
+    .is("archived_at", null);
+  if (userOwnedRows.error) throw userOwnedRows.error;
+  const sourceCatalogIds = new Set(
+    (userOwnedRows.data ?? [])
+      .map((ipo) => ipo.source_catalog_id)
+      .filter((sourceCatalogId): sourceCatalogId is string => typeof sourceCatalogId === "string"),
+  );
+  const userApplications = await context
+    .get("rlsSupabase")
+    .from("applications")
+    .select("ipo_id, application_status")
+    .eq("user_id", context.get("authenticatedUser").id)
+    .in(
+      "ipo_id",
+      (userOwnedRows.data ?? []).map((ipo) => ipo.id),
+    )
+    .is("archived_at", null);
+  if (userApplications.error) throw userApplications.error;
+  const applicationStatusByOwnedIpoId = new Map(
+    (userApplications.data ?? []).map((application) => [
+      application.ipo_id,
+      application.application_status,
+    ]),
+  );
+  const statusByCatalogId = new Map<string, string>();
+  for (const ipo of userOwnedRows.data ?? []) {
+    if (typeof ipo.source_catalog_id === "string" && applicationStatusByOwnedIpoId.has(ipo.id)) {
+      statusByCatalogId.set(ipo.source_catalog_id, applicationStatusByOwnedIpoId.get(ipo.id)!);
+    }
+  }
   return context.json({
     data: {
-      ipos: (data ?? []).map(catalogRecord),
+      ipos: catalogRows.map((ipo) => ({
+        ...ipo,
+        alreadyApplied: sourceCatalogIds.has(ipo.id),
+        applicationStatus: statusByCatalogId.get(ipo.id) ?? null,
+      })),
       pagination: {
         page: query.page,
         page_size: query.page_size,
@@ -397,7 +487,14 @@ iposRoutes.get("/", async (context) => {
 
   const personalIpos = ownedIpos.map((ipo) => ({ ...ipo, source: "PERSONAL" as const }));
   const catalogIpos = catalog.map((ipo) => ({ ...catalogRecord(ipo), source: "CATALOG" as const }));
-  const combinedIpos = [...personalIpos, ...catalogIpos];
+  const hydrated = await hydrateApplicationFlags(supabase, userId, personalIpos, catalogIpos);
+  const combinedIpos = [...hydrated.personal, ...hydrated.catalog] as unknown as Array<{
+    id: string;
+    company_name: string;
+    opening_date: string | null;
+    issue_price_min: string | null;
+    source: "PERSONAL" | "CATALOG";
+  }>;
   if (combinedList) {
     const compareNullable = (left: string | null, right: string | null) => {
       if (left === null) return right === null ? 0 : 1;
@@ -444,8 +541,8 @@ iposRoutes.get("/", async (context) => {
   const listedIpos = combinedList
     ? combinedIpos.slice(offset, pageEnd + 1)
     : query.source === "catalog"
-      ? catalogIpos
-      : personalIpos;
+      ? hydrated.catalog
+      : hydrated.personal;
   return context.json({
     data: {
       ipos: listedIpos,
@@ -466,60 +563,17 @@ iposRoutes.get("/", async (context) => {
   });
 });
 
-iposRoutes.post("/", validateJson(ipoSchema), async (context) => {
-  const submittedIpo = context.req.valid("json");
-  if (!(["UPCOMING", "OPEN", "CLOSED", "LISTED"] as string[]).includes(submittedIpo.status)) {
-    return context.json(
-      {
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Shared catalog IPOs must use Upcoming, Open, Closed, or Listed status.",
-        },
+iposRoutes.post("/", (context) =>
+  context.json(
+    {
+      error: {
+        code: "FORBIDDEN",
+        message: "IPO creation is restricted to administrators.",
       },
-      400,
-    );
-  }
-  const { data, error } = await context
-    .get("rlsSupabase")
-    .from("ipo_catalog")
-    .insert({
-      submitted_by: context.get("authenticatedUser").id,
-      company_name: submittedIpo.company_name,
-      symbol: submittedIpo.symbol,
-      issue_type: submittedIpo.ipo_type.toUpperCase() === "SME" ? "SME" : "mainboard",
-      exchange: submittedIpo.exchange,
-      price_band_min: submittedIpo.issue_price_min,
-      price_band_max: submittedIpo.issue_price_max,
-      issue_price: submittedIpo.cut_off_price,
-      lot_size: submittedIpo.lot_size,
-      issue_size: submittedIpo.issue_size,
-      bidding_start_date: submittedIpo.opening_date,
-      bidding_end_date: submittedIpo.closing_date,
-      allotment_date: submittedIpo.allotment_date,
-      listing_date: submittedIpo.listing_date,
-      ipo_status: submittedIpo.status.toLowerCase(),
-      data_source: "USER_SUBMITTED",
-      source_reference: submittedIpo.source_reference,
-      source_last_updated_at: submittedIpo.last_verified_at,
-      manual_override_fields: [],
-    })
-    .select(catalogColumns)
-    .single();
-
-  if (error?.code === "23505") {
-    return context.json(
-      {
-        error: {
-          code: "DUPLICATE_IPO",
-          message: "An active shared catalog IPO already uses this symbol and exchange.",
-        },
-      },
-      409,
-    );
-  }
-  if (error) return ipoDatabaseError(context, error);
-  return context.json({ data: catalogRecord(data as IpoCatalogDatabaseRow) }, 201);
-});
+    },
+    403,
+  ),
+);
 
 iposRoutes.get("/:ipoId/categories", async (context) => {
   const ipoId = context.req.param("ipoId");

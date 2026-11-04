@@ -1,6 +1,6 @@
 begin;
 
-select plan(16);
+select plan(18);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -36,6 +36,12 @@ values
     '22222222-2222-4222-8222-222222222222',
     'Application IPO B', 'APPB', 'Test', 'Test Exchange', 10, 20, 20, 10, 100000,
     '2026-11-01', '2026-11-03', 'UPCOMING'
+  ),
+  (
+    '77777777-7777-4777-8777-777777777777',
+    '11111111-1111-4111-8111-111111111111',
+    'Application IPO A2', 'APPA2', 'Test', 'Test Exchange', 10, 20, 20, 10, 100000,
+    '2026-11-01', '2026-11-03', 'UPCOMING'
   );
 
 insert into public.ipo_categories (
@@ -54,21 +60,27 @@ values
     '22222222-2222-4222-8222-222222222222',
     '99999999-9999-4999-8999-999999999999', 'RETAIL', 1, 'CONFIGURED', 1, 3, 1,
     'NO_PUBLISHED_LIMIT', '[]', array['CUT_OFF'], 'MANUAL'
+  ),
+  (
+    'abababab-abab-4bab-8bab-abababababab',
+    '11111111-1111-4111-8111-111111111111',
+    '77777777-7777-4777-8777-777777777777', 'RETAIL', 1, 'CONFIGURED', 1, 3, 1,
+    'NO_PUBLISHED_LIMIT', '[]', array['CUT_OFF'], 'MANUAL'
   );
 
 insert into public.demat_accounts (
-  id, user_id, holder_name, depository_type, masked_demat_identifier
+  id, user_id, holder_name, bank_name, username
 )
 values
   (
     'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     '11111111-1111-4111-8111-111111111111', 'Application Holder A',
-    'NSDL', 'XXXXAPPA'
+    'Application Bank A', 'application-a'
   ),
   (
     'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
     '22222222-2222-4222-8222-222222222222', 'Application Holder B',
-    'NSDL', 'XXXXAPPB'
+    'Application Bank B', 'application-b'
   );
 
 insert into public.applications (
@@ -112,9 +124,9 @@ values (
   2,
   '{
     "user_id":"11111111-1111-4111-8111-111111111111",
-    "ipo_id":"88888888-8888-4888-8888-888888888888",
+    "ipo_id":"77777777-7777-4777-8777-777777777777",
     "demat_account_id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-    "category_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "category_id":"abababab-abab-4bab-8bab-abababababab",
     "lots":1,"total_shares":10,"application_amount":"200",
     "application_number":"APP-A-2","external_reference":"stable-a-2",
     "submission_date":null,"application_status":"DRAFT",
@@ -157,12 +169,14 @@ select is(
   '200',
   'Status edits preserve the historical calculation snapshot'
 );
-select throws_ok(
-  $$update public.applications set calculation_snapshot = '{}'::jsonb
+select lives_ok(
+  $$update public.applications
+    set lots = 2,
+        total_shares = 20,
+        application_amount = 400,
+        calculation_snapshot = '{"calculation_result":{"application_amount":"400","total_shares":20},"category_rules":{"rule_version":1}}'::jsonb
     where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'$$,
-  '42501',
-  'permission denied for table applications',
-  'Application calculation snapshots cannot be overwritten by clients'
+  'Owners can update application terms with their recalculated snapshot'
 );
 select throws_ok(
   $$insert into public.applications (
@@ -193,6 +207,29 @@ select throws_ok(
   '23505',
   'duplicate key value violates unique constraint "applications_external_reference_unique"',
   'Duplicate external references are rejected atomically'
+);
+select throws_ok(
+  $$insert into public.applications (
+      user_id, ipo_id, demat_account_id, category_id, lots, total_shares,
+      application_amount, external_reference, rule_version, calculation_snapshot
+    ) values (
+      '11111111-1111-4111-8111-111111111111',
+      '88888888-8888-4888-8888-888888888888',
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      1, 10, 200, 'stable-a-duplicate', 1, '{}'::jsonb
+    )$$,
+  '23505',
+  'duplicate key value violates unique constraint "applications_user_ipo_unique"',
+  'Duplicate active applications per user and IPO are rejected atomically'
+);
+select is(
+  (select count(*) from public.applications
+   where user_id = '11111111-1111-4111-8111-111111111111'
+     and ipo_id = '88888888-8888-4888-8888-888888888888'
+     and archived_at is null),
+  1::bigint,
+  'Only one active application is kept per user and IPO'
 );
 select is(
   public.confirm_application_import('55555555-5555-4555-8555-555555555555')->>'imported_rows',

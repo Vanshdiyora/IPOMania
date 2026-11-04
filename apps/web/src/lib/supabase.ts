@@ -4,7 +4,9 @@ import { createThirtyDayAuthStorage } from "./authStorage";
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const authStorage =
-  typeof window === "undefined" ? undefined : createThirtyDayAuthStorage(window.localStorage);
+  typeof window === "undefined" || !window.localStorage
+    ? undefined
+    : createThirtyDayAuthStorage(window.localStorage);
 
 export const supabase =
   supabaseUrl && supabaseAnonKey

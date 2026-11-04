@@ -143,7 +143,7 @@ for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await seedAuthenticatedUser(page);
     await page.goto("/ipos");
-    await expect(page.getByRole("heading", { name: "IPOs", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "IPO catalog", exact: true })).toBeVisible();
     await expect(
       page.getByRole("textbox", { name: "Search company or exact symbol" }),
     ).toBeVisible();
@@ -171,7 +171,7 @@ for (const viewport of viewports.filter(({ width }) => width < 768)) {
     await page.setViewportSize(viewport);
     await seedAuthenticatedUser(page);
     await page.goto("/ipos");
-    await expect(page.getByRole("heading", { name: "IPOs", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "IPO catalog", exact: true })).toBeVisible();
 
     const menuButton = page.getByRole("button", { name: "Open navigation" });
     await expect(menuButton).toBeVisible();

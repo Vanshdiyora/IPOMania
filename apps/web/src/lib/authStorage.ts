@@ -34,38 +34,47 @@ function parseStoredAuthValue(value: string): StoredAuthValue | null {
  * extend a login indefinitely.
  */
 export function createThirtyDayAuthStorage(
-  storage: AuthStorage,
+  storage?: AuthStorage | null,
   now: () => number = Date.now,
 ): AuthStorage {
+  const safeStorage: AuthStorage =
+    storage && typeof storage.getItem === "function"
+      ? storage
+      : {
+          getItem: () => null,
+          removeItem: () => undefined,
+          setItem: () => undefined,
+        };
+
   return {
     getItem(key) {
-      const storedValue = storage.getItem(key);
+      const storedValue = safeStorage.getItem(key);
       if (!storedValue) return null;
 
       const stored = parseStoredAuthValue(storedValue);
       if (!stored) {
         const expiresAt = now() + THIRTY_DAYS_IN_MILLISECONDS;
-        storage.setItem(key, JSON.stringify({ value: storedValue, expiresAt }));
+        safeStorage.setItem(key, JSON.stringify({ value: storedValue, expiresAt }));
         return storedValue;
       }
 
       if (stored.expiresAt <= now()) {
-        storage.removeItem(key);
+        safeStorage.removeItem(key);
         return null;
       }
 
       return stored.value;
     },
     removeItem(key) {
-      storage.removeItem(key);
+      safeStorage.removeItem(key);
     },
     setItem(key, value) {
-      const existing = storage.getItem(key);
+      const existing = safeStorage.getItem(key);
       const stored = existing ? parseStoredAuthValue(existing) : null;
       const expiresAt =
         stored && stored.expiresAt > now() ? stored.expiresAt : now() + THIRTY_DAYS_IN_MILLISECONDS;
 
-      storage.setItem(key, JSON.stringify({ value, expiresAt }));
+      safeStorage.setItem(key, JSON.stringify({ value, expiresAt }));
     },
   };
 }

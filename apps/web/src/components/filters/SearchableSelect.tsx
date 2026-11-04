@@ -340,14 +340,17 @@ export function SearchableSelect({
               {filtered.length ? (
                 filtered.map((option, index) => {
                   const isSelected = selected.includes(option.value);
+                  const isDisabled = Boolean(option.disabled);
                   return (
                     <button
                       key={option.value}
                       data-select-option
                       type="button"
-                      disabled={option.disabled}
+                      disabled={isDisabled}
                       role="option"
                       aria-selected={isSelected}
+                      aria-disabled={isDisabled || undefined}
+                      title={isDisabled ? "You have already applied for this IPO." : undefined}
                       onClick={() => select(option.value)}
                       onKeyDown={(event) => {
                         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -368,26 +371,46 @@ export function SearchableSelect({
                           ]?.focus();
                         }
                       }}
-                      className={`flex min-h-touch w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 ${isSelected ? "bg-[#EAF0F6]" : ""}`}
+                      className={`flex min-h-touch w-full items-center gap-3 rounded-lg px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 ${
+                        isDisabled
+                          ? "cursor-not-allowed bg-slate-100 text-muted opacity-80"
+                          : "hover:bg-canvas"
+                      } ${isSelected ? "bg-[#EAF0F6]" : ""}`}
                     >
                       <span
-                        className={`flex size-5 shrink-0 items-center justify-center rounded border ${isSelected ? "border-action bg-action text-white" : "border-slate-400 bg-white"}`}
+                        className={`flex size-5 shrink-0 items-center justify-center rounded border ${
+                          isSelected
+                            ? "border-action bg-action text-white"
+                            : isDisabled
+                              ? "border-slate-300 bg-slate-100 text-slate-400"
+                              : "border-slate-400 bg-white"
+                        }`}
                         aria-hidden="true"
                       >
                         {isSelected ? <Check className="size-3.5" /> : null}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-semibold text-ink">
+                        <span
+                          className={`block truncate font-semibold ${
+                            isDisabled ? "text-muted" : "text-ink"
+                          }`}
+                        >
                           {option.label}
                         </span>
                         {option.description ? (
-                          <span className="block truncate text-xs text-muted">
+                          <span
+                            className={`block truncate text-xs ${isDisabled ? "text-slate-500" : "text-muted"}`}
+                          >
                             {option.description}
                           </span>
                         ) : null}
                       </span>
                       {option.badge ? (
-                        <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-navy">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            isDisabled ? "bg-slate-200 text-slate-600" : "bg-canvas text-navy"
+                          }`}
+                        >
                           {option.badge}
                         </span>
                       ) : null}

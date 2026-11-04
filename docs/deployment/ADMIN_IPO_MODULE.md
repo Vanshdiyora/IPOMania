@@ -45,8 +45,8 @@ category rules from **Categories** in `/admin/ipos`; each save creates an immuta
 versioned rule with source and verification metadata. Signed-in users can read those rules. From
 catalog details, **Use for application** copies complete shared issue data and the latest rules
 into the user's own IPO record; missing issue inputs are never fabricated. Archived records are
-excluded. The **My IPOs** view preserves personal issue records and their existing editing,
-category configuration, and quota workflows.
+excluded. The user IPO page is catalog-only, with creation and maintenance restricted to
+administrators. Existing private snapshots remain available to application and quota workflows.
 
 ## Scheduling
 

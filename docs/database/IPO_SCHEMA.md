@@ -1,15 +1,15 @@
 # IPO schema
 
 Migrations: `supabase/migrations/20261031140000_ipo_manager_quota_engine.sql`,
-`supabase/migrations/20261031160000_capital_management.sql`, and
-`supabase/migrations/20261103130000_shared_ipo_category_rules.sql`.
+`supabase/migrations/20261031160000_capital_management.sql`,
+`supabase/migrations/20261103130000_shared_ipo_category_rules.sql`, and
+`supabase/migrations/20261104230000_admin_only_ipo_catalog_inserts.sql`.
 
 ## Ownership decision
 
 Personal IPO records are owner-scoped snapshots. The shared catalog is the source of truth for new
-IPO issue data: signed-in users may submit a complete `USER_SUBMITTED` catalog entry under their
-verified identity, and administrators manage catalog data and category rules thereafter.
-User-owned IPO notes, shareholder inputs, calculations, and application snapshots remain private.
+IPO issue data, and catalog records are created and managed by administrators. User-owned IPO
+notes, shareholder inputs, calculations, and application snapshots remain private.
 
 ## `public.ipos`
 
@@ -44,13 +44,11 @@ triggers assign versions. User imports copy the latest source rule per category 
 `ipo_categories` rows and retain the source rule ID for idempotent future imports. Imported rules
 remain private copies governed by the existing user-owned RLS and application foreign keys.
 
-## Shared catalog submissions
+## Shared catalog administration
 
-`public.ipo_catalog.submitted_by` records the verified user who submitted a `USER_SUBMITTED`
-catalog entry, and `source_reference` preserves an optional source supplied with it. RLS allows a
-signed-in user to insert only a `USER_SUBMITTED` row tied to their own identity; users cannot edit
-or archive catalog rows. The active-symbol/exchange unique index prevents duplicate active issues.
-Administrators retain catalog-management access.
+The RLS insert policy permits catalog creation only through the administrator policy; regular users
+cannot insert, edit, or archive catalog rows. Legacy `submitted_by` values are retained for audit
+history. The active-symbol/exchange unique index prevents duplicate active issues.
 
 ## `public.ipo_quota_calculations`
 

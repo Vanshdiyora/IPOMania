@@ -1,6 +1,14 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  CalendarDays,
+  CircleDollarSign,
+  Landmark,
+  Layers3,
+  Pencil,
+  ReceiptText,
+} from "lucide-react";
 import type {
   DematAccount,
   IpoApplication,
@@ -24,7 +32,7 @@ import { Button } from "../../components/ui/Button";
 import { DrawerRouteLink, RouteFormDrawer } from "../../components/ui/FormDrawer";
 import { SearchableFormSelect } from "../../components/ui/SearchableFormSelect";
 import { SearchableSelect } from "../../components/filters/SearchableSelect";
-import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
+import { FormInput, FormSelect } from "../../components/ui/FormControls";
 import { Select as CustomSelect } from "../../components/ui/Input";
 import { FormSection } from "../../components/ui/FormSection";
 import { useFormValidation } from "../../components/ui/useFormValidation";
@@ -56,9 +64,9 @@ type ApplicationListResponse = {
   data: {
     applications: Array<
       IpoApplication & {
-        ipos?: { symbol: string; company_name: string };
+        ipos?: { symbol: string | null; company_name: string };
         demat_accounts?: { holder_name: string };
-        ipo_categories?: { category: string };
+        ipo_categories?: { category: string } | null;
       }
     >;
     pagination: { page: number; page_size: number; total: number; total_pages: number };
@@ -89,8 +97,12 @@ type CategoryResponse = { data: { configurations: ApplicationCategoryConfigurati
 type ApplicationLotBounds = { minimum: number | null; maximum: number | null; increment: number };
 type ApplicationResponse = {
   data: IpoApplication & {
-    ipos?: { company_name: string; symbol: string };
-    demat_accounts?: { holder_name: string; masked_demat_identifier: string };
+    ipos?: { company_name: string | null; symbol: string | null };
+    demat_accounts?: {
+      holder_name: string | null;
+      bank_name: string | null;
+      username: string | null;
+    };
     ipo_categories?: { category: string };
   };
 };
@@ -193,6 +205,32 @@ function useOwnedLists() {
       return page && totalPages && page < totalPages ? page + 1 : undefined;
     },
   });
+  const applications = useQuery({
+    queryKey: ["applications", "applied-ipo-status"],
+    enabled: Boolean(session),
+    queryFn: async () => {
+      const loadPage = (page: number) =>
+        apiRequest<ApplicationListResponse>(
+          `/api/applications?page=${page}&page_size=100&include_archived=all`,
+          session!,
+        );
+      const first = await loadPage(1);
+      const totalPages = first.data.pagination?.total_pages ?? 1;
+      if (totalPages <= 1) return first;
+      const pages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) => loadPage(index + 2)),
+      );
+      return {
+        data: {
+          ...first.data,
+          applications: [
+            first.data.applications,
+            ...pages.map((page) => page.data.applications),
+          ].flat(),
+        },
+      };
+    },
+  });
   const accounts = useQuery({
     queryKey: ["accounts", "application-options"],
     enabled: Boolean(session),
@@ -213,16 +251,27 @@ function useOwnedLists() {
       };
     },
   });
+  const appliedIpoIds = new Set(
+    (applications.data?.data.applications ?? []).map((application) => application.ipo_id),
+  );
+  const appliedStatusByIpoId = new Map(
+    (applications.data?.data.applications ?? [])
+      .filter((application) => application.ipo_id)
+      .map((application) => [application.ipo_id, application.application_status]),
+  );
   return {
     ipos: ipos.data?.pages.flatMap((page) => page.data.ipos) ?? [],
     accounts: accounts.data?.data.accounts ?? [],
-    loading: ipos.isLoading || accounts.isLoading,
+    appliedIpoIds,
+    appliedStatusByIpoId,
+    loading: ipos.isLoading || accounts.isLoading || applications.isLoading,
     optionLoading: {
       ipos: ipos.isLoading,
       accounts: accounts.isLoading,
+      applications: applications.isLoading,
     },
-    error: ipos.error ?? accounts.error,
-    refetch: () => Promise.all([ipos.refetch(), accounts.refetch()]),
+    error: ipos.error ?? accounts.error ?? applications.error,
+    refetch: () => Promise.all([ipos.refetch(), accounts.refetch(), applications.refetch()]),
     iposInfinite: ipos,
   };
 }
@@ -401,7 +450,7 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
   const accountOptions = lists.accounts.map((account) => ({
     value: account.id,
     label: account.holder_name,
-    description: account.masked_demat_identifier,
+    description: `${account.bank_name ?? "Bank not provided"} · ${account.username ?? "Username not provided"}`,
   }));
   const categoryOptions = (categoriesQuery.data ?? []).map((category) => ({
     value: category.id,
@@ -595,11 +644,14 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
                 <th scope="col" className="p-3 text-left">
                   Submitted
                 </th>
+                <th scope="col" className="p-3 text-right">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody aria-busy={isLoading}>
               {isLoading ? (
-                <SkeletonTableRows rows={6} cols={5} />
+                <SkeletonTableRows rows={6} cols={6} />
               ) : (
                 rows.map((row) => (
                   <tr key={row.id} className="border-b border-border">
@@ -609,16 +661,28 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
                         to={`/applications/${row.id}`}
                         state={{ from: `${location.pathname}${location.search}` }}
                       >
-                        {row.ipos?.symbol ?? "IPO"}
+                        {row.ipos?.company_name || row.ipos?.symbol || "IPO"}
                       </Link>
                     </td>
-                    <td className="p-3">{row.ipo_categories?.category ?? "Category"}</td>
+                    <td className="p-3">
+                      {formatCategory(row.ipo_categories?.category ?? row.category_code)}
+                    </td>
                     <td className="p-3">{row.demat_accounts?.holder_name ?? "Account"}</td>
                     <td className="p-3 text-right tabular-nums whitespace-nowrap">
                       {row.lots} lots · {row.application_amount}
                     </td>
                     <td className="p-3 text-sm tabular-nums whitespace-nowrap">
                       {formatDateTime(row.submission_date ?? row.created_at)}
+                    </td>
+                    <td className="p-3 text-right">
+                      <DrawerRouteLink
+                        to={`/applications/${row.id}/edit`}
+                        aria-label={`Edit ${row.ipos?.company_name || row.ipos?.symbol || "application"}`}
+                        title="Edit application"
+                        className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-lg border border-border text-ink transition-colors hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+                      >
+                        <Pencil aria-hidden="true" className="size-4" />
+                      </DrawerRouteLink>
                     </td>
                   </tr>
                 ))
@@ -669,9 +733,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const [categoryCode, setCategoryCode] = useState("");
   const [lots, setLots] = useState("1");
   const [price, setPrice] = useState("");
-  const [applicationNumber, setApplicationNumber] = useState("");
-  const [externalReference, setExternalReference] = useState("");
-  const [notes, setNotes] = useState("");
   const [selectedCatalogIpo, setSelectedCatalogIpo] = useState<IpoCatalogRecord | null>(null);
   const preselectedAccountId = searchParams.get("demat_account_id");
   const preselectedIpoId = searchParams.get("ipo_id");
@@ -719,11 +780,13 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   ).map(([, configuration]) => configuration);
   const activeCategory = categories.find((category) => category.id === categoryId);
   const personalIpos = lists.ipos.filter((item) => !item.source_catalog_id);
+  const selectableIpos = editing ? lists.ipos : personalIpos;
   const sharedCatalogIpos = catalogIpos.data?.pages.flatMap((page) => page.data.ipos) ?? [];
   const selectedIpo =
     selectedCatalogIpo ??
-    personalIpos.find((item) => item.id === ipoId) ??
+    lists.ipos.find((item) => item.id === ipoId) ??
     (preselectedIpo.data?.data.id === ipoId ? preselectedIpo.data.data : null);
+  const selectedIpoIsApplied = Boolean(ipoId && lists.appliedIpoIds.has(ipoId));
   const enteredLots = Number(lots);
   const lotBounds = getApplicationLotBounds(
     selectedIpo && typeof selectedIpo.lot_size === "number"
@@ -784,7 +847,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     application_status: "DRAFT",
     mandate_status: "UNKNOWN",
     allotment_status: "UNKNOWN",
-    notes: notes || null,
+    notes: null,
   };
   const localCalculation = (() => {
     if (
@@ -812,9 +875,10 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       if (!session) throw new Error("Sign in to save applications.");
       let body = editing
         ? {
-            application_number: applicationNumber || null,
-            external_reference: externalReference || null,
-            notes: notes || null,
+            category_id: categoryId || null,
+            category_code: categoryCode || undefined,
+            lots: Number(lots),
+            price,
           }
         : applicationPayload;
       if (!editing && selectedCatalogIpo) {
@@ -879,14 +943,25 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     setCategoryId(application.category_id ?? "");
     setCategoryCode(application.category_code);
     setLots(String(application.lots));
-    setApplicationNumber(application.application_number ?? "");
-    setExternalReference(application.external_reference ?? "");
-    setNotes(application.notes ?? "");
+    const snapshotPrice = asRecord(
+      asRecord(application.calculation_snapshot).calculation_input,
+    ).price;
+    setPrice(
+      typeof snapshotPrice === "string"
+        ? snapshotPrice
+        : application.total_shares > 0
+          ? (Number(application.application_amount) / application.total_shares).toFixed(2)
+          : "",
+    );
   }, [application, editing, ipoId]);
   return (
     <RouteFormDrawer
       title={editing ? "Edit application" : "Add application"}
-      description="Choose an issue, account, category, and lot count. This records an application for tracking; it does not submit an IPO application."
+      description={
+        editing
+          ? "Update the category, lots, or price. Total shares and the application amount are recalculated from the IPO terms."
+          : "Choose an issue, account, category, and lot count. This records an application for tracking; it does not submit an IPO application."
+      }
       cancelTo={returnTo}
       formId="application-form"
       submitLabel="Save application"
@@ -895,15 +970,15 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       disabled={
         Boolean(detail.error || lists.error) ||
         (editing && !application) ||
-        (!editing &&
-          (!ipoId ||
-            !accountId ||
-            !categoryCode ||
-            categoriesQuery.isLoading ||
-            Boolean(categoriesQuery.error) ||
-            !price ||
-            !localCalculation ||
-            !validLotSelection))
+        !ipoId ||
+        !accountId ||
+        !categoryCode ||
+        categoriesQuery.isLoading ||
+        Boolean(categoriesQuery.error) ||
+        !price ||
+        !localCalculation ||
+        !validLotSelection ||
+        (!editing && selectedIpoIsApplied)
       }
     >
       <form
@@ -919,7 +994,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
         {editing && detail.isLoading ? (
           <div role="status" aria-label="Loading application" aria-busy="true">
             <span className="sr-only">Loading application…</span>
-            <SkeletonFormFields fields={6} />
+            <SkeletonFormFields fields={5} />
           </div>
         ) : null}
         {detail.error ? (
@@ -950,227 +1025,219 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
               </Button>
             </div>
           ) : null}
-          {!editing ? (
-            <FormSection title="Issue and account">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="min-w-0">
-                  <SearchableSelect
-                    label="IPO"
-                    placeholder="Choose an IPO"
-                    value={ipoId}
-                    loading={lists.optionLoading.ipos || catalogIpos.isLoading}
-                    disabled={lists.optionLoading.ipos || catalogIpos.isLoading}
-                    emptyLabel={
-                      personalIpos.length === 0 && sharedCatalogIpos.length === 0
-                        ? "No IPOs are available."
-                        : "No matching options."
-                    }
-                    options={[
-                      ...personalIpos.map((item) => ({
-                        value: item.id,
-                        label: item.company_name,
-                      })),
-                      ...sharedCatalogIpos.map((item) => ({
-                        value: item.id,
-                        label: item.company_name,
-                        description: isIpoReadyForApplication(item)
-                          ? "Shared catalog"
-                          : "Shared catalog · Issue data incomplete",
-                        disabled: !isIpoReadyForApplication(item),
-                      })),
-                    ]}
-                    hasMore={Boolean(lists.iposInfinite.hasNextPage || catalogIpos.hasNextPage)}
-                    loadingMore={
-                      lists.iposInfinite.isFetchingNextPage || catalogIpos.isFetchingNextPage
-                    }
-                    onLoadMore={() => {
-                      if (lists.iposInfinite.hasNextPage) void lists.iposInfinite.fetchNextPage();
-                      if (catalogIpos.hasNextPage) void catalogIpos.fetchNextPage();
-                    }}
-                    onChange={(value) => {
-                      const nextValue = Array.isArray(value) ? (value[0] ?? "") : value;
-                      const catalogIpo = sharedCatalogIpos.find((item) => item.id === nextValue);
-                      setSelectedCatalogIpo(catalogIpo ?? null);
-                      setIpoId(nextValue);
-                      setCategoryId("");
-                      setCategoryCode("");
-                      const ownedIpo = personalIpos.find((item) => item.id === nextValue);
-                      setPrice(catalogIpo?.issue_price_max ?? ownedIpo?.issue_price_max ?? "");
-                    }}
-                  />
-                  {!lists.optionLoading.ipos &&
-                  !catalogIpos.isLoading &&
-                  personalIpos.length === 0 &&
-                  sharedCatalogIpos.length === 0 ? (
-                    <p className="mt-2 text-sm text-muted">
-                      No IPOs are available in your records or the shared catalog.{" "}
-                      <Link
-                        className="font-semibold text-action underline underline-offset-2 hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
-                        to="/ipos/new"
-                      >
-                        Add to catalog
-                      </Link>{" "}
-                      and record applications with manually selected lots.
-                    </p>
-                  ) : null}
-                  {validation.errors.ipo_id ? (
-                    <p role="alert" className="mt-1 text-sm font-medium text-red-700">
-                      {validation.errors.ipo_id}
-                    </p>
-                  ) : null}
-                </div>
-                <SearchableFormSelect
-                  label="Demat account"
-                  required
-                  error={validation.errors.demat_account_id}
-                  value={accountId}
-                  placeholder={
-                    lists.optionLoading.accounts ? "Loading accounts…" : "Choose an active account"
+          <FormSection title="Issue and account">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="min-w-0">
+                <SearchableSelect
+                  label="IPO"
+                  placeholder="Choose an IPO"
+                  value={ipoId}
+                  loading={lists.optionLoading.ipos || catalogIpos.isLoading}
+                  disabled={editing || lists.optionLoading.ipos || catalogIpos.isLoading}
+                  emptyLabel={
+                    personalIpos.length === 0 && sharedCatalogIpos.length === 0
+                      ? "No IPOs are available."
+                      : "No matching options."
                   }
-                  disabled={lists.optionLoading.accounts}
-                  options={lists.accounts
-                    .filter(
-                      (account) => account.account_status === "active" && !account.archived_at,
-                    )
-                    .map((account) => ({
-                      value: account.id,
-                      label: `${account.holder_name} — ${account.masked_demat_identifier}`,
-                    }))}
-                  onChange={setAccountId}
-                />
-                <FormSelect
-                  label="Investor category"
-                  error={validation.errors.category_code ?? validation.errors.category_id}
-                  required
-                  value={categoryId || categoryCode}
-                  disabled={categoriesQuery.isLoading}
-                  onChange={(event) => {
-                    const nextCategory = categories.find((item) => item.id === event.target.value);
-                    setCategoryId(nextCategory?.id ?? "");
-                    setCategoryCode(nextCategory?.category ?? event.target.value);
-                    if (nextCategory) {
-                      const bounds = getApplicationLotBounds(
-                        selectedIpo && typeof selectedIpo.lot_size === "number"
-                          ? { lot_size: selectedIpo.lot_size }
-                          : null,
-                        nextCategory,
-                        price,
-                      );
-                      setLots(
-                        bounds
-                          ? adjustLotsToBounds(String(nextCategory.default_lots), bounds)
-                          : String(nextCategory.default_lots),
-                      );
-                    } else {
-                      setLots("1");
-                    }
+                  options={[
+                    ...selectableIpos.map((item) => ({
+                      value: item.id,
+                      label: item.company_name,
+                      badge: !editing && lists.appliedIpoIds.has(item.id) ? "Applied" : undefined,
+                      description:
+                        !editing && lists.appliedIpoIds.has(item.id)
+                          ? "Already applied for this IPO"
+                          : undefined,
+                      disabled: !editing && lists.appliedIpoIds.has(item.id),
+                    })),
+                    ...sharedCatalogIpos.map((item) => ({
+                      value: item.id,
+                      label: item.company_name,
+                      description: isIpoReadyForApplication(item)
+                        ? "Shared catalog"
+                        : "Shared catalog · Issue data incomplete",
+                      disabled: !isIpoReadyForApplication(item),
+                    })),
+                  ]}
+                  hasMore={Boolean(lists.iposInfinite.hasNextPage || catalogIpos.hasNextPage)}
+                  loadingMore={
+                    lists.iposInfinite.isFetchingNextPage || catalogIpos.isFetchingNextPage
+                  }
+                  onLoadMore={() => {
+                    if (lists.iposInfinite.hasNextPage) void lists.iposInfinite.fetchNextPage();
+                    if (catalogIpos.hasNextPage) void catalogIpos.fetchNextPage();
                   }}
-                >
-                  <option value="">
-                    {categoriesQuery.isLoading
-                      ? "Loading categories…"
-                      : categoriesQuery.error
-                        ? "Categories unavailable"
-                        : "Choose an investor category"}
-                  </option>
-                  {(["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"] as const).map((code) => {
-                    const item = categories.find((category) => category.category === code);
-                    return (
-                      <option key={code} value={item?.id ?? code}>
-                        {formatCategory(code)}
-                      </option>
-                    );
-                  })}
-                  {categories
-                    .filter((item) => item.category === "EMPLOYER")
-                    .map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {formatCategory(item.category)}
-                      </option>
-                    ))}
-                </FormSelect>
-                <div className="sm:col-span-2">
-                  <FormInput
-                    label="Lots"
-                    error={validation.errors.lots}
-                    required
-                    type="number"
-                    min={activeCategory ? (lotBounds?.minimum ?? undefined) : 1}
-                    max={activeCategory ? (lotBounds?.maximum ?? undefined) : 1_000_000}
-                    step={activeCategory ? (lotBounds?.increment ?? 1) : 1}
-                    value={lots}
-                    disabled={
-                      categoriesQuery.isLoading ||
-                      Boolean(categoriesQuery.error) ||
-                      (activeCategory &&
-                        (!lotBounds ||
-                          lotBounds.minimum === null ||
-                          (lotBounds.maximum !== null && lotBounds.maximum < lotBounds.minimum)))
-                    }
-                    onChange={(event) => setLots(event.target.value)}
-                  />
-                  {lotBounds?.minimum !== null &&
-                  lotBounds?.minimum !== undefined &&
-                  Number.isSafeInteger(enteredLots) &&
-                  enteredLots < lotBounds.minimum ? (
-                    <p role="alert" className="mt-1 text-sm font-medium text-red-700">
-                      Select at least {lotBounds.minimum} lot(s).
-                    </p>
-                  ) : null}
-                  {lotBounds?.maximum !== null &&
-                  lotBounds?.maximum !== undefined &&
-                  Number.isSafeInteger(enteredLots) &&
-                  enteredLots > lotBounds.maximum ? (
-                    <p role="alert" className="mt-1 text-sm font-medium text-red-700">
-                      Select no more than {lotBounds.maximum} lot(s).
-                    </p>
-                  ) : null}
-                  {lotBounds?.minimum !== null &&
-                  lotBounds?.minimum !== undefined &&
-                  Number.isSafeInteger(enteredLots) &&
-                  enteredLots >= lotBounds.minimum &&
-                  (enteredLots - lotBounds.minimum) % lotBounds.increment !== 0 ? (
-                    <p role="alert" className="mt-1 text-sm font-medium text-red-700">
-                      Select lots in increments of {lotBounds.increment}.
-                    </p>
-                  ) : null}
-                </div>
-                {selectedIpo?.lot_size ? (
-                  <p className="text-sm text-muted sm:col-span-2">
-                    One lot contains {selectedIpo.lot_size.toLocaleString("en-IN")} shares.
-                    {estimatedTotalShares !== null
-                      ? ` ${enteredLots.toLocaleString("en-IN")} lot(s) = ${estimatedTotalShares.toLocaleString("en-IN")} shares.`
-                      : ""}
+                  onChange={(value) => {
+                    const nextValue = Array.isArray(value) ? (value[0] ?? "") : value;
+                    const catalogIpo = sharedCatalogIpos.find((item) => item.id === nextValue);
+                    setSelectedCatalogIpo(catalogIpo ?? null);
+                    setIpoId(nextValue);
+                    setCategoryId("");
+                    setCategoryCode("");
+                    const ownedIpo = personalIpos.find((item) => item.id === nextValue);
+                    setPrice(catalogIpo?.issue_price_max ?? ownedIpo?.issue_price_max ?? "");
+                  }}
+                />
+                {!lists.optionLoading.ipos &&
+                !catalogIpos.isLoading &&
+                personalIpos.length === 0 &&
+                sharedCatalogIpos.length === 0 ? (
+                  <p className="mt-2 text-sm text-muted">
+                    No IPOs are available in the catalog yet. Please check back after an
+                    administrator adds one.
                   </p>
                 ) : null}
-                <FormInput
-                  label="Price"
-                  error={validation.errors.price}
-                  required
-                  inputMode="decimal"
-                  value={price}
-                  onChange={(event) => {
-                    const nextPrice = event.target.value;
-                    setPrice(nextPrice);
-                    if (activeCategory) {
-                      const bounds = getApplicationLotBounds(
-                        selectedIpo && typeof selectedIpo.lot_size === "number"
-                          ? { lot_size: selectedIpo.lot_size }
-                          : null,
-                        activeCategory,
-                        nextPrice,
-                      );
-                      if (bounds) setLots((current) => adjustLotsToBounds(current, bounds));
-                    }
-                  }}
-                />
+                {validation.errors.ipo_id ? (
+                  <p role="alert" className="mt-1 text-sm font-medium text-red-700">
+                    {validation.errors.ipo_id}
+                  </p>
+                ) : null}
               </div>
-            </FormSection>
-          ) : (
-            <p className="text-muted">
-              Calculation inputs and rule version are preserved and cannot be changed here.
-            </p>
-          )}
+              <SearchableFormSelect
+                label="Demat account"
+                required
+                error={validation.errors.demat_account_id}
+                value={accountId}
+                placeholder={
+                  lists.optionLoading.accounts ? "Loading accounts…" : "Choose an active account"
+                }
+                disabled={editing || lists.optionLoading.accounts}
+                options={lists.accounts
+                  .filter((account) => account.account_status === "active" && !account.archived_at)
+                  .map((account) => ({
+                    value: account.id,
+                    label: `${account.holder_name} — ${account.bank_name ?? "Bank not provided"} · ${account.username ?? "Username not provided"}`,
+                  }))}
+                onChange={setAccountId}
+              />
+              <FormSelect
+                label="Investor category"
+                error={validation.errors.category_code ?? validation.errors.category_id}
+                required
+                value={categoryId || categoryCode}
+                disabled={categoriesQuery.isLoading}
+                onChange={(event) => {
+                  const nextCategory = categories.find((item) => item.id === event.target.value);
+                  setCategoryId(nextCategory?.id ?? "");
+                  setCategoryCode(nextCategory?.category ?? event.target.value);
+                  if (nextCategory) {
+                    const bounds = getApplicationLotBounds(
+                      selectedIpo && typeof selectedIpo.lot_size === "number"
+                        ? { lot_size: selectedIpo.lot_size }
+                        : null,
+                      nextCategory,
+                      price,
+                    );
+                    setLots(
+                      bounds
+                        ? adjustLotsToBounds(String(nextCategory.default_lots), bounds)
+                        : String(nextCategory.default_lots),
+                    );
+                  } else {
+                    setLots("1");
+                  }
+                }}
+              >
+                <option value="">
+                  {categoriesQuery.isLoading
+                    ? "Loading categories…"
+                    : categoriesQuery.error
+                      ? "Categories unavailable"
+                      : "Choose an investor category"}
+                </option>
+                {(["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"] as const).map((code) => {
+                  const item = categories.find((category) => category.category === code);
+                  return (
+                    <option key={code} value={item?.id ?? code}>
+                      {formatCategory(code)}
+                    </option>
+                  );
+                })}
+                {categories
+                  .filter((item) => item.category === "EMPLOYER")
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {formatCategory(item.category)}
+                    </option>
+                  ))}
+              </FormSelect>
+              <div className="sm:col-span-2">
+                <FormInput
+                  label="Lots"
+                  error={validation.errors.lots}
+                  required
+                  type="number"
+                  min={activeCategory ? (lotBounds?.minimum ?? undefined) : 1}
+                  max={activeCategory ? (lotBounds?.maximum ?? undefined) : 1_000_000}
+                  step={activeCategory ? (lotBounds?.increment ?? 1) : 1}
+                  value={lots}
+                  disabled={
+                    categoriesQuery.isLoading ||
+                    Boolean(categoriesQuery.error) ||
+                    (activeCategory &&
+                      (!lotBounds ||
+                        lotBounds.minimum === null ||
+                        (lotBounds.maximum !== null && lotBounds.maximum < lotBounds.minimum)))
+                  }
+                  onChange={(event) => setLots(event.target.value)}
+                />
+                {lotBounds?.minimum !== null &&
+                lotBounds?.minimum !== undefined &&
+                Number.isSafeInteger(enteredLots) &&
+                enteredLots < lotBounds.minimum ? (
+                  <p role="alert" className="mt-1 text-sm font-medium text-red-700">
+                    Select at least {lotBounds.minimum} lot(s).
+                  </p>
+                ) : null}
+                {lotBounds?.maximum !== null &&
+                lotBounds?.maximum !== undefined &&
+                Number.isSafeInteger(enteredLots) &&
+                enteredLots > lotBounds.maximum ? (
+                  <p role="alert" className="mt-1 text-sm font-medium text-red-700">
+                    Select no more than {lotBounds.maximum} lot(s).
+                  </p>
+                ) : null}
+                {lotBounds?.minimum !== null &&
+                lotBounds?.minimum !== undefined &&
+                Number.isSafeInteger(enteredLots) &&
+                enteredLots >= lotBounds.minimum &&
+                (enteredLots - lotBounds.minimum) % lotBounds.increment !== 0 ? (
+                  <p role="alert" className="mt-1 text-sm font-medium text-red-700">
+                    Select lots in increments of {lotBounds.increment}.
+                  </p>
+                ) : null}
+              </div>
+              {selectedIpo?.lot_size ? (
+                <p className="text-sm text-muted sm:col-span-2">
+                  One lot contains {selectedIpo.lot_size.toLocaleString("en-IN")} shares.
+                  {estimatedTotalShares !== null
+                    ? ` ${enteredLots.toLocaleString("en-IN")} lot(s) = ${estimatedTotalShares.toLocaleString("en-IN")} shares.`
+                    : ""}
+                </p>
+              ) : null}
+              <FormInput
+                label="Price"
+                error={validation.errors.price}
+                required
+                inputMode="decimal"
+                value={price}
+                onChange={(event) => {
+                  const nextPrice = event.target.value;
+                  setPrice(nextPrice);
+                  if (activeCategory) {
+                    const bounds = getApplicationLotBounds(
+                      selectedIpo && typeof selectedIpo.lot_size === "number"
+                        ? { lot_size: selectedIpo.lot_size }
+                        : null,
+                      activeCategory,
+                      nextPrice,
+                    );
+                    if (bounds) setLots((current) => adjustLotsToBounds(current, bounds));
+                  }
+                }}
+              />
+            </div>
+          </FormSection>
           {localCalculation ? (
             <p role="status" className="mt-3 rounded-lg bg-canvas p-4 text-lg font-semibold">
               Total amount: ₹{localCalculation.applicationAmount}
@@ -1178,32 +1245,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                 Total shares: {localCalculation.totalShares.toLocaleString("en-IN")}
               </span>
             </p>
-          ) : null}
-          {editing ? (
-            <FormSection title="Record details">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormInput
-                  label="Application number"
-                  error={validation.errors.application_number}
-                  value={applicationNumber}
-                  onChange={(event) => setApplicationNumber(event.target.value)}
-                />
-                <FormInput
-                  label="External reference"
-                  error={validation.errors.external_reference}
-                  value={externalReference}
-                  onChange={(event) => setExternalReference(event.target.value)}
-                />
-                <FormTextarea
-                  label="Notes"
-                  error={validation.errors.notes}
-                  fieldClassName="sm:col-span-2"
-                  rows={3}
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                />
-              </div>
-            </FormSection>
           ) : null}
         </div>
       </form>
@@ -1242,55 +1283,184 @@ export function ApplicationDetailsPage() {
   if (detail.error)
     return <ErrorMessage error={detail.error} onRetry={() => void detail.refetch()} />;
   if (!item) return <p>Application not found.</p>;
+  const snapshot = asRecord(item.calculation_snapshot);
+  const calculationInput = asRecord(snapshot.calculation_input);
+  const snapshotIpo = asRecord(calculationInput.ipo ?? snapshot.ipo);
+  const categoryRules = asRecord(calculationInput.rules ?? snapshot.category_configuration);
+  const ipoName = item.ipos?.company_name?.trim() || "IPO details unavailable";
+  const ipoSymbol = item.ipos?.symbol?.trim();
+  const accountName = item.demat_accounts?.holder_name?.trim() || "Demat account";
+  const accountBank = item.demat_accounts?.bank_name?.trim();
+  const accountUsername = item.demat_accounts?.username?.trim();
+  const price = calculationInput.price;
+  const priceType = calculationInput.price_type;
+  const submittedDate = item.submission_date ?? item.created_at;
+  const historicalRuleDetails: Array<[string, unknown]> = [
+    ["Minimum lots", categoryRules.minimum_lots],
+    ["Maximum lots", categoryRules.maximum_lots],
+    ["Lot increment", categoryRules.lot_increment],
+    ["Minimum investment", categoryRules.minimum_investment],
+    ["Maximum investment", categoryRules.maximum_investment],
+  ];
+
   return (
-    <div className="w-full space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+    <div className="w-full space-y-6 pb-8">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
           <BackLink fallback="/applications" allowedPath={/^\/(applications|dashboard)?$/}>
             Back to applications
           </BackLink>
-          <h1 className="text-3xl font-bold text-navy">Application details</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-bold text-navy">Application details</h1>
+            <ApplicationStatusBadge status={item.application_status} />
+          </div>
           <p className="mt-2 text-base text-muted">
-            Historical calculation rules are retained with this record.
+            {ipoSymbol ? `${ipoSymbol} · ` : ""}
+            {ipoName}
           </p>
         </div>
         <DrawerRouteLink className={linkClass} to={`/applications/${item.id}/edit`}>
           Edit application details
         </DrawerRouteLink>
       </header>
-      <Card>
-        <dl className="grid gap-4 sm:grid-cols-2">
-          {[
-            ["IPO", item.ipos ? `${item.ipos.symbol} — ${item.ipos.company_name}` : item.ipo_id],
-            [
-              "Demat account",
-              item.demat_accounts
-                ? `${item.demat_accounts.holder_name} — ${item.demat_accounts.masked_demat_identifier}`
-                : item.demat_account_id,
-            ],
-            ["Category", item.ipo_categories?.category ?? formatCategory(item.category_code)],
-            ["Lots", item.lots],
-            ["Total shares", item.total_shares],
-            ["Application amount", item.application_amount],
-            ["Submitted", formatDateTime(item.submission_date ?? item.created_at)],
-            ["Rule version", item.rule_version],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <dt className="font-semibold text-muted">{label}</dt>
-              <dd className="mt-1 break-words text-ink">{value}</dd>
+      <section
+        aria-label="Application summary"
+        className="overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-br from-white via-white to-indigo-50 shadow-card"
+      >
+        <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="flex min-w-0 items-start gap-4">
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-action">
+              <CircleDollarSign aria-hidden="true" className="size-6" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-muted">Total application amount</p>
+              <p className="mt-1 break-words text-3xl font-bold tracking-tight text-navy">
+                {formatRupees(item.application_amount)}
+              </p>
+              <p className="mt-2 text-sm text-muted">
+                {formatCategory(item.ipo_categories?.category ?? item.category_code)} category
+              </p>
             </div>
-          ))}
-        </dl>
-        <details className="mt-6">
-          <summary className="min-h-touch cursor-pointer font-semibold">
-            View saved calculation snapshot
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <SummaryMetric
+              icon={<Layers3 aria-hidden="true" className="size-4" />}
+              label="Lots applied"
+              value={item.lots.toLocaleString("en-IN")}
+            />
+            <SummaryMetric
+              icon={<ReceiptText aria-hidden="true" className="size-4" />}
+              label="Total shares"
+              value={item.total_shares.toLocaleString("en-IN")}
+            />
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card>
+          <DetailSectionHeading
+            icon={<ReceiptText aria-hidden="true" className="size-5" />}
+            title="Application"
+          />
+          <dl className="mt-5 grid gap-x-6 gap-y-5 sm:grid-cols-2">
+            <ApplicationDetail label="IPO" value={ipoName} />
+            <ApplicationDetail
+              label="Category"
+              value={formatCategory(item.ipo_categories?.category ?? item.category_code)}
+            />
+          </dl>
+        </Card>
+
+        <Card>
+          <DetailSectionHeading
+            icon={<Landmark aria-hidden="true" className="size-5" />}
+            title="Account & timeline"
+          />
+          <dl className="mt-5 grid gap-x-6 gap-y-5 sm:grid-cols-2">
+            <ApplicationDetail
+              label="Demat account"
+              value={
+                accountBank && accountUsername
+                  ? `${accountName} · ${accountBank} (${accountUsername})`
+                  : accountName
+              }
+            />
+            <ApplicationDetail
+              label="Submitted"
+              value={formatDateTime(submittedDate)}
+              icon={<CalendarDays aria-hidden="true" className="size-4" />}
+            />
+            <ApplicationDetail
+              label="Last updated"
+              value={formatDateTime(item.updated_at)}
+              icon={<CalendarDays aria-hidden="true" className="size-4" />}
+            />
+            {item.notes ? (
+              <ApplicationDetail label="Notes" value={item.notes} className="sm:col-span-2" />
+            ) : null}
+          </dl>
+        </Card>
+      </div>
+
+      <Card>
+        <details className="group">
+          <summary className="flex min-h-touch cursor-pointer list-none items-center justify-between gap-4 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-action [&::-webkit-details-marker]:hidden">
+            <div>
+              <h2 className="text-lg font-semibold text-ink">Calculation details</h2>
+              <p className="mt-1 text-sm text-muted">
+                The saved inputs and issue rules used for this application.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-canvas px-3 py-1.5 text-sm font-semibold text-action group-open:bg-indigo-100">
+              <span className="group-open:hidden">Show details</span>
+              <span className="hidden group-open:inline">Hide details</span>
+            </span>
           </summary>
-          <pre className="mt-3 overflow-x-auto rounded-lg bg-canvas p-4 text-sm">
-            {JSON.stringify(item.calculation_snapshot, null, 2)}
-          </pre>
+          <div className="mt-5 border-t border-border pt-5">
+            <dl className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+              <ApplicationDetail label="Price type" value={formatPriceType(priceType)} />
+              <ApplicationDetail label="Price per share" value={formatOptionalRupees(price)} />
+              <ApplicationDetail
+                label="Price band"
+                value={formatPriceBand(snapshotIpo.issue_price_min, snapshotIpo.issue_price_max)}
+              />
+              <ApplicationDetail
+                label="Cut-off price"
+                value={formatOptionalRupees(snapshotIpo.cut_off_price)}
+              />
+              <ApplicationDetail
+                label="Shares per lot"
+                value={formatOptionalNumber(snapshotIpo.lot_size)}
+              />
+              <ApplicationDetail
+                label="Snapshot captured"
+                value={
+                  typeof snapshot.captured_at === "string"
+                    ? formatDateTime(snapshot.captured_at)
+                    : "Not recorded"
+                }
+              />
+              {historicalRuleDetails.map(([label, value]) =>
+                value === null || value === undefined ? null : (
+                  <ApplicationDetail
+                    key={label}
+                    label={label}
+                    value={
+                      label.includes("investment")
+                        ? formatOptionalRupees(value)
+                        : formatOptionalNumber(value)
+                    }
+                  />
+                ),
+              )}
+            </dl>
+          </div>
         </details>
+      </Card>
+
+      <div className="flex justify-end border-t border-border pt-5">
         <ConfirmButton
-          className="mt-5"
           variant="outline"
           disabled={archive.isPending}
           title="Archive this record?"
@@ -1300,7 +1470,7 @@ export function ApplicationDetailsPage() {
         >
           Archive application
         </ConfirmButton>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -1522,7 +1692,10 @@ export function BulkApplicationPage() {
                 />
                 <span>
                   <span className="font-semibold">{account.holder_name}</span>
-                  <span className="text-sm text-muted">{account.masked_demat_identifier}</span>
+                  <span className="text-sm text-muted">
+                    {account.bank_name ?? "Bank not provided"} ·{" "}
+                    {account.username ?? "Username not provided"}
+                  </span>
                 </span>
               </label>
             ))}
@@ -1995,9 +2168,130 @@ function formatCategory(value: string) {
   );
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function formatRupees(value: string | number) {
+  const amount = Number(value);
+  return Number.isFinite(amount)
+    ? new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 2,
+      }).format(amount)
+    : "Not recorded";
+}
+
+function formatOptionalRupees(value: unknown) {
+  return typeof value === "string" || typeof value === "number"
+    ? formatRupees(value)
+    : "Not recorded";
+}
+
+function formatOptionalNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value.toLocaleString("en-IN")
+    : "Not recorded";
+}
+
+function formatPriceBand(minimum: unknown, maximum: unknown) {
+  const min = typeof minimum === "string" || typeof minimum === "number" ? minimum : null;
+  const max = typeof maximum === "string" || typeof maximum === "number" ? maximum : null;
+  if (min !== null && max !== null) return `${formatRupees(min)} – ${formatRupees(max)}`;
+  if (min !== null) return `From ${formatRupees(min)}`;
+  if (max !== null) return `Up to ${formatRupees(max)}`;
+  return "Not recorded";
+}
+
+function formatPriceType(value: unknown) {
+  if (value === "BID") return "Bid price";
+  if (value === "CUT_OFF") return "Cut-off price";
+  return "Not recorded";
+}
+
 function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Not recorded";
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
-    new Date(value),
+    date,
+  );
+}
+
+function formatStatus(value: string) {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function statusTone(value: string) {
+  if (["APPROVED", "COMPLETED", "ALLOTTED", "RELEASED", "NOT_REQUIRED"].includes(value)) {
+    return "border-success/20 bg-green-50 text-success";
+  }
+  if (["REJECTED", "FAILED", "NOT_ALLOTTED", "EXPIRED", "REVOKED"].includes(value)) {
+    return "border-danger/20 bg-red-50 text-danger";
+  }
+  if (["PENDING", "UNDER_PROCESSING", "PARTIALLY_ALLOTTED", "PARTIAL_ALLOTMENT"].includes(value)) {
+    return "border-warning/20 bg-amber-50 text-warning";
+  }
+  return "border-border bg-canvas text-muted";
+}
+
+function ApplicationStatusBadge({ status }: { status: string }) {
+  return (
+    <span
+      className={`inline-flex min-h-7 items-center rounded-full border px-3 py-1 text-xs font-semibold ${statusTone(status)}`}
+    >
+      {formatStatus(status)}
+    </span>
+  );
+}
+
+function DetailSectionHeading({ icon, title }: { icon: ReactNode; title: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex size-10 items-center justify-center rounded-xl bg-indigo-50 text-action">
+        {icon}
+      </span>
+      <h2 className="text-lg font-semibold text-ink">{title}</h2>
+    </div>
+  );
+}
+
+function ApplicationDetail({
+  label,
+  value,
+  icon,
+  className = "",
+}: {
+  label: string;
+  value: string | number;
+  icon?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`min-w-0 ${className}`}>
+      <dt className="flex items-center gap-2 text-sm font-medium text-muted">
+        {icon ? <span className="text-action">{icon}</span> : null}
+        {label}
+      </dt>
+      <dd className="mt-1 break-words font-semibold text-ink">{value}</dd>
+    </div>
+  );
+}
+
+function SummaryMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-border/80 bg-white/80 p-3 sm:min-w-32 sm:p-4">
+      <div className="flex items-center gap-2 text-action">
+        {icon}
+        <span className="text-xs font-semibold text-muted">{label}</span>
+      </div>
+      <p className="mt-2 break-words text-lg font-bold tabular-nums text-ink">{value}</p>
+    </div>
   );
 }
 

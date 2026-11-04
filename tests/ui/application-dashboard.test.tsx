@@ -27,6 +27,7 @@ const allIpoSummary = {
     category_counts: { RETAIL: 12, SHNI: 5, BHNI: 4, SHAREHOLDER: 2 },
   },
 };
+let listRows: unknown[] = [];
 
 function renderPage(path = "/applications") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -43,6 +44,7 @@ function renderPage(path = "/applications") {
 
 describe("application manager overview", () => {
   beforeEach(() => {
+    listRows = [];
     apiRequestMock.mockReset();
     apiRequestMock.mockImplementation(async (path: string) => {
       if (path === "/api/applications/summary") return allIpoSummary;
@@ -58,8 +60,8 @@ describe("application manager overview", () => {
       if (path.startsWith("/api/applications?")) {
         return {
           data: {
-            applications: [],
-            pagination: { page: 1, page_size: 50, total: 0, total_pages: 1 },
+            applications: listRows,
+            pagination: { page: 1, page_size: 50, total: listRows.length, total_pages: 1 },
           },
         };
       }
@@ -112,5 +114,46 @@ describe("application manager overview", () => {
       expect.anything(),
     );
     overview.unmount();
+  });
+
+  it("shows the applied IPO name and category when the issue has no symbol or saved category", async () => {
+    listRows = [
+      {
+        id: "55555555-5555-4555-8555-555555555555",
+        user_id: "22222222-2222-4222-8222-222222222222",
+        ipo_id: ipoId,
+        demat_account_id: "99999999-9999-4999-8999-999999999999",
+        category_id: null,
+        category_code: "SHNI",
+        lots: 1,
+        total_shares: 100,
+        application_amount: "112800",
+        application_number: null,
+        external_reference: null,
+        submission_date: "2026-11-04T11:09:00.000Z",
+        application_status: "SUBMITTED",
+        mandate_status: "UNKNOWN",
+        allotment_status: "UNKNOWN",
+        notes: null,
+        rule_version: null,
+        calculation_snapshot: {},
+        created_at: "2026-11-04T11:09:00.000Z",
+        updated_at: "2026-11-04T11:09:00.000Z",
+        archived_at: null,
+        ipos: { symbol: null, company_name: "Vansh Industries" },
+        demat_accounts: { holder_name: "Vansh" },
+        ipo_categories: null,
+      },
+    ];
+
+    renderPage();
+
+    const row = await screen.findByRole("row", { name: /Vansh Industries/ });
+    expect(row).toHaveTextContent("sHNI");
+    expect(screen.getByRole("link", { name: "Vansh Industries" })).toHaveAttribute(
+      "href",
+      "/applications/55555555-5555-4555-8555-555555555555",
+    );
+    expect(row).not.toHaveTextContent("Category");
   });
 });

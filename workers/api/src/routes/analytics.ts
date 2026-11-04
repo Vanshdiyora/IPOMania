@@ -237,12 +237,7 @@ function createReportRows(analytics: DashboardAnalytics): ReportRow[] {
       reportRow("category", "", item.category, item.count),
     ),
     ...analytics.applications_by_account.map((item) =>
-      reportRow(
-        "demat account",
-        "",
-        `${item.holder_name} (${item.masked_demat_identifier})`,
-        item.count,
-      ),
+      reportRow("demat account", "", `${item.holder_name} (${item.bank_name})`, item.count),
     ),
     ...analytics.monthly_application_trends.map((item) =>
       reportRow("monthly applications", item.month, "Applications", item.count),

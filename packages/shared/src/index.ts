@@ -26,9 +26,9 @@ export interface DematAccount {
   id: string;
   user_id: string;
   holder_name: string;
-  depository_type: "NSDL" | "CDSL";
-  masked_demat_identifier: string;
-  masked_client_reference: string | null;
+  bank_name: string | null;
+  username: string | null;
+  password_saved: boolean;
   account_status: "active" | "inactive" | "closed";
   notes: string | null;
   created_at: string;
@@ -38,7 +38,10 @@ export interface DematAccount {
 
 export interface AccountImportPreviewRow {
   row_number: number;
-  record: Omit<DematAccount, "id" | "user_id" | "created_at" | "updated_at" | "archived_at">;
+  record: Omit<
+    DematAccount,
+    "id" | "user_id" | "created_at" | "updated_at" | "archived_at" | "password_saved"
+  >;
   row_status: "ready" | "duplicate" | "invalid";
   errors: string[];
   warnings: string[];
@@ -365,7 +368,7 @@ export interface DashboardAnalytics {
   applications_by_account: Array<{
     account_id: string;
     holder_name: string;
-    masked_demat_identifier: string;
+    bank_name: string;
     count: number;
   }>;
   monthly_application_trends: Array<{
@@ -412,10 +415,10 @@ export interface DashboardAnalytics {
     application_id: string;
     ipo_id: string;
     company_name: string;
-    symbol: string;
+    symbol: string | null;
     account_id: string;
     holder_name: string;
-    masked_demat_identifier: string;
+    bank_name: string;
     category: IpoCategoryCode;
     status: ApplicationStatus;
     created_at: string;
