@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from "reac
 import type {
   DematAccount,
   IpoApplication,
+  IpoCatalogRecord,
   IpoCategoryConfiguration,
   IpoRecord,
 } from "@ipo-mania/shared";
@@ -62,6 +63,12 @@ type ApplicationSummaryResponse = {
 };
 type IpoListResponse = {
   data: { ipos: IpoRecord[]; pagination?: { page: number; total_pages: number } };
+};
+type IpoCatalogListResponse = {
+  data: {
+    ipos: IpoCatalogRecord[];
+    pagination?: { page: number; total_pages: number };
+  };
 };
 type IpoResponse = { data: IpoRecord };
 type AccountListResponse = {
@@ -656,6 +663,8 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { session } = useAuth();
+  const { notify } = useToast();
+  const queryClient = useQueryClient();
   const lists = useOwnedLists();
   const [dirty, setDirty] = useState(false);
   const validation = useFormValidation();
@@ -667,6 +676,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const [applicationNumber, setApplicationNumber] = useState("");
   const [externalReference, setExternalReference] = useState("");
   const [notes, setNotes] = useState("");
+  const [preparedCatalogIpo, setPreparedCatalogIpo] = useState<IpoRecord | null>(null);
   const [reviewedApplication, setReviewedApplication] = useState<{
     fingerprint: string;
     data: CalculationResponse["data"];
@@ -677,6 +687,39 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     queryKey: ["ipo", preselectedIpoId],
     enabled: Boolean(session && !editing && preselectedIpoId),
     queryFn: () => apiRequest<IpoResponse>(`/api/ipos/${preselectedIpoId}`, session!),
+  });
+  const catalogIpos = useInfiniteQuery({
+    queryKey: ["ipo-catalog", "application-options"],
+    enabled: Boolean(session && !editing),
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      apiRequest<IpoCatalogListResponse>(
+        `/api/ipos/catalog?page=${pageParam}&page_size=25`,
+        session!,
+      ),
+    getNextPageParam: (lastPage) => {
+      const { page, total_pages: totalPages } = lastPage.data.pagination ?? {};
+      return page && totalPages && page < totalPages ? page + 1 : undefined;
+    },
+  });
+  const importCatalogIpo = useMutation({
+    mutationFn: (catalogIpoId: string) =>
+      apiRequest<IpoResponse>(`/api/ipos/catalog/${catalogIpoId}/import`, session!, {
+        method: "POST",
+      }),
+    onSuccess: async (result) => {
+      setPreparedCatalogIpo(result.data);
+      setIpoId(result.data.id);
+      setCategoryId("");
+      setReviewedApplication(null);
+      await queryClient.invalidateQueries({ queryKey: ["ipos", "application-options"] });
+    },
+    onError: (error) =>
+      notify({
+        title: "IPO could not be prepared for an application",
+        description: errorMessage(error),
+        tone: "error",
+      }),
   });
   const categoriesQuery = useQuery({
     queryKey: ["ipo-categories", ipoId],
@@ -695,8 +738,18 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     }, new Map<IpoCategoryConfiguration["category"], IpoCategoryConfiguration>()),
   ).map(([, configuration]) => configuration);
   const activeCategory = categories.find((category) => category.id === categoryId);
+  const personalIpos =
+    preparedCatalogIpo && !lists.ipos.some((item) => item.id === preparedCatalogIpo.id)
+      ? [preparedCatalogIpo, ...lists.ipos]
+      : lists.ipos;
+  const importedCatalogIds = new Set(
+    personalIpos.flatMap((item) => (item.source_catalog_id ? [item.source_catalog_id] : [])),
+  );
+  const sharedCatalogIpos = (
+    catalogIpos.data?.pages.flatMap((page) => page.data.ipos) ?? []
+  ).filter((item) => !importedCatalogIds.has(item.id));
   const selectedIpo =
-    lists.ipos.find((item) => item.id === ipoId) ??
+    personalIpos.find((item) => item.id === ipoId) ??
     (preselectedIpo.data?.data.id === ipoId ? preselectedIpo.data.data : null);
   const enteredLots = Number(lots);
   const estimatedTotalShares =
@@ -736,7 +789,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     notes: notes || null,
   };
   const applicationFingerprint = JSON.stringify(applicationPayload);
-  const { notify } = useToast();
   const currentReview =
     reviewedApplication?.fingerprint === applicationFingerprint ? reviewedApplication.data : null;
   const calculation = useMutation({
@@ -870,34 +922,64 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                     label="IPO"
                     placeholder="Choose an IPO"
                     value={ipoId}
-                    loading={lists.optionLoading.ipos}
-                    disabled={lists.optionLoading.ipos}
+                    loading={
+                      lists.optionLoading.ipos ||
+                      catalogIpos.isLoading ||
+                      importCatalogIpo.isPending
+                    }
+                    disabled={
+                      lists.optionLoading.ipos ||
+                      catalogIpos.isLoading ||
+                      importCatalogIpo.isPending
+                    }
                     emptyLabel={
-                      lists.ipos.length === 0
-                        ? "No personal IPOs are available."
+                      personalIpos.length === 0 && sharedCatalogIpos.length === 0
+                        ? "No IPOs are available."
                         : "No matching options."
                     }
-                    options={lists.ipos.map((item) => ({
-                      value: item.id,
-                      label: item.company_name,
-                    }))}
-                    hasMore={Boolean(lists.iposInfinite.hasNextPage)}
-                    loadingMore={lists.iposInfinite.isFetchingNextPage}
-                    onLoadMore={() => void lists.iposInfinite.fetchNextPage()}
+                    options={[
+                      ...personalIpos.map((item) => ({
+                        value: item.id,
+                        label: item.company_name,
+                        description: "My IPO",
+                      })),
+                      ...sharedCatalogIpos.map((item) => ({
+                        value: `catalog:${item.id}`,
+                        label: item.company_name,
+                        description: "Shared catalog",
+                      })),
+                    ]}
+                    hasMore={Boolean(lists.iposInfinite.hasNextPage || catalogIpos.hasNextPage)}
+                    loadingMore={
+                      lists.iposInfinite.isFetchingNextPage || catalogIpos.isFetchingNextPage
+                    }
+                    onLoadMore={() => {
+                      if (lists.iposInfinite.hasNextPage) void lists.iposInfinite.fetchNextPage();
+                      if (catalogIpos.hasNextPage) void catalogIpos.fetchNextPage();
+                    }}
                     onChange={(value) => {
                       const nextValue = Array.isArray(value) ? (value[0] ?? "") : value;
+                      if (nextValue.startsWith("catalog:")) {
+                        importCatalogIpo.mutate(nextValue.slice("catalog:".length));
+                        return;
+                      }
+                      setPreparedCatalogIpo(null);
                       setIpoId(nextValue);
                       setCategoryId("");
+                      setReviewedApplication(null);
                     }}
                   />
-                  {!lists.optionLoading.ipos && lists.ipos.length === 0 ? (
+                  {!lists.optionLoading.ipos &&
+                  !catalogIpos.isLoading &&
+                  personalIpos.length === 0 &&
+                  sharedCatalogIpos.length === 0 ? (
                     <p className="mt-2 text-sm text-muted">
-                      No personal IPOs are available.{" "}
+                      No IPOs are available in your records or the shared catalog.{" "}
                       <Link
                         className="font-semibold text-action underline underline-offset-2 hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
                         to="/ipos/new"
                       >
-                        Add an IPO
+                        Add to catalog
                       </Link>{" "}
                       and configure its category before recording an application.
                     </p>
