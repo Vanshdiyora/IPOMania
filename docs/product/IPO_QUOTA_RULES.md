@@ -5,7 +5,8 @@
 Category rules are **issue-specific**. The system has no built-in quota limits, category
 allocations, investment caps, reserved percentages, or shareholder criteria. Users must record
 values from an issue-specific published source or leave the corresponding rule unconfigured.
-There are no category-specific defaults.
+Each rule also stores an explicit starting lot quantity for the application form. This is a user-
+configured form value, not an inferred quota limit or market-data value.
 
 The supported category identifiers are `RETAIL`, `SHNI`, `BHNI`, `SHAREHOLDER`, and `EMPLOYER`. A category
 record is linked to exactly one user-owned IPO. Every saved configuration gets a monotonically
@@ -15,6 +16,7 @@ assigned rule version; configurations are append-only and historical versions ar
 
 | Field                                                 | Meaning                                                                                                                                                                                                |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `default_lots`                                        | Initial lot quantity prefilled when the category is selected. Must satisfy the category's lot bounds and increment.                                                                                    |
 | `lot_limit_status`                                    | `CONFIGURED` means one or both lot bounds are known; `NO_PUBLISHED_LIMIT` means the source explicitly has no published lot bound; `UNCONFIGURED` means the rule is unknown and calculations must stop. |
 | `minimum_lots`                                        | Inclusive minimum lot count when configured; null when no bound is published or the rule is unconfigured.                                                                                              |
 | `maximum_lots`                                        | Inclusive maximum lot count when configured; null when no bound is published or the rule is unconfigured.                                                                                              |
@@ -33,6 +35,8 @@ assigned rule version; configurations are append-only and historical versions ar
 Unknown rules are not equivalent to unlimited rules. A calculation is rejected if the lot or
 investment limit status is `UNCONFIGURED`. A null bound is treated as absent only when its status
 explicitly says `NO_PUBLISHED_LIMIT` or when a configured status has a different bound present.
+The IPO's `lot_size` is the number of shares in one lot. Application previews calculate total
+shares from lots and lot size, then calculate the amount using the selected price.
 
 ## Eligibility behavior
 

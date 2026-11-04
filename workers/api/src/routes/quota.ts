@@ -21,7 +21,7 @@ type CalculationRequest = z.infer<typeof ipoCalculationSchema>;
 const ipoPricingColumns =
   "id, issue_price_min, issue_price_max, cut_off_price, lot_size, archived_at";
 const categoryColumns =
-  "id, category, rule_version, lot_limit_status, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment";
+  "id, category, rule_version, lot_limit_status, default_lots, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment";
 
 export const quotaRoutes = new Hono<QuotaContext>();
 quotaRoutes.use("*", authenticate);

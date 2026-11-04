@@ -695,6 +695,17 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     }, new Map<IpoCategoryConfiguration["category"], IpoCategoryConfiguration>()),
   ).map(([, configuration]) => configuration);
   const activeCategory = categories.find((category) => category.id === categoryId);
+  const selectedIpo =
+    lists.ipos.find((item) => item.id === ipoId) ??
+    (preselectedIpo.data?.data.id === ipoId ? preselectedIpo.data.data : null);
+  const enteredLots = Number(lots);
+  const estimatedTotalShares =
+    selectedIpo &&
+    Number.isSafeInteger(enteredLots) &&
+    enteredLots > 0 &&
+    Number.isSafeInteger(selectedIpo.lot_size * enteredLots)
+      ? selectedIpo.lot_size * enteredLots
+      : null;
   useEffect(() => {
     if (editing || dirty || ipoId || !preselectedIpo.data?.data.id) return;
     setIpoId(preselectedIpo.data.data.id);
@@ -922,7 +933,11 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                   required
                   value={categoryId}
                   disabled={categoriesQuery.isLoading || Boolean(categoriesQuery.error)}
-                  onChange={(event) => setCategoryId(event.target.value)}
+                  onChange={(event) => {
+                    const nextCategory = categories.find((item) => item.id === event.target.value);
+                    setCategoryId(event.target.value);
+                    if (nextCategory) setLots(String(nextCategory.default_lots));
+                  }}
                 >
                   <option value="">
                     {categoriesQuery.isLoading
@@ -962,6 +977,14 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                   value={lots}
                   onChange={(event) => setLots(event.target.value)}
                 />
+                {selectedIpo?.lot_size ? (
+                  <p className="text-sm text-muted sm:col-span-2">
+                    One lot contains {selectedIpo.lot_size.toLocaleString("en-IN")} shares.
+                    {estimatedTotalShares !== null
+                      ? ` ${enteredLots.toLocaleString("en-IN")} lot(s) = ${estimatedTotalShares.toLocaleString("en-IN")} shares.`
+                      : ""}
+                  </p>
+                ) : null}
                 <FormInput
                   label="Price"
                   error={validation.errors.price}
@@ -988,6 +1011,9 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
           {currentReview ? (
             <p role="status" className="mt-3 rounded-lg bg-canvas p-4 text-lg font-semibold">
               Total amount: {currentReview.application_amount}
+              <span className="mt-1 block text-base font-normal">
+                Total shares: {currentReview.total_shares?.toLocaleString("en-IN") ?? "—"}
+              </span>
               {currentReview.warnings.map((warning) => (
                 <span className="mt-2 block text-base font-normal text-danger" key={warning}>
                   Potential duplicate: {warning}

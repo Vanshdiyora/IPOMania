@@ -27,9 +27,9 @@ type IpoRouteContext = Context<IpoContext>;
 const ipoColumns =
   "id, company_name, symbol, ipo_type, exchange, issue_price_min, issue_price_max, cut_off_price, lot_size, issue_size, opening_date, closing_date, allotment_date, listing_date, status, data_source, source_reference, last_verified_at, source_catalog_id, created_at, updated_at, archived_at";
 const categoryColumns =
-  "id, ipo_id, category, rule_version, lot_limit_status, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, reserved_shares, reserved_percentage, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment, source_reference, source_catalog_rule_id, rule_source, last_verified_at, created_at";
+  "id, ipo_id, category, rule_version, lot_limit_status, default_lots, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, reserved_shares, reserved_percentage, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment, source_reference, source_catalog_rule_id, rule_source, last_verified_at, created_at";
 const catalogCategoryColumns =
-  "id, ipo_catalog_id, category, rule_version, lot_limit_status, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, reserved_shares, reserved_percentage, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment, source_reference, rule_source, last_verified_at, created_at";
+  "id, ipo_catalog_id, category, rule_version, lot_limit_status, default_lots, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, reserved_shares, reserved_percentage, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment, source_reference, rule_source, last_verified_at, created_at";
 const catalogColumns =
   "id,provider_id,company_name,symbol,issue_type,exchange,price_band_min,price_band_max,issue_price,lot_size,issue_size,bidding_start_date,bidding_end_date,allotment_date,listing_date,ipo_status,data_source,last_synced_at,created_at,updated_at,archived_at";
 
@@ -538,6 +538,7 @@ async function copyLatestCatalogRules(
       source_catalog_rule_id: rule.id,
       category: rule.category,
       lot_limit_status: rule.lot_limit_status,
+      default_lots: rule.default_lots,
       minimum_lots: rule.minimum_lots,
       maximum_lots: rule.maximum_lots,
       lot_increment: rule.lot_increment,

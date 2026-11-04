@@ -347,6 +347,7 @@ export const ipoCategoryConfigurationSchema = z
   .object({
     category: ipoCategorySchema,
     lot_limit_status: z.enum(["CONFIGURED", "NO_PUBLISHED_LIMIT", "UNCONFIGURED"]),
+    default_lots: z.number().int().positive().max(2_147_483_647),
     minimum_lots: z.number().int().positive().max(2_147_483_647).nullable(),
     maximum_lots: z.number().int().positive().max(2_147_483_647).nullable(),
     lot_increment: z.number().int().positive().max(2_147_483_647),
@@ -425,6 +426,20 @@ export const ipoCategoryConfigurationSchema = z
         code: "custom",
         message: "Minimum lots cannot exceed maximum lots.",
         path: ["minimum_lots"],
+      });
+    }
+    if (
+      configuration.default_lots < (configuration.minimum_lots ?? 1) ||
+      (configuration.maximum_lots !== null &&
+        configuration.default_lots > configuration.maximum_lots) ||
+      (configuration.default_lots - (configuration.minimum_lots ?? 1)) %
+        configuration.lot_increment !==
+        0
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Initial lots must follow the configured lot bounds and increment.",
+        path: ["default_lots"],
       });
     }
     if (

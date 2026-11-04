@@ -43,6 +43,9 @@ and decimal `price`, nullable `shareholder_shares`, and explicit `eligibility_an
 application fields include number, external reference, submission date, statuses, and notes. Unknown
 properties are rejected. The server verifies all owned records, checks active account state and
 category/IPO linkage, runs the shared financial engine, and derives shares, amount, and rule version.
+The application form initializes lots from the selected category rule's configured `default_lots`.
+The IPO's `lot_size` is the number of shares per lot; preview responses return the calculated total
+shares and application amount based on the submitted lot quantity and price.
 The client cannot supply amount, shares, snapshot, owner, or rule version.
 
 Bulk creation validates every row before one insert. If any row is invalid, it returns an

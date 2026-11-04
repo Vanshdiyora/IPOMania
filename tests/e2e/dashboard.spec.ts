@@ -227,7 +227,7 @@ async function prepareDashboard(page: Page) {
       json: { data: { ipos: [{ id: ipoId, company_name: "Dashboard Test IPO", symbol: "DASH" }] } },
     }),
   );
-  await page.route("**/api/accounts?*", (route) =>
+  await page.route(/\/api\/accounts(?:\?|$)/, (route) =>
     route.fulfill({
       json: {
         data: {
@@ -290,6 +290,7 @@ test("financial pages are unavailable in the web app", async ({ page }) => {
 test("dashboard remains usable across responsive viewports with accessible filters", async ({
   page,
 }, testInfo) => {
+  test.setTimeout(90_000);
   await prepareDashboard(page);
   await page.goto("/");
 

@@ -1,6 +1,6 @@
 begin;
 
-select plan(24);
+select plan(26);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -134,6 +134,25 @@ select is(
   (select count(*) from public.ipo_categories),
   1::bigint,
   'User A reads only their category rule versions'
+);
+select is(
+  (select default_lots from public.ipo_categories
+   where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+  1,
+  'Category rules store an initial lots value'
+);
+select throws_ok(
+  $$insert into public.ipo_categories (
+      user_id, ipo_id, category, lot_limit_status, default_lots, lot_increment,
+      investment_limit_status, eligibility_conditions, allowed_price_types
+    ) values (
+      '66666666-6666-4666-8666-666666666666',
+      '88888888-8888-4888-8888-888888888888', 'BHNI', 'UNCONFIGURED', 2, 3,
+      'UNCONFIGURED', '[]'::jsonb, array['BID']
+    )$$,
+  '23514',
+  'new row for relation "ipo_categories" violates check constraint "ipo_categories_default_lots_valid"',
+  'Initial lots must follow the configured lot increment'
 );
 select lives_ok(
   $$insert into public.ipo_categories (

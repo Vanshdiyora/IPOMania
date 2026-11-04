@@ -83,7 +83,7 @@ async function prepare(page: Page, admin = false) {
   await page.route("**/rest/v1/profiles*", (route) =>
     route.fulfill({ json: { role: admin ? "ADMIN" : "USER" } }),
   );
-  await page.route("**/api/accounts?*", (route) =>
+  await page.route(/\/api\/accounts(?:\?|$)/, (route) =>
     route.fulfill({
       json: {
         data: {
@@ -97,14 +97,14 @@ async function prepare(page: Page, admin = false) {
   await page.route(`**/api/accounts/${recordId}`, (route) =>
     route.fulfill({ json: { data: account } }),
   );
-  await page.route("**/api/ipos?*", (route) =>
+  await page.route(/\/api\/ipos(?:\?|$)/, (route) =>
     route.fulfill({
       json: {
         data: { ipos: [ipo], pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 } },
       },
     }),
   );
-  await page.route("**/api/ipos/catalog?*", (route) =>
+  await page.route(/\/api\/ipos\/catalog(?:\?|$)/, (route) =>
     route.fulfill({
       json: {
         data: { ipos: [], pagination: { page: 1, page_size: 25, total: 0, total_pages: 0 } },
@@ -524,7 +524,7 @@ test("disabled synchronization actions retain readable contrast", async ({ page 
 
 test("application search and IPO filter update the actual list request", async ({ page }) => {
   await prepare(page);
-  await page.route("**/api/applications?*", (route) =>
+  await page.route(/\/api\/applications(?:\?|$)/, (route) =>
     route.fulfill({
       json: {
         data: {
@@ -563,7 +563,7 @@ test("application search and IPO filter update the actual list request", async (
 test("application filter options remain visible in the mobile drawer", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await prepare(page);
-  await page.route("**/api/applications?*", (route) =>
+  await page.route(/\/api\/applications(?:\?|$)/, (route) =>
     route.fulfill({
       json: {
         data: {
