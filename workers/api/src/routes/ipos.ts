@@ -354,68 +354,14 @@ iposRoutes.get("/", async (context) => {
   );
   if (error) throw error;
 
-  const catalogStatuses = selectedStatuses.filter((status) =>
-    ["UPCOMING", "OPEN", "CLOSED", "LISTED"].includes(status),
-  );
-  let catalog: IpoCatalogDatabaseRow[] = [];
-  let catalogCount = 0;
-  if (selectedStatuses.length === 0 || catalogStatuses.length > 0) {
-    let catalogRequest = supabase
-      .from("ipo_catalog")
-      .select(catalogColumns, { count: "exact" })
-      .is("archived_at", null)
-      .order(
-        sortColumn === "opening_date"
-          ? "bidding_start_date"
-          : sortColumn === "issue_price_min"
-            ? "price_band_min"
-            : "company_name",
-        { ascending: sortAscending, nullsFirst: false },
-      );
-    if (sortColumn !== "company_name")
-      catalogRequest = catalogRequest.order("company_name", { ascending: true });
-    catalogRequest = catalogRequest.order("id", { ascending: true });
-    if (catalogStatuses.length === 1) {
-      catalogRequest = catalogRequest.eq("ipo_status", catalogStatuses[0]!.toLowerCase());
-    } else if (catalogStatuses.length > 1) {
-      catalogRequest = catalogRequest.in(
-        "ipo_status",
-        catalogStatuses.map((status) => status.toLowerCase()),
-      );
-    }
-    if (query.exchange) catalogRequest = catalogRequest.ilike("exchange", query.exchange);
-    if (query.opening_from)
-      catalogRequest = catalogRequest.gte("bidding_start_date", query.opening_from);
-    if (query.opening_to)
-      catalogRequest = catalogRequest.lte("bidding_start_date", query.opening_to);
-    if (query.search) {
-      const term = escapeLike(query.search).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-      catalogRequest = catalogRequest.or(`company_name.ilike."%${term}%",symbol.ilike."${term}"`);
-    }
-    const catalogResult = await catalogRequest.range(
-      (query.page - 1) * query.page_size,
-      query.page * query.page_size - 1,
-    );
-    if (catalogResult.error) throw catalogResult.error;
-    catalog = (catalogResult.data ?? []) as IpoCatalogDatabaseRow[];
-    catalogCount = catalogResult.count ?? 0;
-  }
-
   return context.json({
     data: {
       ipos: (data ?? []) as IpoRecord[],
-      catalog: catalog.map(catalogRecord),
       pagination: {
         page: query.page,
         page_size: query.page_size,
         total: count ?? 0,
         total_pages: Math.ceil((count ?? 0) / query.page_size),
-      },
-      catalog_pagination: {
-        page: query.page,
-        page_size: query.page_size,
-        total: catalogCount,
-        total_pages: Math.ceil(catalogCount / query.page_size),
       },
     },
   });
