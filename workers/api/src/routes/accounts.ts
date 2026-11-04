@@ -2,12 +2,14 @@ import { Hono, type Context } from "hono";
 import * as XLSX from "@e965/xlsx";
 import {
   accountListQuerySchema,
+  dematAccountImportSchema,
   dematAccountSchema,
   dematAccountUpdateSchema,
 } from "@ipo-mania/validation";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { AccountImportPreviewRow, DematAccount } from "@ipo-mania/shared";
 import type { EnvironmentBindings } from "../env";
+import { decryptAccountPassword, encryptAccountPassword } from "../lib/account-credentials";
 import { authenticate } from "../middleware/authenticate";
 import { validateJson } from "../middleware/validate-json";
 
@@ -15,7 +17,7 @@ const maxUploadBytes = 5 * 1024 * 1024;
 const maxImportRows = 500;
 const xlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const accountColumns =
-  "id, user_id, holder_name, depository_type, masked_demat_identifier, masked_client_reference, account_status, notes, created_at, updated_at, archived_at";
+  "id, user_id, holder_name, bank_name, username, password_encrypted, account_status, notes, created_at, updated_at, archived_at";
 
 type AccountContext = {
   Bindings: EnvironmentBindings;
@@ -25,15 +27,13 @@ type AccountRouteContext = Context<AccountContext>;
 
 type ColumnMapping = Partial<
   Record<
-    | "holder_name"
-    | "depository_type"
-    | "masked_demat_identifier"
-    | "masked_client_reference"
-    | "account_status"
-    | "notes",
+    "holder_name" | "bank_name" | "username" | "account_status" | "notes",
     string
   >
 >;
+type StoredDematAccount = Omit<DematAccount, "password_saved"> & {
+  password_encrypted: string | null;
+};
 
 type ParsedRow = {
   row_number: number;
@@ -43,6 +43,11 @@ type ParsedRow = {
 export const accountsRoutes = new Hono<AccountContext>();
 
 accountsRoutes.use("*", authenticate);
+
+function serializeAccount(account: StoredDematAccount): DematAccount {
+  const { password_encrypted, ...publicAccount } = account;
+  return { ...publicAccount, password_saved: Boolean(password_encrypted) };
+}
 
 accountsRoutes.get("/", async (context) => {
   const parsedQuery = accountListQuerySchema.safeParse(context.req.query());
@@ -68,7 +73,6 @@ accountsRoutes.get("/", async (context) => {
   if (query.holder_name) {
     accountsQuery = accountsQuery.ilike("holder_name", `${escapeLike(query.holder_name)}%`);
   }
-  if (query.depository) accountsQuery = accountsQuery.eq("depository_type", query.depository);
   if (query.status) accountsQuery = accountsQuery.eq("account_status", query.status);
   if (query.created_from) accountsQuery = accountsQuery.gte("created_at", query.created_from);
   if (query.created_to) accountsQuery = accountsQuery.lte("created_at", query.created_to);
@@ -101,7 +105,7 @@ accountsRoutes.get("/", async (context) => {
   const archived = archivedResult.count ?? 0;
   return context.json({
     data: {
-      accounts: accountsResult.data as DematAccount[],
+      accounts: (accountsResult.data as StoredDematAccount[]).map(serializeAccount),
       pagination: {
         page: query.page,
         pageSize: query.pageSize,
@@ -119,15 +123,28 @@ accountsRoutes.get("/", async (context) => {
 
 accountsRoutes.post("/", validateJson(dematAccountSchema), async (context) => {
   const payload = context.req.valid("json");
+  const passwordEncrypted = await encryptAccountPassword(
+    payload.password,
+    context.env?.ACCOUNT_CREDENTIAL_ENCRYPTION_KEY,
+  );
+  if (!passwordEncrypted) return credentialEncryptionUnavailable(context);
   const { data, error } = await context
     .get("rlsSupabase")
     .from("demat_accounts")
-    .insert({ ...payload, user_id: context.get("authenticatedUser").id })
+    .insert({
+      holder_name: payload.holder_name,
+      bank_name: payload.bank_name,
+      username: payload.username,
+      account_status: payload.account_status,
+      notes: payload.notes ?? null,
+      password_encrypted: passwordEncrypted,
+      user_id: context.get("authenticatedUser").id,
+    })
     .select(accountColumns)
     .single();
 
   if (error) return databaseError(context, error);
-  return context.json({ data: data as DematAccount }, 201);
+  return context.json({ data: serializeAccount(data as StoredDematAccount) }, 201);
 });
 
 accountsRoutes.get("/:accountId", async (context) => {
@@ -143,13 +160,49 @@ accountsRoutes.get("/:accountId", async (context) => {
 
   if (error) throw error;
   if (!data) return accountNotFound(context);
-  return context.json({ data: data as DematAccount });
+  return context.json({ data: serializeAccount(data as StoredDematAccount) });
+});
+
+accountsRoutes.get("/:accountId/password", async (context) => {
+  const accountId = context.req.param("accountId");
+  if (!isUuid(accountId)) return accountNotFound(context);
+  const { data, error } = await context
+    .get("rlsSupabase")
+    .from("demat_accounts")
+    .select("password_encrypted")
+    .eq("id", accountId)
+    .eq("user_id", context.get("authenticatedUser").id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return accountNotFound(context);
+  if (!data.password_encrypted) {
+    return context.json(
+      { error: { code: "PASSWORD_NOT_SET", message: "No password is saved for this account." } },
+      404,
+    );
+  }
+  const password = await decryptAccountPassword(
+    data.password_encrypted,
+    context.env?.ACCOUNT_CREDENTIAL_ENCRYPTION_KEY,
+  );
+  if (password === null) return credentialEncryptionUnavailable(context);
+  return context.json({ data: { password } }, 200, { "Cache-Control": "no-store" });
 });
 
 accountsRoutes.patch("/:accountId", validateJson(dematAccountUpdateSchema), async (context) => {
   const accountId = context.req.param("accountId");
   if (!isUuid(accountId)) return accountNotFound(context);
-  const updates = context.req.valid("json");
+  const { password, ...accountUpdates } = context.req.valid("json");
+  const updates: typeof accountUpdates & { password_encrypted?: string } = accountUpdates;
+  if (password !== undefined) {
+    const passwordEncrypted = await encryptAccountPassword(
+      password,
+      context.env?.ACCOUNT_CREDENTIAL_ENCRYPTION_KEY,
+    );
+    if (!passwordEncrypted) return credentialEncryptionUnavailable(context);
+    updates.password_encrypted = passwordEncrypted;
+  }
   if (Object.keys(updates).length === 0) {
     return context.json(
       { error: { code: "VALIDATION_ERROR", message: "Provide at least one account field." } },
@@ -169,7 +222,7 @@ accountsRoutes.patch("/:accountId", validateJson(dematAccountUpdateSchema), asyn
 
   if (error) return databaseError(context, error);
   if (!data) return accountNotFound(context);
-  return context.json({ data: data as DematAccount });
+  return context.json({ data: serializeAccount(data as StoredDematAccount) });
 });
 
 accountsRoutes.post("/:accountId/archive", async (context) =>
@@ -303,7 +356,7 @@ async function setArchived(context: AccountRouteContext, accountId: string, arch
   const { data, error } = await query.select(accountColumns).maybeSingle();
   if (error) return databaseError(context, error);
   if (!data) return accountNotFound(context);
-  return context.json({ data: data as DematAccount });
+  return context.json({ data: serializeAccount(data as StoredDematAccount) });
 }
 
 async function previewImport(context: AccountRouteContext) {
@@ -388,6 +441,17 @@ async function previewImport(context: AccountRouteContext) {
       400,
     );
   }
+  if (headers.some((header) => /\b(?:password|passcode|secret|credential)s?\b/i.test(header))) {
+    return context.json(
+      {
+        error: {
+          code: "CREDENTIAL_COLUMN_NOT_ALLOWED",
+          message: "Remove password or credential columns before importing accounts.",
+        },
+      },
+      400,
+    );
+  }
   const parsedRows: ParsedRow[] = table.slice(1).map((cells, index) => ({
     row_number: index + 2,
     values: Object.fromEntries(
@@ -415,13 +479,8 @@ async function previewImport(context: AccountRouteContext) {
       400,
     );
   }
-  const required = ["holder_name", "depository_type", "masked_demat_identifier"] as const;
-  const allowedTargets = new Set([
-    ...required,
-    "masked_client_reference",
-    "account_status",
-    "notes",
-  ]);
+  const required = ["holder_name", "bank_name", "username"] as const;
+  const allowedTargets = new Set([...required, "account_status", "notes"]);
   if (
     !mapping ||
     typeof mapping !== "object" ||
@@ -448,34 +507,32 @@ async function previewImport(context: AccountRouteContext) {
         source ? [[target, values[source] ?? ""]] : [],
       ),
     );
-    return { row_number, raw, parsed: dematAccountSchema.safeParse(raw) };
+    return { row_number, raw, parsed: dematAccountImportSchema.safeParse(raw) };
   });
-  const identifiers = records.flatMap(({ parsed }) =>
+  const normalizedAccounts = records.flatMap(({ parsed }) =>
     parsed.success
       ? [
           {
-            depository_type: parsed.data.depository_type,
-            identifier: parsed.data.masked_demat_identifier.trim().toLowerCase(),
+            bank_name: parsed.data.bank_name.toLowerCase(),
+            username: parsed.data.username.toLowerCase(),
           },
         ]
       : [],
   );
   const existing = new Set<string>();
   const supabase = context.get("rlsSupabase");
-  for (const depository of ["NSDL", "CDSL"] as const) {
-    const ids = identifiers
-      .filter((item) => item.depository_type === depository)
-      .map((item) => item.identifier);
-    if (!ids.length) continue;
+  const bankNames = [...new Set(normalizedAccounts.map((item) => item.bank_name))];
+  const usernames = [...new Set(normalizedAccounts.map((item) => item.username))];
+  if (bankNames.length && usernames.length) {
     const { data, error } = await supabase
       .from("demat_accounts")
-      .select("depository_type, masked_demat_identifier_normalized")
+      .select("bank_name_normalized, username_normalized")
       .eq("user_id", context.get("authenticatedUser").id)
-      .eq("depository_type", depository)
-      .in("masked_demat_identifier_normalized", [...new Set(ids)]);
+      .in("bank_name_normalized", bankNames)
+      .in("username_normalized", usernames);
     if (error) throw error;
     for (const account of data ?? []) {
-      existing.add(`${account.depository_type}:${account.masked_demat_identifier_normalized}`);
+      existing.add(`${account.bank_name_normalized}:${account.username_normalized}`);
     }
   }
 
@@ -491,7 +548,7 @@ async function previewImport(context: AccountRouteContext) {
       };
     }
     const record = parsed.data;
-    const identity = `${record.depository_type}:${record.masked_demat_identifier.toLowerCase()}`;
+    const identity = `${record.bank_name.toLowerCase()}:${record.username.toLowerCase()}`;
     const errors: string[] = [];
     const warnings: string[] = [];
     if (seen.has(identity)) {
@@ -504,7 +561,6 @@ async function previewImport(context: AccountRouteContext) {
       row_number,
       record: {
         ...record,
-        masked_client_reference: record.masked_client_reference ?? null,
         notes: record.notes ?? null,
       },
       row_status: warnings.length ? "duplicate" : "ready",
@@ -643,6 +699,18 @@ function accountNotFound(context: AccountRouteContext) {
   );
 }
 
+function credentialEncryptionUnavailable(context: AccountRouteContext) {
+  return context.json(
+    {
+      error: {
+        code: "CREDENTIAL_ENCRYPTION_UNAVAILABLE",
+        message: "Secure account password storage is not configured.",
+      },
+    },
+    503,
+  );
+}
+
 function importNotFound(context: AccountRouteContext) {
   return context.json(
     { error: { code: "IMPORT_NOT_FOUND", message: "The import was not found." } },
@@ -660,7 +728,7 @@ function databaseError(context: AccountRouteContext, error: { code?: string; mes
   if (error.code === "23505") {
     return context.json(
       {
-        error: { code: "DUPLICATE_ACCOUNT", message: "This demat account is already registered." },
+        error: { code: "DUPLICATE_ACCOUNT", message: "This bank account is already registered." },
       },
       409,
     );

@@ -97,10 +97,8 @@ describe("user IPO catalog", () => {
     renderPage();
     const link = await screen.findByRole("link", { name: catalogIpo.company_name });
     expect(link).toHaveAttribute("href", `/ipos/catalog/${catalogIpo.id}`);
-    expect(screen.getByRole("button", { name: "IPO catalog" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(screen.queryByRole("button", { name: "My IPOs" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Add to catalog" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Source" })).not.toBeInTheDocument();
     expect(screen.queryByText("Admin-managed", { exact: true })).not.toBeInTheDocument();
     expect(screen.getAllByText("Not published")).toHaveLength(2);
@@ -110,7 +108,7 @@ describe("user IPO catalog", () => {
     );
   });
 
-  it("shows personal IPOs only in My IPOs, separately from the shared catalog", async () => {
+  it("ignores the legacy personal source and only shows the shared catalog", async () => {
     const ownedIpo = {
       ...catalogIpo,
       id: "99999999-9999-4999-8999-999999999999",
@@ -124,56 +122,23 @@ describe("user IPO catalog", () => {
       path.startsWith("/api/ipos?") ? listResponse([ownedIpo]) : listResponse([catalogIpo]),
     );
 
-    renderPage();
+    renderPage("/ipos?source=personal");
 
     expect(await screen.findByRole("link", { name: catalogIpo.company_name })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "My Private IPO" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "My IPOs" })).not.toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",
       expect.anything(),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "My IPOs" }));
-    expect(await screen.findByRole("link", { name: /My Private IPO/ })).toHaveAttribute(
-      "href",
-      `/ipos/${ownedIpo.id}`,
-    );
-    expect(screen.queryByRole("link", { name: catalogIpo.company_name })).not.toBeInTheDocument();
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      "/api/ipos?page=1&page_size=25&sort=date_desc",
+    expect(apiRequestMock).not.toHaveBeenCalledWith(
+      expect.stringMatching(/^\/api\/ipos\?/),
       expect.anything(),
     );
   });
 
-  it("keeps personal IPO records and their original details links available", async () => {
-    apiRequestMock.mockImplementation(async (path: string) =>
-      listResponse([
-        {
-          ...catalogIpo,
-          company_name: path.startsWith("/api/ipos?")
-            ? "Personal Test Company"
-            : catalogIpo.company_name,
-          data_source: "MANUAL",
-        },
-      ]),
-    );
-    renderPage();
-    await screen.findByRole("link", { name: catalogIpo.company_name });
-    fireEvent.click(screen.getByRole("button", { name: "My IPOs" }));
-    expect(await screen.findByRole("link", { name: "Personal Test Company" })).toHaveAttribute(
-      "href",
-      `/ipos/${catalogIpo.id}`,
-    );
-    expect(screen.queryByText("Manual entry · unverified")).not.toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "Source" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /calendar/i })).not.toBeInTheDocument();
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      "/api/ipos?page=1&page_size=25&sort=date_desc",
-      expect.anything(),
-    );
-  });
-
-  it("keeps pagination and supports status filtering, sorting, and search", async () => {
+  it("keeps pagination and supports multi-status filtering, sorting, and search", async () => {
     apiRequestMock.mockResolvedValue(
       listResponse(
         [
@@ -201,12 +166,10 @@ describe("user IPO catalog", () => {
         expect.anything(),
       ),
     );
-    fireEvent.click(screen.getByRole("combobox", { name: "Filter IPOs" }));
-    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("option", { name: "Open", exact: true }));
-    fireEvent.click(screen.getByRole("option", { name: "Closed", exact: true }));
-    expect(screen.getByRole("option", { name: "Open", exact: true })).toHaveAttribute(
-      "aria-selected",
+    fireEvent.click(screen.getByRole("button", { name: "Open", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Closed", exact: true }));
+    expect(screen.getByRole("button", { name: "Open", exact: true })).toHaveAttribute(
+      "aria-pressed",
       "true",
     );
     await waitFor(() =>
@@ -224,20 +187,12 @@ describe("user IPO catalog", () => {
         expect.anything(),
       ),
     );
-    fireEvent.click(screen.getByRole("button", { name: "My IPOs" }));
-    await waitFor(() =>
-      expect(apiRequestMock).toHaveBeenCalledWith(
-        "/api/ipos?page=1&page_size=25&sort=price_desc",
-        expect.anything(),
-      ),
-    );
-    expect(screen.getByRole("textbox")).toHaveValue("");
   });
 
   it("keeps the catalog page focused without calendar navigation", async () => {
     apiRequestMock.mockResolvedValue(listResponse());
     renderPage();
-    expect(await screen.findByRole("heading", { name: "IPOs" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "IPO catalog" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /calendar/i })).not.toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",

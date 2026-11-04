@@ -5,9 +5,9 @@ const account = {
   id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   user_id: "11111111-1111-4111-8111-111111111111",
   holder_name: "Asha Mehta",
-  depository_type: "CDSL",
-  masked_demat_identifier: "XXXX1234",
-  masked_client_reference: null,
+  bank_name: "Example Bank",
+  username: "asha.mehta",
+  password_saved: true,
   account_status: "active",
   notes: null,
   created_at: "2026-01-01T00:00:00.000Z",
@@ -73,7 +73,8 @@ test("accounts tab shows readable cards without horizontal page overflow on mobi
 
   await expect(page.getByRole("heading", { name: "Demat accounts" })).toBeVisible();
   await expect(page.getByRole("article")).toContainText("Asha Mehta");
-  await expect(page.getByRole("article")).toContainText("XXXX1234");
+  await expect(page.getByRole("article")).toContainText("Example Bank");
+  await expect(page.getByRole("article")).toContainText("••••••••");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
@@ -87,6 +88,8 @@ test("accounts tab renders the account table on desktop", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Demat accounts" })).toBeVisible();
   await expect(page.getByRole("table").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Asha Mehta" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Bank" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Password" })).toBeVisible();
 });
 
 test("account dashboard shows totals without a capacity limit", async ({ page }) => {

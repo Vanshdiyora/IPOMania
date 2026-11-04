@@ -36,8 +36,8 @@ const account = {
   id: accountId,
   account_status: "active",
   archived_at: null,
-  masked_demat_identifier: "XXXX1234",
-  masked_client_reference: null,
+  bank_name: "Example Bank",
+  username: "test-user",
 };
 const category = {
   id: categoryId,
@@ -77,6 +77,7 @@ function installMock(
     category?: typeof category;
     duplicate?: boolean;
     exportRows?: boolean;
+    applicationRow?: Record<string, unknown>;
   } = {},
 ) {
   const requests: Request[] = [];
@@ -100,10 +101,11 @@ function installMock(
       }
       if (table === "ipo_categories") return json([options.category ?? category]);
       if (table === "applications") {
-        if (request.method === "POST") {
+        if (request.method === "POST" || request.method === "PATCH") {
           const record = await request.json();
           return json(record, 201);
         }
+        if (options.applicationRow) return json([options.applicationRow]);
         if (options.exportRows) {
           return new Response(
             JSON.stringify([
@@ -129,7 +131,7 @@ function installMock(
                 updated_at: "2026-10-31T00:00:00.000Z",
                 archived_at: null,
                 ipos: { symbol: "TEST", company_name: "Test IPO" },
-                demat_accounts: { masked_demat_identifier: "XXXX1234" },
+                demat_accounts: { bank_name: "Example Bank", username: "test-user" },
                 ipo_categories: { category: "RETAIL" },
               },
             ]),
@@ -230,6 +232,58 @@ describe("application API", () => {
         "ipo_categories!applications_category_owner_issue_fk(category)",
       );
     }
+  });
+
+  it("recalculates shares and amount when an owner edits the category, lots, or price", async () => {
+    const requests = installMock({
+      applicationRow: {
+        id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        user_id: userId,
+        ipo_id: ipoId,
+        demat_account_id: accountId,
+        category_id: categoryId,
+        category_code: "RETAIL",
+        lots: 1,
+        total_shares: 10,
+        application_amount: "200.00",
+        application_number: null,
+        external_reference: null,
+        submission_date: null,
+        application_status: "DRAFT",
+        mandate_status: "UNKNOWN",
+        allotment_status: "UNKNOWN",
+        notes: null,
+        rule_version: 3,
+        calculation_snapshot: { calculation_input: { price: "20.00", price_type: "BID" } },
+        created_at: "2026-10-31T00:00:00.000Z",
+        updated_at: "2026-10-31T00:00:00.000Z",
+        archived_at: null,
+        ipos: { lot_size: 10 },
+      },
+    });
+    const response = await createApp().request(
+      "/api/applications/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      {
+        method: "PATCH",
+        headers: { Authorization: "Bearer test-token", "Content-Type": "application/json" },
+        body: JSON.stringify({ category_id: categoryId, lots: 2, price: "20.00" }),
+      },
+      bindings,
+    );
+    expect(response.status).toBe(200);
+
+    const update = requests.find((request) => request.method === "PATCH");
+    expect(update).toBeDefined();
+    const body = (await update!.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      category_id: categoryId,
+      category_code: "RETAIL",
+      lots: 2,
+      total_shares: 20,
+      application_amount: "400",
+    });
+    expect(body).not.toHaveProperty("application_number");
+    expect(body).not.toHaveProperty("external_reference");
   });
 
   it("filters parent application rows for IPO name in list and export", async () => {

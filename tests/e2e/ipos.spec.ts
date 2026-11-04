@@ -166,24 +166,18 @@ async function prepareAuthenticatedPage(page: Page) {
   );
 }
 
-test("IPO list and details show user-entered provenance and rule setup links", async ({ page }) => {
+test("the user IPO page does not expose personal IPO or catalog creation controls", async ({
+  page,
+}) => {
   await prepareAuthenticatedPage(page);
-  await page.goto("/ipos");
-  await page.getByRole("button", { name: "My IPOs", exact: true }).click();
+  await page.goto("/ipos?source=personal");
 
-  await expect(page.getByRole("heading", { name: "IPOs", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/ipos$/);
+  await expect(page.getByRole("heading", { name: "IPO catalog", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "My IPOs", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Add to catalog", exact: true })).toHaveCount(0);
   await expect(page.getByRole("columnheader", { name: "Source" })).toHaveCount(0);
-  await page.getByRole("link", { name: "IPO Test Company" }).click();
-
-  await expect(page.getByRole("heading", { name: "IPO Test Company" })).toBeVisible();
-  await expect(
-    page.getByText(/The application does not automatically fetch or verify the source/),
-  ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Configure categories" })).toBeVisible();
-  await expect(page.getByText("Rules not configured").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Demat account applications" })).toBeVisible();
-  await expect(page.getByText("Application APP-2026-001")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Edit", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "IPO Test Company", exact: true })).toHaveCount(0);
 });
 
 test("regular users see admin-managed IPOs by default and can open shared details", async ({
@@ -191,10 +185,9 @@ test("regular users see admin-managed IPOs by default and can open shared detail
 }) => {
   await prepareAuthenticatedPage(page);
   await page.goto("/ipos");
-  await expect(page.getByRole("button", { name: "IPO catalog", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("heading", { name: "IPO catalog", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "My IPOs", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Add to catalog", exact: true })).toHaveCount(0);
   await expect(page.getByRole("columnheader", { name: "Source" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "IPO Test Company", exact: true })).toHaveCount(0);
   await page.getByRole("link", { name: catalogIpo.company_name }).click();
@@ -248,22 +241,17 @@ test("a direct catalog detail link returns to the catalog", async ({ page }) => 
 test("the legacy IPO calendar URL redirects to the IPO list", async ({ page }) => {
   await prepareAuthenticatedPage(page);
   await page.goto("/ipo-calendar?source=personal");
-  await expect(page).toHaveURL(/\/ipos\?source=personal$/);
-  await expect(page.getByRole("heading", { name: "IPOs", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/ipos$/);
+  await expect(page.getByRole("heading", { name: "IPO catalog", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: /calendar/i })).toHaveCount(0);
 });
 
-test("browser back restores the catalog without status filters", async ({ page }) => {
+test("browser back restores the previous catalog sort", async ({ page }) => {
   await prepareAuthenticatedPage(page);
-  await page.goto("/ipos");
-  await page.getByRole("button", { name: "My IPOs", exact: true }).click();
-  await page.getByRole("combobox", { name: "Sort IPOs" }).click();
-  await page.getByRole("option", { name: "Alphabetical · Z to A" }).click();
+  await page.goto("/ipos?sort=date_asc");
+  await page.goto("/ipos?sort=date_desc");
   await page.goBack();
-  await expect(page.getByRole("button", { name: "IPO catalog", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("combobox", { name: "Sort IPOs" })).toHaveText("Date · oldest first");
   await expect(page.getByRole("link", { name: catalogIpo.company_name })).toBeVisible();
 });
 

@@ -13,6 +13,7 @@ payloads do not accept `user_id`.
 | `GET /api/accounts`                     | List, filters, pagination, and account totals |
 | `POST /api/accounts`                    | Create an account                             |
 | `GET /api/accounts/:accountId`          | Read one owned account                        |
+| `GET /api/accounts/:accountId/password` | Reveal an owned account password on demand    |
 | `PATCH /api/accounts/:accountId`        | Update a non-archived owned account           |
 | `POST /api/accounts/:accountId/archive` | Soft-archive an account                       |
 | `POST /api/accounts/:accountId/restore` | Restore an account                            |
@@ -24,12 +25,19 @@ are rejected. An empty patch is invalid. The database RLS policy additionally pr
 unarchived accounts. A restrictive foreign-key error for linked history is returned as `409
 ACCOUNT_HAS_HISTORY`.
 
+Create requires `holder_name`, `bank_name`, `username`, and `password`. Updates may omit the
+password to keep the current value. The Worker encrypts passwords before database writes. List and
+ordinary account responses expose only `password_saved`; they never return plaintext or ciphertext.
+The password route returns plaintext only after bearer-token verification and owner-scoped lookup,
+and responds with `Cache-Control: no-store`. Configure `ACCOUNT_CREDENTIAL_ENCRYPTION_KEY` as a
+base64-encoded 32-byte Worker secret; password writes and reveals return
+`503 CREDENTIAL_ENCRYPTION_UNAVAILABLE` until it is configured.
+
 ### List parameters
 
 `page` defaults to 1; `pageSize` defaults to 25 and is limited to 100. Optional filters:
 
 - `holder_name`: case-insensitive prefix search
-- `depository`: `NSDL` or `CDSL`
 - `status`: `active`, `inactive`, or `closed`
 - `created_from`, `created_to`: ISO-8601 timestamps, inclusive
 - `archived`: `false` (default), `true`, or `all`
@@ -50,9 +58,9 @@ closed records; `active` counts only unarchived active records.
 
 Preview accepts `file` and optional JSON `mapping` multipart fields. Without `mapping`, it returns
 the detected header names and a small sample without staging any data. With a mapping, required
-fields are `holder_name`, `depository_type`, and `masked_demat_identifier`. Optional
-fields are `masked_client_reference`, `account_status`, and `notes`. Mapping
-values must name a header in the uploaded file.
+fields are `holder_name`, `bank_name`, and `username`. Optional fields are `account_status` and
+`notes`. Passwords are excluded from bulk import; enter them through the account form so they are
+encrypted before storage. Mapping values must name a header in the uploaded file.
 
 The API accepts CSV (`text/csv`) and XLSX
 (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`) only, with matching file
@@ -68,10 +76,11 @@ instead of inserting a second set of accounts. Reversal is all-or-nothing and fa
 
 | HTTP | Codes                                                                                          |
 | ---- | ---------------------------------------------------------------------------------------------- |
-| 400  | `VALIDATION_ERROR`, `INVALID_HEADERS`, `INVALID_ROW_COUNT`, `INVALID_FILE`                     |
+| 400  | `VALIDATION_ERROR`, `INVALID_HEADERS`, `INVALID_ROW_COUNT`, `INVALID_FILE`, `CREDENTIAL_COLUMN_NOT_ALLOWED` |
 | 401  | `UNAUTHORIZED`                                                                                 |
-| 404  | `ACCOUNT_NOT_FOUND`, `IMPORT_NOT_FOUND`                                                        |
+| 404  | `ACCOUNT_NOT_FOUND`, `PASSWORD_NOT_SET`, `IMPORT_NOT_FOUND`                                     |
 | 409  | `DUPLICATE_ACCOUNT`, `ACCOUNT_HAS_HISTORY`, `IMPORT_NOT_REVERSIBLE`, `IMPORT_REVERSAL_BLOCKED` |
+| 503  | `CREDENTIAL_ENCRYPTION_UNAVAILABLE`                                                             |
 | 413  | `FILE_TOO_LARGE`                                                                               |
 | 415  | `UNSUPPORTED_FILE_TYPE`                                                                        |
 

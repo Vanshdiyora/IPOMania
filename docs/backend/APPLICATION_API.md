@@ -15,7 +15,7 @@ tokens, and database credentials are not returned.
 | `POST /api/applications/preview`          | Calculate and check an individual application before saving              |
 | `POST /api/applications`                  | Validate eligibility/calculation and create one application              |
 | `GET /api/applications/:applicationId`    | Read one owned application and its saved snapshot                        |
-| `PATCH /api/applications/:applicationId`  | Edit application number, reference, submission date, statuses, and notes |
+| `PATCH /api/applications/:applicationId`  | Revise category, lots, or price and update supplied operational fields    |
 | `DELETE /api/applications/:applicationId` | Soft-archive one active application                                      |
 | `POST /api/applications/bulk/preview`     | Independently validate a set of account-specific inputs                  |
 | `POST /api/applications/bulk`             | Create up to 500 applications atomically after validation                |
@@ -49,6 +49,13 @@ IPO's issue-price range. The IPO's `lot_size` is the number of shares per lot; p
 return the calculated total shares and application amount. Rule version is null when no rule was
 used.
 The client cannot supply amount, shares, snapshot, owner, or rule version.
+
+Updates may replace `category_id`/`category_code`, `lots`, and decimal `price`. The server
+re-validates the terms against the owned IPO and category rule, then recalculates total shares,
+application amount, rule version, and the calculation snapshot; clients cannot supply those derived
+values. Applications created from a saved quota calculation keep their terms locked and return
+`409 APPLICATION_TERMS_LOCKED`. Supplied number, reference, submission date, statuses, and notes
+are applied as before.
 
 Bulk creation validates every row before one insert. If any row is invalid, it returns an
 account-specific `422 BULK_VALIDATION_FAILED` report and inserts nothing. Duplicate detection is

@@ -350,9 +350,7 @@ export function SearchableSelect({
                       role="option"
                       aria-selected={isSelected}
                       aria-disabled={isDisabled || undefined}
-                      title={
-                        isDisabled ? "You have already applied for this IPO." : undefined
-                      }
+                      title={isDisabled ? "You have already applied for this IPO." : undefined}
                       onClick={() => select(option.value)}
                       onKeyDown={(event) => {
                         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -374,7 +372,9 @@ export function SearchableSelect({
                         }
                       }}
                       className={`flex min-h-touch w-full items-center gap-3 rounded-lg px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 ${
-                        isDisabled ? "cursor-not-allowed bg-slate-100 text-muted opacity-80" : "hover:bg-canvas"
+                        isDisabled
+                          ? "cursor-not-allowed bg-slate-100 text-muted opacity-80"
+                          : "hover:bg-canvas"
                       } ${isSelected ? "bg-[#EAF0F6]" : ""}`}
                     >
                       <span
@@ -398,7 +398,9 @@ export function SearchableSelect({
                           {option.label}
                         </span>
                         {option.description ? (
-                          <span className={`block truncate text-xs ${isDisabled ? "text-slate-500" : "text-muted"}`}>
+                          <span
+                            className={`block truncate text-xs ${isDisabled ? "text-slate-500" : "text-muted"}`}
+                          >
                             {option.description}
                           </span>
                         ) : null}
@@ -406,9 +408,7 @@ export function SearchableSelect({
                       {option.badge ? (
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            isDisabled
-                              ? "bg-slate-200 text-slate-600"
-                              : "bg-canvas text-navy"
+                            isDisabled ? "bg-slate-200 text-slate-600" : "bg-canvas text-navy"
                           }`}
                         >
                           {option.badge}

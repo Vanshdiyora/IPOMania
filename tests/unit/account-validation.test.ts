@@ -7,9 +7,9 @@ import {
 
 const validAccount = {
   holder_name: "  Ananya Rao ",
-  depository_type: "NSDL",
-  masked_demat_identifier: "XXXX1234",
-  masked_client_reference: "XXXX5678",
+  bank_name: "  Example Bank ",
+  username: "ananya.rao",
+  password: "  caseSensitive password  ",
   account_status: "active",
   notes: "Primary account",
 };
@@ -18,15 +18,18 @@ describe("demat account validation", () => {
   it("trims and accepts a valid account", () => {
     expect(dematAccountSchema.parse(validAccount)).toMatchObject({
       holder_name: "Ananya Rao",
+      bank_name: "Example Bank",
+      password: "  caseSensitive password  ",
       account_status: "active",
     });
   });
 
   it.each([
     ["unknown field", { ...validAccount, broker_name: "Example Securities" }],
-    ["unknown depository", { ...validAccount, depository_type: "OTHER" }],
-    ["missing masked identifier", { ...validAccount, masked_demat_identifier: "" }],
-    ["unmasked identifier", { ...validAccount, masked_demat_identifier: "123456789" }],
+    ["removed depository field", { ...validAccount, depository_type: "NSDL" }],
+    ["empty bank name", { ...validAccount, bank_name: "" }],
+    ["empty username", { ...validAccount, username: "" }],
+    ["empty password", { ...validAccount, password: "" }],
     ["client-supplied owner", { ...validAccount, user_id: "11111111-1111-4111-8111-111111111111" }],
   ])("rejects %s", (_description, account) => {
     expect(dematAccountSchema.safeParse(account).success).toBe(false);
@@ -36,6 +39,7 @@ describe("demat account validation", () => {
     expect(dematAccountUpdateSchema.safeParse({ holder_name: "Updated Holder" }).success).toBe(
       true,
     );
+    expect(dematAccountUpdateSchema.safeParse({ password: "new secret" }).success).toBe(true);
     expect(
       dematAccountUpdateSchema.safeParse({ archived_at: new Date().toISOString() }).success,
     ).toBe(false);
@@ -48,6 +52,7 @@ describe("demat account validation", () => {
       pageSize: 50,
     });
     expect(accountListQuerySchema.safeParse({ page: "0" }).success).toBe(false);
+    expect(accountListQuerySchema.safeParse({ depository: "NSDL" }).success).toBe(false);
     expect(
       accountListQuerySchema.safeParse({
         created_from: "2026-03-02T00:00:00.000Z",

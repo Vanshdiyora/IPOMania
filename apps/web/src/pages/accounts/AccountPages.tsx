@@ -6,9 +6,19 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Archive, Building2, CheckCircle2, Plus, Upload, WalletCards, X } from "lucide-react";
+import {
+  Archive,
+  Building2,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Plus,
+  Upload,
+  WalletCards,
+  X,
+} from "lucide-react";
 import type { z } from "@ipo-mania/validation";
-import { dematAccountSchema } from "@ipo-mania/validation";
+import { dematAccountFormSchema } from "@ipo-mania/validation";
 import type { AccountImportPreviewRow, DematAccount } from "@ipo-mania/shared";
 import { useAuth } from "../../auth/useAuth";
 import { ConfirmButton } from "../../components/ui/ConfirmButton";
@@ -49,6 +59,7 @@ type AccountListResponse = {
   };
 };
 type AccountResponse = { data: DematAccount };
+type AccountPasswordResponse = { data: { password: string } };
 type ImportPreviewResponse = {
   data: {
     requires_mapping?: boolean;
@@ -89,14 +100,14 @@ type ImportDetailResponse = {
     }>;
   };
 };
-type AccountValues = z.input<typeof dematAccountSchema>;
-type ValidAccountValues = z.output<typeof dematAccountSchema>;
+type AccountValues = z.input<typeof dematAccountFormSchema>;
+type ValidAccountValues = z.output<typeof dematAccountFormSchema>;
 
 const blankAccount: AccountValues = {
   holder_name: "",
-  depository_type: "NSDL",
-  masked_demat_identifier: "",
-  masked_client_reference: null,
+  bank_name: "",
+  username: "",
+  password: "",
   account_status: "active",
   notes: null,
 };
@@ -109,8 +120,13 @@ const accountColumns: ColumnDef<DematAccount>[] = [
       <AccountDetailLink account={row.original}>{row.original.holder_name}</AccountDetailLink>
     ),
   },
-  { accessorKey: "depository_type", header: "Depository" },
-  { accessorKey: "masked_demat_identifier", header: "Masked ID" },
+  { accessorKey: "bank_name", header: "Bank" },
+  { accessorKey: "username", header: "Username" },
+  {
+    accessorKey: "password_saved",
+    header: "Password",
+    cell: ({ row }) => (row.original.password_saved ? "••••••••" : "Not set"),
+  },
   {
     accessorKey: "account_status",
     header: "Status",
@@ -272,13 +288,11 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
   const pageValue = Number(listParams.get("page"));
   const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
   const holderName = listParams.get("holder_name") ?? "";
-  const depository = listParams.get("depository") ?? "";
   const status = listParams.get("status") ?? "";
   const archived = listParams.get("archived") ?? "false";
   const createdFrom = listParams.get("created_from") ?? "";
   const createdTo = listParams.get("created_to") ?? "";
   const [draftFilters, setDraftFilters] = useState(() => ({
-    depository,
     status,
     archived,
     createdFrom,
@@ -309,7 +323,6 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
     pageSize: "50",
     archived,
     ...(holderName ? { holder_name: holderName } : {}),
-    ...(depository ? { depository } : {}),
     ...(status ? { status } : {}),
     ...(createdFrom ? { created_from: `${createdFrom}T00:00:00.000Z` } : {}),
     ...(createdTo ? { created_to: `${createdTo}T23:59:59.999Z` } : {}),
@@ -339,9 +352,7 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
     setListParams({}, { replace: true });
   }
 
-  const filterCount = [depository, status, archived !== "false", createdFrom, createdTo].filter(
-    Boolean,
-  ).length;
+  const filterCount = [status, archived !== "false", createdFrom, createdTo].filter(Boolean).length;
 
   return (
     <div className="space-y-6">
@@ -364,7 +375,7 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
               activeFilterCount={filterCount}
               onSearchChange={(value) => updateFilter("holder_name", value)}
               onOpenFilters={() => {
-                setDraftFilters({ depository, status, archived, createdFrom, createdTo });
+                setDraftFilters({ status, archived, createdFrom, createdTo });
                 setFiltersOpen(true);
               }}
               onClearFilters={resetFilters}
@@ -383,7 +394,7 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
           activeFilterCount={filterCount}
           onSearchChange={(value) => updateFilter("holder_name", value)}
           onOpenFilters={() => {
-            setDraftFilters({ depository, status, archived, createdFrom, createdTo });
+            setDraftFilters({ status, archived, createdFrom, createdTo });
             setFiltersOpen(true);
           }}
           onClearFilters={resetFilters}
@@ -396,7 +407,6 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
         onClose={() => setFiltersOpen(false)}
         onReset={() => {
           setDraftFilters({
-            depository: "",
             status: "",
             archived: "false",
             createdFrom: "",
@@ -407,10 +417,9 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
           setListParams(
             (previous) => {
               const next = new URLSearchParams(previous);
-              ["depository", "status", "created_from", "created_to"].forEach((key) => {
+              ["status", "created_from", "created_to"].forEach((key) => {
                 next.delete(key);
               });
-              if (draftFilters.depository) next.set("depository", draftFilters.depository);
               if (draftFilters.status) next.set("status", draftFilters.status);
               if (draftFilters.createdFrom) next.set("created_from", draftFilters.createdFrom);
               if (draftFilters.createdTo) next.set("created_to", draftFilters.createdTo);
@@ -426,20 +435,6 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
       >
         <FilterSection title="Account">
           <div className="grid gap-4">
-            <label className="block text-sm font-semibold text-ink">
-              Depository
-              <CustomSelect
-                className={inputClass}
-                value={draftFilters.depository}
-                onChange={(event) =>
-                  setDraftFilters((current) => ({ ...current, depository: event.target.value }))
-                }
-              >
-                <option value="">All depositories</option>
-                <option value="NSDL">NSDL</option>
-                <option value="CDSL">CDSL</option>
-              </CustomSelect>
-            </label>
             <label className="block text-sm font-semibold text-ink">
               Account status
               <CustomSelect
@@ -501,12 +496,13 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
             <DataTable minWidth="1080px" className="table-fixed text-base">
               <colgroup>
                 {[
-                  ["holder_name", "16%"],
-                  ["depository_type", "12%"],
-                  ["masked_demat_identifier", "15%"],
+                  ["holder_name", "13%"],
+                  ["bank_name", "13%"],
+                  ["username", "16%"],
+                  ["password_saved", "11%"],
                   ["account_status", "10%"],
                   ["created_at", "12%"],
-                  ["actions", "21%"],
+                  ["actions", "25%"],
                 ].map(([id, width]) => (
                   <col key={id} style={{ width }} />
                 ))}
@@ -517,7 +513,7 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
                     {group.headers.map((header) => (
                       <th
                         key={header.id}
-                        className={`border-b border-border px-3 py-4 font-bold ${header.column.id === "actions" ? "text-right" : ["depository_type", "account_status", "created_at"].includes(header.column.id) ? "text-center" : "text-left"}`}
+                        className={`border-b border-border px-3 py-4 font-bold ${header.column.id === "actions" ? "text-right" : ["password_saved", "account_status", "created_at"].includes(header.column.id) ? "text-center" : "text-left"}`}
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                       </th>
@@ -535,7 +531,7 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
                         {row.getVisibleCells().map((cell) => (
                           <td
                             key={cell.id}
-                            className={`px-3 py-4 ${cell.column.id === "actions" ? "text-right" : ["depository_type", "account_status", "created_at"].includes(cell.column.id) ? "truncate text-center tabular-nums" : "truncate text-left"}`}
+                            className={`px-3 py-4 ${cell.column.id === "actions" ? "text-right" : ["password_saved", "account_status", "created_at"].includes(cell.column.id) ? "truncate text-center tabular-nums" : "truncate text-left"}`}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </td>
@@ -613,7 +609,7 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
     reset,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<AccountValues, unknown, ValidAccountValues>({
-    resolver: zodResolver(dematAccountSchema),
+    resolver: zodResolver(dematAccountFormSchema),
     defaultValues: blankAccount,
   });
 
@@ -622,9 +618,9 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
     if (!account || isDirty) return;
     reset({
       holder_name: account.holder_name,
-      depository_type: account.depository_type,
-      masked_demat_identifier: account.masked_demat_identifier,
-      masked_client_reference: account.masked_client_reference,
+      bank_name: account.bank_name ?? "",
+      username: account.username ?? "",
+      password: "",
       account_status: account.account_status,
       notes: account.notes,
     });
@@ -636,13 +632,22 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
 
   async function save(values: ValidAccountValues) {
     if (!session) return;
+    if (!editing && !values.password) {
+      notify({
+        title: "Password is required",
+        description: "Enter the bank account password before saving.",
+        tone: "error",
+      });
+      return;
+    }
     try {
       const path = editing ? `/api/accounts/${accountId}` : "/api/accounts";
+      const { password, ...accountFields } = values;
       await apiRequest<AccountResponse>(path, session, {
         method: editing ? "PATCH" : "POST",
         body: JSON.stringify({
-          ...values,
-          masked_client_reference: values.masked_client_reference || null,
+          ...accountFields,
+          ...(password ? { password } : {}),
           notes: values.notes || null,
         }),
       });
@@ -666,7 +671,7 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
   return (
     <RouteFormDrawer
       title={editing ? "Edit demat account" : "Add demat account"}
-      description="Enter masked account details only. Do not enter a full account number or password."
+      description="Bank passwords are encrypted before storage and can only be revealed by you."
       cancelTo={editing && accountId ? `/accounts/${accountId}` : "/accounts"}
       formId="account-form"
       submitLabel="Save account"
@@ -696,27 +701,26 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
               required
               {...register("holder_name")}
             />
-            <Controller
-              control={control}
-              name="depository_type"
-              render={({ field }) => (
-                <FormSelect label="Depository" error={errors.depository_type?.message} {...field}>
-                  <option value="NSDL">NSDL</option>
-                  <option value="CDSL">CDSL</option>
-                </FormSelect>
-              )}
-            />
             <FormInput
-              label="Masked demat identifier"
-              error={errors.masked_demat_identifier?.message}
-              placeholder="For example, XXXX1234"
+              label="Bank name"
+              error={errors.bank_name?.message}
               required
-              {...register("masked_demat_identifier")}
+              {...register("bank_name")}
             />
             <FormInput
-              label="Masked client reference (optional)"
-              error={errors.masked_client_reference?.message}
-              {...register("masked_client_reference")}
+              label="Username"
+              error={errors.username?.message}
+              required
+              {...register("username")}
+            />
+            <FormInput
+              label="Password"
+              type="password"
+              autoComplete="new-password"
+              error={errors.password?.message}
+              placeholder={editing ? "Leave blank to keep the current password" : ""}
+              required={!editing}
+              {...register("password")}
             />
             <Controller
               control={control}
@@ -752,11 +756,39 @@ export function AccountDetailsPage() {
   const client = useQueryClient();
   const navigate = useNavigate();
   const { notify } = useToast();
+  const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
+  const [isRevealingPassword, setIsRevealingPassword] = useState(false);
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["accounts", accountId],
     enabled: Boolean(session && accountId),
     queryFn: () => apiRequest<AccountResponse>(`/api/accounts/${accountId}`, session!),
   });
+  useEffect(() => setRevealedPassword(null), [accountId]);
+
+  async function togglePasswordVisibility() {
+    if (revealedPassword !== null) {
+      setRevealedPassword(null);
+      return;
+    }
+    if (!session || !accountId) return;
+    setIsRevealingPassword(true);
+    try {
+      const response = await apiRequest<AccountPasswordResponse>(
+        `/api/accounts/${accountId}/password`,
+        session,
+      );
+      setRevealedPassword(response.data.password);
+    } catch (reason) {
+      if (reason instanceof ApiRequestError && reason.status === 401) markSessionExpired();
+      notify({
+        title: "Password could not be revealed",
+        description: reason instanceof Error ? reason.message : "The password could not be loaded.",
+        tone: "error",
+      });
+    } finally {
+      setIsRevealingPassword(false);
+    }
+  }
   const action = useMutation({
     mutationFn: async (method: "archive" | "restore" | "delete") =>
       apiRequest(`/api/accounts/${accountId}${method === "delete" ? "" : `/${method}`}`, session!, {
@@ -796,7 +828,7 @@ export function AccountDetailsPage() {
           </BackLink>
           <h1 className="text-2xl font-bold text-navy">Account details</h1>
           <p className="mt-2 text-base text-muted">
-            Only masked account identifiers are displayed.
+            Passwords are hidden until you choose to reveal them.
           </p>
         </div>
         {account && !account.archived_at ? (
@@ -813,12 +845,38 @@ export function AccountDetailsPage() {
         <Card>
           <dl className="grid gap-5 sm:grid-cols-2">
             <DetailItem label="Account holder" value={account.holder_name} />
-            <DetailItem label="Depository" value={account.depository_type} />
-            <DetailItem label="Masked demat identifier" value={account.masked_demat_identifier} />
-            <DetailItem
-              label="Masked client reference"
-              value={account.masked_client_reference ?? "Not provided"}
-            />
+            <DetailItem label="Bank name" value={account.bank_name ?? "Not provided"} />
+            <DetailItem label="Username" value={account.username ?? "Not provided"} />
+            <div>
+              <dt className="text-sm font-semibold text-muted">Password</dt>
+              <dd className="mt-1 flex flex-wrap items-center gap-3 text-base text-ink">
+                <span className="break-all font-mono">
+                  {!account.password_saved
+                    ? "Not set"
+                    : (revealedPassword ?? "••••••••")}
+                </span>
+                {account.password_saved ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={isRevealingPassword}
+                    aria-expanded={revealedPassword !== null}
+                    onClick={() => void togglePasswordVisibility()}
+                  >
+                    {revealedPassword !== null ? (
+                      <EyeOff className="mr-2 size-4" aria-hidden="true" />
+                    ) : (
+                      <Eye className="mr-2 size-4" aria-hidden="true" />
+                    )}
+                    {isRevealingPassword
+                      ? "Loading…"
+                      : revealedPassword !== null
+                        ? "Hide password"
+                        : "Reveal password"}
+                  </Button>
+                ) : null}
+              </dd>
+            </div>
             <DetailItem label="Account status" value={account.account_status} />
             <DetailItem label="Created" value={formatDate(account.created_at)} />
             <DetailItem label="Last updated" value={formatDate(account.updated_at)} />
@@ -1108,8 +1166,8 @@ export function AccountImportDialog({ onClose }: { onClose: () => void }) {
                       <tr className="border-b border-border">
                         <th className="p-3">Row</th>
                         <th className="p-3">Holder</th>
-                        <th className="p-3">Depository</th>
-                        <th className="p-3">Masked ID</th>
+                        <th className="p-3">Bank</th>
+                        <th className="p-3">Username</th>
                         <th className="p-3">Result</th>
                         <th className="p-3">Details</th>
                       </tr>
@@ -1119,8 +1177,8 @@ export function AccountImportDialog({ onClose }: { onClose: () => void }) {
                         <tr key={row.row_number} className="border-b border-border align-top">
                           <td className="p-3">{row.row_number}</td>
                           <td className="p-3">{row.record.holder_name}</td>
-                          <td className="p-3">{row.record.depository_type}</td>
-                          <td className="p-3">{row.record.masked_demat_identifier}</td>
+                          <td className="p-3">{row.record.bank_name}</td>
+                          <td className="p-3">{row.record.username}</td>
                           <td className="p-3 capitalize">{row.row_status}</td>
                           <td className="p-3 text-danger">
                             {[...row.errors, ...row.warnings].join(" ") || "—"}
@@ -1391,12 +1449,16 @@ function MobileAccountCard({ account }: { account: DematAccount }) {
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-3 border-y border-indigo-100 py-3">
-        <AccountCardDetail label="Depository" value={account.depository_type} />
+        <AccountCardDetail label="Bank" value={account.bank_name ?? "Not provided"} />
         <AccountCardDetail label="Created" value={formatDate(account.created_at)} />
         <AccountCardDetail
           className="col-span-2"
-          label="Masked demat ID"
-          value={account.masked_demat_identifier}
+          label="Username"
+          value={account.username ?? "Not provided"}
+        />
+        <AccountCardDetail
+          label="Password"
+          value={account.password_saved ? "••••••••" : "Not set"}
         />
       </dl>
       <AccountApplicationAction account={account} className="mt-4 w-full" />
@@ -1471,9 +1533,8 @@ const secondaryLinkClass =
 
 const importFields = [
   { key: "holder_name", label: "Holder name", required: true },
-  { key: "depository_type", label: "Depository", required: true },
-  { key: "masked_demat_identifier", label: "Masked demat identifier", required: true },
-  { key: "masked_client_reference", label: "Masked client reference", required: false },
+  { key: "bank_name", label: "Bank name", required: true },
+  { key: "username", label: "Username", required: true },
   { key: "account_status", label: "Account status", required: false },
   { key: "notes", label: "Notes", required: false },
 ];

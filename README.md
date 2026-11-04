@@ -1,12 +1,12 @@
 # IPO Mania
 
 IPO Mania is a TypeScript monorepo for an IPO research application. It includes the development
-foundation, Supabase authentication and multi-user security, user-owned demat account management,
+foundation, Supabase authentication and multi-user security, user-owned account management,
 user-specific IPO records with an issue-configured decimal quota calculator, and manual
 application, UPI mandate, allotment, refund, and capital tracking. It does not submit IPO
 applications, initiate payments, approve mandates automatically, or fetch market data.
 
-The web UI currently shows IPOs, demat accounts, applications, and the quota calculator. Mandate,
+The web UI currently shows IPOs, account records, applications, and the quota calculator. Mandate,
 allotment, refund, and capital screens are temporarily hidden; their API endpoints remain available.
 
 ## Requirements

@@ -30,11 +30,12 @@ focus-managed side drawer with separate draft and applied URL-backed state. Sear
 the user's actual IPO, account, category, and status records; list and CSV endpoints apply
 the same server-validated criteria, including multi-IPO selection.
 
-Protected IPO list and opening-date calendar routes show the shared admin-managed catalog by
-default, with server-side search, status filters, and pagination. Catalog details are read-only and
-retain provider attribution and unset source values. The **My IPOs** view (`?source=personal`)
-preserves the user-owned list, details, add/edit form, immutable category-rule configuration, and
-quota calculator. Shared issue IDs never become personal category-rule or editing targets.
+Protected IPO list and opening-date calendar routes show the shared admin-managed catalog with
+server-side search, status filters, and pagination. The user IPO page has no personal-IPO switch or
+catalog-creation control; legacy `?source=personal` URLs resolve to the catalog view. Catalog
+details are read-only and retain provider attribution and unset source values. User-owned IPO
+snapshots remain available to application and quota workflows, but are not exposed as a separate
+IPO list or creation form. Shared issue IDs never become personal category-rule or editing targets.
 Category forms expose explicit
 unknown/unpublished/configured states rather than applying defaults. Calculator results show
 validation reasons, source/rule version, calculation inputs, and a clear notice that self-reported

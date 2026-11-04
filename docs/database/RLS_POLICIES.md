@@ -14,7 +14,8 @@ The `20261031120000_demat_accounts_rls.sql` migration adds:
 - `account_imports` and `account_import_rows`, owner-scoped import history and row reports.
 - Forced RLS and authenticated-only, owner-scoped policies on the account and import tables.
 - Column-scoped insert/update grants. Account deletion is permitted only for an archived row.
-- A unique index on the normalized masked identifier per user and depository.
+- Bank name, username, and encrypted-password columns replace the old depository and masked
+  identifier fields. Passwords are encrypted in the API Worker before they reach Postgres.
 
 The `20261102120000_remove_demat_account_capacity.sql` migration removes the former account-count
 trigger, function, counter table, and capacity-only index. Account ownership and RLS are unchanged.

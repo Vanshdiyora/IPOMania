@@ -14,17 +14,18 @@ Application status is independent of payment mandate and allotment:
 - Allotment: `UNKNOWN`, `PENDING`, `ALLOTTED`, `PARTIALLY_ALLOTTED`, `NOT_ALLOTTED`.
 
 New and imported records default to `DRAFT` and do not imply an exchange submission. Imported
-statuses are only set to another value when the user explicitly maps that field. Editing statuses,
-legacy numbers, and notes never rewrites the calculation snapshot; the server-recorded submission
-timestamp is not editable. Archiving is soft; the
-application and its historical details remain available.
+statuses are only set to another value when the user explicitly maps that field. The edit drawer
+changes only the category, lots, and price; the server recalculates shares, amount, and the
+calculation snapshot from those terms. Application number, external reference, rule version, and
+the server-recorded submission timestamp are not editable. Archiving is soft; the application and
+its historical details remain available.
 
 ## Calculation and validation
 
 The add-application form keeps entry to an owned, unarchived IPO, an active owned demat account,
 a selected category, positive whole lots, and price. Shared IPO details offer
 **Use for application**, which copies complete shared issue data and the latest admin-managed
-category rules into the caller's **My IPOs** before opening the form. Unknown market values are not
+category rules into the caller's private application snapshot before opening the form. Unknown market values are not
 filled with defaults; incomplete shared records cannot be imported for application calculations.
 Personal IPO records and their independently configured rules are unchanged. When category rules
 exist, selecting a category prefills its configured lots and the existing rule checks remain in
@@ -64,7 +65,8 @@ accounts is never treated as proof of eligibility.
   shows how many different IPOs have applications.
 - `/applications/list`: searchable, filterable table with pagination and filtered CSV export.
 - `/applications/new`, `/applications/:applicationId`, and `/applications/:applicationId/edit`:
-  creation, historical details, and editable operational fields.
+  creation, historical details, and category/lots/price revision. The table keeps an icon-only
+  edit action in its last column.
 - `/ipos/:ipoId`: an account-first table of active demat accounts and recorded applications for
   that IPO. It shows the selected category and recorded bid price, opens the application form in a
   drawer with the IPO and account preselected, and returns to the table after save or edit.

@@ -240,7 +240,7 @@ function createReportRows(analytics: DashboardAnalytics): ReportRow[] {
       reportRow(
         "demat account",
         "",
-        `${item.holder_name} (${item.masked_demat_identifier})`,
+        `${item.holder_name} (${item.bank_name})`,
         item.count,
       ),
     ),

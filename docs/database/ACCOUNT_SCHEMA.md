@@ -1,25 +1,33 @@
 # Account database schema
 
-Current shape: `supabase/migrations/20261104180000_remove_broker_fields.sql`.
+Current shape: `supabase/migrations/20261104220000_replace_demat_identifiers_with_bank_credentials.sql`.
 
 ## `public.demat_accounts`
 
-The table stores one user's masked demat account record. `id` is a generated UUID primary key;
+The table stores one user's IPO-linked account record. `id` is a generated UUID primary key;
 `user_id` is non-null and references `auth.users(id) ON DELETE CASCADE`. Fields and constraints:
 
 - `holder_name`: trimmed non-empty text, maximum 160 characters.
-- `depository_type`: `NSDL` or `CDSL`.
-- `masked_demat_identifier`: required printable masked value containing `X` or `*`, 3–80
-  characters.
-- `masked_demat_identifier_normalized`: stored generated lower-case/trimmed comparison value.
-- `masked_client_reference`: optional 3–80 character masked value containing `X` or `*`.
+- `bank_name`: bank display name, maximum 120 characters.
+- `username`: bank login username, maximum 160 characters.
+- `password_encrypted`: nullable AES-GCM ciphertext with a version prefix. Existing rows remain
+  nullable and are not backfilled with invented account data.
 - `account_status`: `active` (default), `inactive`, or `closed`.
 - `notes`: optional, at most 2,000 characters.
 - `created_at`, trigger-maintained `updated_at`, and nullable `archived_at`.
 
-A unique index on `(user_id, depository_type, masked_demat_identifier_normalized)` prevents
-duplicate records, including archived ones. Owner/date, status/depository/archive, and
-trigram search indexes support the API filters.
+Generated normalized bank-name and username columns support import duplicate checks. The old
+depository, masked identifier, and masked client-reference columns are removed by the migration.
+
+Passwords are encrypted in the API Worker with AES-256-GCM and a fresh 96-bit nonce before any
+database write. The encryption key is configured as the Worker secret
+`ACCOUNT_CREDENTIAL_ENCRYPTION_KEY`; it must be a base64-encoded 32-byte key and must not be
+committed. The database stores ciphertext only. List, details, create, update, and lifecycle
+responses never contain ciphertext or plaintext. The explicit `GET /api/accounts/:accountId/password`
+route verifies the caller, scopes the query to their user ID, decrypts only for that request, and
+sets `Cache-Control: no-store`. The UI keeps passwords masked unless the owner explicitly reveals
+them. Key loss or rotation without migration makes existing ciphertext unrecoverable; maintain
+protected backups and a deliberate key-rotation procedure.
 
 ## Account count
 
@@ -59,9 +67,10 @@ cascades all of the user's account and import data.
 
 ## Verification
 
-`supabase/tests/demat_accounts.test.sql` exercises actual two-user RLS, invalid values, duplicate
-identifiers, create/archive/restore/delete beyond 500 active accounts, import confirmation
-retry, and safe reversal. Run it with the other pgTAP tests using `npm run test:security:db`.
+`supabase/tests/demat_accounts.test.sql` exercises actual two-user RLS, bank and ciphertext
+constraints, create/archive/restore/delete beyond 500 active accounts, import confirmation retry,
+and safe reversal. API tests cover encryption, owner-scoped password reveal, and no plaintext
+storage. Run the pgTAP suites with `npm run test:security:db`.
 
 `tests/integration/demat-account-concurrency.test.ts` uses two independent PostgreSQL transactions to
 create accounts simultaneously above 500 existing active accounts. It is skipped unless

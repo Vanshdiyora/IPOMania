@@ -1,8 +1,5 @@
-import { toIsoDateTime, toLocalDateTime, formValuesFromRecord } from "../../lib/formValues";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
   DematAccount,
@@ -15,15 +12,12 @@ import type {
   IpoStatus,
 } from "@ipo-mania/shared";
 import { isIpoReadyForApplication } from "@ipo-mania/shared";
-import { ipoCategoryConfigurationSchema, ipoSchema, ipoStatusSchema } from "@ipo-mania/validation";
-import type { z } from "@ipo-mania/validation";
+import { ipoCategoryConfigurationSchema } from "@ipo-mania/validation";
 import { useAuth } from "../../auth/useAuth";
 import { ConfirmButton } from "../../components/ui/ConfirmButton";
 import { Button } from "../../components/ui/Button";
-import { FormInput, FormSelect, FormTextarea } from "../../components/ui/FormControls";
+import { FormInput, FormSelect } from "../../components/ui/FormControls";
 import { Input, Select as CustomSelect } from "../../components/ui/Input";
-import { SearchableSelect } from "../../components/filters/SearchableSelect";
-import { FormSection } from "../../components/ui/FormSection";
 import { ConfirmationDialog } from "../../components/ui/ConfirmationDialog";
 import { DrawerRouteLink, RouteFormDrawer } from "../../components/ui/FormDrawer";
 import { useToast } from "../../components/ui/ToastContext";
@@ -51,7 +45,6 @@ type IpoListResponse<T = IpoRecord> = {
   };
 };
 type IpoResponse = { data: IpoRecord };
-type IpoCatalogResponse = { data: IpoCatalogRecord };
 type IpoCategoryResponse = { data: { configurations: IpoCategoryConfiguration[] } };
 type IpoCatalogCategoryResponse = {
   data: { configurations: IpoCatalogCategoryConfiguration[] };
@@ -80,8 +73,6 @@ type IpoApplicationTableRow = {
   account: DematAccount | null;
   application: IpoApplicationWithRelations | null;
 };
-type IpoValues = z.input<typeof ipoSchema>;
-type IpoOutput = z.output<typeof ipoSchema>;
 type AccountListResponse = {
   data: {
     accounts: DematAccount[];
@@ -102,26 +93,6 @@ type CalculationResponse = {
   };
 };
 
-const blankIpo: IpoValues = {
-  company_name: "",
-  symbol: "",
-  ipo_type: "",
-  exchange: "",
-  issue_price_min: "",
-  issue_price_max: "",
-  cut_off_price: null,
-  lot_size: 0,
-  issue_size: "",
-  opening_date: "",
-  closing_date: "",
-  allotment_date: null,
-  listing_date: null,
-  status: "" as IpoValues["status"],
-  data_source: "MANUAL",
-  source_reference: null,
-  last_verified_at: null,
-};
-
 const categories: IpoCategoryCode[] = ["RETAIL", "SHNI", "BHNI", "SHAREHOLDER", "EMPLOYER"];
 const ipoSortOptions = [
   { value: "date_desc", label: "Date · newest first" },
@@ -132,23 +103,28 @@ const ipoSortOptions = [
   { value: "name_desc", label: "Alphabetical · Z to A" },
 ] as const;
 type IpoSort = (typeof ipoSortOptions)[number]["value"];
-const statuses = ipoStatusSchema.options;
 const catalogStatuses = ["UPCOMING", "OPEN", "CLOSED", "LISTED"] as const;
 const secondaryLinkClass =
   "inline-flex min-h-touch items-center justify-center rounded-lg border border-border bg-white px-5 py-2 font-semibold text-ink hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
 
 export function IpoListPage() {
-  const [searchParams] = useSearchParams();
-  const personal = searchParams.get("source") === "personal";
-  return <IpoListContent key={String(personal)} personal={personal} />;
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (!searchParams.has("source")) return;
+    const canonicalParams = new URLSearchParams(searchParams);
+    canonicalParams.delete("source");
+    setSearchParams(canonicalParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  return <IpoListContent />;
 }
 
-function IpoListContent({ personal }: { personal: boolean }) {
+function IpoListContent() {
   const { session } = useAuth();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get("search") ?? "";
-  const availableStatuses: readonly IpoStatus[] = personal ? statuses : catalogStatuses;
+  const availableStatuses: readonly IpoStatus[] = catalogStatuses;
   const selectedStatuses = searchParams
     .getAll("status")
     .filter((requestedStatus) => availableStatuses.includes(requestedStatus as IpoStatus));
@@ -184,79 +160,52 @@ function IpoListContent({ personal }: { personal: boolean }) {
   });
   selectedStatuses.forEach((selectedStatus) => params.append("status", selectedStatus));
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["ipos", personal ? "personal" : "catalog", params.toString()],
+    queryKey: ["ipos", "catalog", params.toString()],
     enabled: Boolean(session),
     queryFn: () =>
       apiRequest<IpoListResponse<IpoRecord | IpoCatalogRecord>>(
-        `/api/ipos${personal ? "" : "/catalog"}?${params}`,
+        `/api/ipos/catalog?${params}`,
         session!,
       ),
   });
   const ipos = data?.data.ipos ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
-        title="IPOs"
-        description="Browse the IPO catalog or manage your personal IPO records."
-        actions={
-          <DrawerRouteLink
-            className="inline-flex min-h-touch items-center justify-center rounded-lg bg-action px-5 py-2 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
-            to="/ipos/new"
-          >
-            Add to catalog
-          </DrawerRouteLink>
-        }
+        eyebrow="Market overview"
+        title="IPO catalog"
+        description="Browse upcoming and open public issues, with key dates and pricing in one place."
+        compact
+        className="border-action/15 bg-gradient-to-r from-white via-white to-indigo-50/60"
       />
-      <div className="flex flex-wrap gap-3" role="group" aria-label="IPO source">
-        {[
-          { value: false, name: "IPO catalog" },
-          { value: true, name: "My IPOs" },
-        ].map((source) => (
-          <Button
-            key={source.name}
-            variant={personal === source.value ? "default" : "outline"}
-            aria-pressed={personal === source.value}
-            onClick={() =>
-              updateListParams({
-                source: source.value ? "personal" : null,
-                search: null,
-                status: null,
-                page: null,
-              })
-            }
-          >
-            {source.name}
-          </Button>
-        ))}
-      </div>
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="IPO totals">
-        <Card>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="IPO totals">
+        <Card className="px-4 py-3 sm:p-4">
           <p className="text-sm font-semibold text-muted">Total IPOs</p>
-          <p className="mt-2 text-3xl font-bold text-navy">{data?.data.pagination.total ?? 0}</p>
+          <p className="mt-1 text-2xl font-bold text-navy">{data?.data.pagination.total ?? 0}</p>
         </Card>
-        <Card>
+        <Card className="px-4 py-3 sm:p-4">
           <p className="text-sm font-semibold text-muted">Open on this page</p>
-          <p className="mt-2 text-3xl font-bold text-navy">
+          <p className="mt-1 text-2xl font-bold text-navy">
             {ipos.filter((ipo) => ipo.status === "OPEN").length}
           </p>
         </Card>
-        <Card>
+        <Card className="px-4 py-3 sm:p-4">
           <p className="text-sm font-semibold text-muted">Upcoming on this page</p>
-          <p className="mt-2 text-3xl font-bold text-navy">
+          <p className="mt-1 text-2xl font-bold text-navy">
             {ipos.filter((ipo) => ipo.status === "UPCOMING").length}
           </p>
         </Card>
-        <Card>
+        <Card className="px-4 py-3 sm:p-4">
           <p className="text-sm font-semibold text-muted">Listed on this page</p>
-          <p className="mt-2 text-3xl font-bold text-navy">
+          <p className="mt-1 text-2xl font-bold text-navy">
             {ipos.filter((ipo) => ipo.status === "LISTED").length}
           </p>
         </Card>
       </section>
       <Card className="overflow-hidden">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="block min-w-0 flex-1 text-sm font-semibold text-ink">
+        <div className="flex flex-col gap-3">
+          <label className="block min-w-0 text-sm font-semibold text-ink">
             Search company or exact symbol
             <Input
               aria-label="Search company or exact symbol"
@@ -268,45 +217,59 @@ function IpoListContent({ personal }: { personal: boolean }) {
               }}
             />
           </label>
-          <div className="block w-full shrink-0 sm:w-52">
-            <SearchableSelect
-              label="Filter IPOs"
-              placeholder="All statuses"
-              options={availableStatuses.map((option) => ({
-                value: option,
-                label: label(option),
-              }))}
-              value={selectedStatuses}
-              multiple
-              searchable={false}
-              showSelectAll={false}
-              onChange={(value) =>
-                updateListParams(
-                  {
-                    status: Array.isArray(value) ? value : value ? [value] : null,
-                    page: null,
-                  },
-                  true,
-                )
-              }
-            />
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="min-w-0 flex-1" role="group" aria-label="Filter IPOs by status">
+              <span className="mb-1.5 block text-sm font-semibold text-ink">Filter IPOs</span>
+              <div className="flex flex-wrap gap-2">
+                {availableStatuses.map((status) => {
+                  const isSelected = selectedStatuses.includes(status);
+                  return (
+                    <button
+                      key={status}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() =>
+                        updateListParams(
+                          {
+                            status: isSelected
+                              ? selectedStatuses.filter((selected) => selected !== status)
+                              : [...selectedStatuses, status],
+                            page: null,
+                          },
+                          true,
+                        )
+                      }
+                      className={`min-h-touch rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy ${
+                        isSelected
+                          ? "border-action bg-action-light text-action"
+                          : "border-border bg-white text-ink hover:bg-canvas"
+                      }`}
+                    >
+                      {label(status)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <label className="block w-full shrink-0 text-sm font-semibold text-ink sm:w-64">
+              Sort IPOs
+              <CustomSelect
+                aria-label="Sort IPOs"
+                value={sort}
+                searchable={false}
+                clearable={false}
+                onChange={(event) =>
+                  updateListParams({ sort: event.target.value, page: null }, true)
+                }
+              >
+                {ipoSortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </CustomSelect>
+            </label>
           </div>
-          <label className="block w-full shrink-0 text-sm font-semibold text-ink sm:w-64">
-            Sort IPOs
-            <CustomSelect
-              aria-label="Sort IPOs"
-              value={sort}
-              searchable={false}
-              clearable={false}
-              onChange={(event) => updateListParams({ sort: event.target.value, page: null }, true)}
-            >
-              {ipoSortOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </CustomSelect>
-          </label>
         </div>
       </Card>
       {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
@@ -323,11 +286,7 @@ function IpoListContent({ personal }: { personal: boolean }) {
         <Card>
           <EmptyState
             title="No IPO records found."
-            description={
-              personal
-                ? "Add an issue to start an issue-specific rule record."
-                : "Try another search. New IPOs appear here when added to the catalog."
-            }
+            description="Try another search. New IPOs appear here when an administrator adds them to the catalog."
           />
         </Card>
       ) : null}
@@ -352,7 +311,7 @@ function IpoListContent({ personal }: { personal: boolean }) {
                 <td className="p-4">
                   <Link
                     className="font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
-                    to={`/ipos/${personal ? "" : "catalog/"}${ipo.id}`}
+                    to={`/ipos/catalog/${ipo.id}`}
                     state={{ from: `${location.pathname}${location.search}` }}
                   >
                     {ipo.company_name}
@@ -799,21 +758,16 @@ export function IpoDetailsPage() {
             Quota calculator
           </Link>
           {!ipo.archived_at ? (
-            <>
-              <DrawerRouteLink className={secondaryLinkClass} to={`/ipos/${ipo.id}/edit`}>
-                Edit IPO
-              </DrawerRouteLink>
-              <ConfirmButton
-                variant="outline"
-                disabled={archive.isPending}
-                title="Archive this record?"
-                description="This record will be removed from the active list."
-                confirmLabel="Archive"
-                onConfirm={() => archive.mutateAsync()}
-              >
-                Archive
-              </ConfirmButton>
-            </>
+            <ConfirmButton
+              variant="outline"
+              disabled={archive.isPending}
+              title="Archive this record?"
+              description="This record will be removed from the active list."
+              confirmLabel="Archive"
+              onConfirm={() => archive.mutateAsync()}
+            >
+              Archive
+            </ConfirmButton>
           ) : null}
         </div>
       </header>
@@ -1003,165 +957,6 @@ export function IpoDetailsPage() {
         )}
       </Card>
     </div>
-  );
-}
-
-export function IpoFormPage({ editing = false }: { editing?: boolean }) {
-  const { ipoId = "" } = useParams();
-  const { session } = useAuth();
-  const navigate = useNavigate();
-  const { notify } = useToast();
-  const [verificationTime, setVerificationTime] = useState("");
-  const loadedRecordId = useRef<string | null>(null);
-  const queryClient = useQueryClient();
-  const existing = useQuery({
-    queryKey: ["ipo", ipoId],
-    enabled: Boolean(editing && session && ipoId),
-    queryFn: () => apiRequest<IpoResponse>(`/api/ipos/${ipoId}`, session!),
-  });
-  const form = useForm<IpoValues, unknown, IpoOutput>({
-    resolver: zodResolver(ipoSchema),
-    defaultValues: blankIpo,
-  });
-
-  useEffect(() => {
-    if (existing.data?.data && loadedRecordId.current !== existing.data.data.id) {
-      loadedRecordId.current = existing.data.data.id;
-      const { last_verified_at } = existing.data.data;
-      form.reset(
-        formValuesFromRecord(blankIpo, {
-          ...existing.data.data,
-          symbol: existing.data.data.symbol ?? "",
-        }),
-      );
-      setVerificationTime(last_verified_at ? toLocalDateTime(last_verified_at) : "");
-    }
-  }, [existing.data, form]);
-
-  const submit = form.handleSubmit(async (values) => {
-    if (!session) return;
-    const payload = {
-      ...values,
-      source_reference: values.source_reference || null,
-      last_verified_at: verificationTime ? toIsoDateTime(verificationTime) : null,
-    };
-    try {
-      const response = await apiRequest<IpoResponse | IpoCatalogResponse>(
-        editing ? `/api/ipos/${ipoId}` : "/api/ipos",
-        session,
-        { method: editing ? "PATCH" : "POST", body: JSON.stringify(payload) },
-      );
-      await queryClient.invalidateQueries({ queryKey: ["ipos"] });
-      navigate(`${editing ? "/ipos/" : "/ipos/catalog/"}${response.data.id}`, {
-        state: { successMessage: editing ? "IPO updated." : "IPO added to the shared catalog." },
-      });
-    } catch (error) {
-      notify({
-        title: editing ? "IPO could not be updated" : "IPO could not be added to the catalog",
-        description: error instanceof Error ? error.message : "Please try again.",
-        tone: "error",
-      });
-    }
-  });
-
-  if (editing && existing.isLoading) return <SkeletonFormPage />;
-  if (editing && existing.error)
-    return <ErrorNotice error={existing.error} onRetry={() => void existing.refetch()} />;
-
-  return (
-    <RouteFormDrawer
-      title={editing ? "Edit IPO" : "Add to shared catalog"}
-      description={
-        editing
-          ? "Update this private IPO record. Manual values are never marked verified automatically."
-          : "Submit issue details to the shared IPO catalog. Include information you can review; administrators can maintain the record after submission."
-      }
-      cancelTo={editing ? `/ipos/${ipoId}` : "/ipos"}
-      formId="ipo-form"
-      submitLabel={editing ? "Save changes" : "Add to catalog"}
-      busy={form.formState.isSubmitting}
-      dirty={
-        form.formState.isDirty ||
-        verificationTime !==
-          (existing.data?.data.last_verified_at
-            ? toLocalDateTime(existing.data.data.last_verified_at)
-            : "")
-      }
-    >
-      <form id="ipo-form" className="space-y-5" onSubmit={submit} noValidate>
-        <FormSection title="Company details">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <TextField form={form} name="company_name" label="Company name" />
-            <TextField form={form} name="symbol" label="Symbol" />
-            <TextField form={form} name="ipo_type" label="IPO type" />
-            <TextField form={form} name="exchange" label="Exchange" />
-          </div>
-        </FormSection>
-        <FormSection title="Issue and pricing">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <TextField form={form} name="issue_price_min" label="Issue price minimum" />
-            <TextField form={form} name="issue_price_max" label="Issue price maximum" />
-            <TextField form={form} name="cut_off_price" label="Cut-off price (optional)" />
-            <TextField
-              form={form}
-              name="lot_size"
-              label="Shares in one lot (lot size)"
-              inputMode="numeric"
-            />
-            <TextField form={form} name="issue_size" label="Issue size" />
-            <SelectField form={form} name="status" label="Status">
-              <option value="" disabled>
-                Choose a status
-              </option>
-              {(editing ? statuses : catalogStatuses).map((status) => (
-                <option key={status} value={status}>
-                  {label(status)}
-                </option>
-              ))}
-            </SelectField>
-          </div>
-        </FormSection>
-        <FormSection title="Key dates">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <TextField form={form} name="opening_date" label="Opening date" type="date" />
-            <TextField form={form} name="closing_date" label="Closing date" type="date" />
-            <TextField
-              form={form}
-              name="listing_date"
-              label="Listing date (optional)"
-              type="date"
-            />
-          </div>
-        </FormSection>
-        <FormSection title="Source and verification">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <SelectField form={form} name="data_source" label="Data source">
-              <option value="MANUAL">Manual entry</option>
-              <option value="PUBLISHED_SOURCE">Published source, entered manually</option>
-            </SelectField>
-            <FormTextarea
-              label="Source reference (optional)"
-              fieldClassName="sm:col-span-2"
-              error={form.formState.errors.source_reference?.message}
-              {...form.register("source_reference")}
-              placeholder="Official document URL or publication reference"
-            />
-            <FormInput
-              label="Last verified at (optional)"
-              fieldClassName="sm:col-span-2"
-              type="datetime-local"
-              value={verificationTime}
-              onChange={(event) => setVerificationTime(event.target.value)}
-              hint={
-                editing
-                  ? "Leave blank unless you personally checked the referenced source."
-                  : "Leave blank unless you checked the referenced source. This entry will be visible in the shared catalog."
-              }
-            />
-          </div>
-        </FormSection>
-      </form>
-    </RouteFormDrawer>
   );
 }
 
@@ -1796,7 +1591,8 @@ export function QuotaCalculatorPage() {
               </option>
               {accountOptions.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.holder_name} · {account.masked_demat_identifier}
+                  {account.holder_name} · {account.bank_name ?? "Bank not provided"} (
+                  {account.username ?? "Username not provided"})
                 </option>
               ))}
             </CustomSelect>
@@ -2097,67 +1893,6 @@ function updateRuleForm(
   value: string,
 ) {
   setForm((current) => ({ ...current, [key]: value }));
-}
-
-function TextField({
-  form,
-  name,
-  label,
-  type = "text",
-  inputMode,
-}: {
-  form: ReturnType<typeof useForm<IpoValues, unknown, IpoOutput>>;
-  name: keyof IpoValues;
-  label: string;
-  type?: React.HTMLInputTypeAttribute;
-  inputMode?: "numeric" | "decimal";
-}) {
-  const nullableField = ["cut_off_price", "allotment_date", "listing_date"].includes(name);
-  const registration =
-    name === "lot_size"
-      ? form.register(name, { valueAsNumber: true })
-      : nullableField
-        ? form.register(name, { setValueAs: (value: string) => (value === "" ? null : value) })
-        : form.register(name);
-  const decimal = ["issue_price_min", "issue_price_max", "cut_off_price", "issue_size"].includes(
-    name,
-  );
-  return (
-    <FormInput
-      label={label}
-      type={name === "lot_size" ? "number" : type}
-      min={name === "lot_size" ? 1 : undefined}
-      step={name === "lot_size" ? 1 : undefined}
-      inputMode={decimal ? "decimal" : inputMode}
-      required={!nullableField}
-      error={form.formState.errors[name]?.message}
-      {...registration}
-    />
-  );
-}
-
-function SelectField({
-  form,
-  name,
-  label,
-  children,
-}: {
-  form: ReturnType<typeof useForm<IpoValues, unknown, IpoOutput>>;
-  name: "status" | "data_source";
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Controller
-      control={form.control}
-      name={name}
-      render={({ field }) => (
-        <FormSelect label={label} required error={form.formState.errors[name]?.message} {...field}>
-          {children}
-        </FormSelect>
-      )}
-    />
-  );
 }
 
 function IssueSummary({ ipo, personal }: { ipo: IpoRecord | IpoCatalogRecord; personal: boolean }) {

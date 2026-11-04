@@ -27,6 +27,12 @@
   Active membership is serialized and capped in the database. Import confirmation and reversal
   use narrow `SECURITY DEFINER` RPCs with an empty search path and explicit `auth.uid()` ownership
   checks; direct clients cannot update import state or results.
+- Bank passwords are encrypted in the API Worker using AES-256-GCM and a deployment-managed
+  32-byte `ACCOUNT_CREDENTIAL_ENCRYPTION_KEY` before database writes. The database stores only
+  versioned ciphertext. Ordinary account responses omit it; password reveal is a separate
+  authenticated, owner-scoped endpoint with `Cache-Control: no-store`. The UI masks passwords in
+  account tables and reveals only on explicit user action. The key must be configured as a Worker
+  secret and backed up/rotated securely; ciphertext is unrecoverable if its key is lost.
 - User-facing IPO data is user-specific; the separately approved admin IPO synchronization module
   may maintain a distinct shared catalog under explicit admin authorization. IPO, category-rule,
   and calculation tables force RLS; composite foreign keys bind categories/calculations to the same

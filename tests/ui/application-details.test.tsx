@@ -65,7 +65,7 @@ const record = {
   updated_at: "2026-11-04T11:09:35.680Z",
   archived_at: null,
   ipos: { company_name: "Vedant Poly Fabs", symbol: null },
-  demat_accounts: { holder_name: "Vansh", masked_demat_identifier: "*23123123" },
+  demat_accounts: { holder_name: "Vansh", bank_name: "Example Bank", username: "vansh" },
   ipo_categories: { category: "RETAIL" },
 };
 
@@ -97,10 +97,14 @@ describe("application details", () => {
     expect(screen.getByText("₹1,12,800.00")).toBeInTheDocument();
     expect(screen.getByText("1", { selector: "p" })).toBeInTheDocument();
     expect(screen.getAllByText("1,200")).toHaveLength(2);
-    expect(screen.getByText("APP-2026-001")).toBeInTheDocument();
     expect(screen.getByText("Submitted through my bank")).toBeInTheDocument();
     expect(screen.getAllByText("Submitted").length).toBeGreaterThan(0);
-    expect(screen.getByText("Pending")).toBeInTheDocument();
+    expect(screen.queryByText("APP-2026-001")).toBeNull();
+    expect(screen.queryByText("Application number")).toBeNull();
+    expect(screen.queryByText("REF-123")).toBeNull();
+    expect(screen.queryByText("External reference")).toBeNull();
+    expect(screen.queryByText("Rule version")).toBeNull();
+    expect(screen.queryByText("Application progress")).toBeNull();
     expect(screen.queryByText(/calculation_input|category_configuration|captured_at/)).toBeNull();
     expect(screen.queryByText(applicationId)).toBeNull();
 

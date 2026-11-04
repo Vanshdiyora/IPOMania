@@ -36,6 +36,12 @@ values
     '22222222-2222-4222-8222-222222222222',
     'Application IPO B', 'APPB', 'Test', 'Test Exchange', 10, 20, 20, 10, 100000,
     '2026-11-01', '2026-11-03', 'UPCOMING'
+  ),
+  (
+    '77777777-7777-4777-8777-777777777777',
+    '11111111-1111-4111-8111-111111111111',
+    'Application IPO A2', 'APPA2', 'Test', 'Test Exchange', 10, 20, 20, 10, 100000,
+    '2026-11-01', '2026-11-03', 'UPCOMING'
   );
 
 insert into public.ipo_categories (
@@ -54,21 +60,27 @@ values
     '22222222-2222-4222-8222-222222222222',
     '99999999-9999-4999-8999-999999999999', 'RETAIL', 1, 'CONFIGURED', 1, 3, 1,
     'NO_PUBLISHED_LIMIT', '[]', array['CUT_OFF'], 'MANUAL'
+  ),
+  (
+    'abababab-abab-4bab-8bab-abababababab',
+    '11111111-1111-4111-8111-111111111111',
+    '77777777-7777-4777-8777-777777777777', 'RETAIL', 1, 'CONFIGURED', 1, 3, 1,
+    'NO_PUBLISHED_LIMIT', '[]', array['CUT_OFF'], 'MANUAL'
   );
 
 insert into public.demat_accounts (
-  id, user_id, holder_name, depository_type, masked_demat_identifier
+  id, user_id, holder_name, bank_name, username
 )
 values
   (
     'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     '11111111-1111-4111-8111-111111111111', 'Application Holder A',
-    'NSDL', 'XXXXAPPA'
+    'Application Bank A', 'application-a'
   ),
   (
     'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
     '22222222-2222-4222-8222-222222222222', 'Application Holder B',
-    'NSDL', 'XXXXAPPB'
+    'Application Bank B', 'application-b'
   );
 
 insert into public.applications (
@@ -112,9 +124,9 @@ values (
   2,
   '{
     "user_id":"11111111-1111-4111-8111-111111111111",
-    "ipo_id":"88888888-8888-4888-8888-888888888888",
+    "ipo_id":"77777777-7777-4777-8777-777777777777",
     "demat_account_id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-    "category_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "category_id":"abababab-abab-4bab-8bab-abababababab",
     "lots":1,"total_shares":10,"application_amount":"200",
     "application_number":"APP-A-2","external_reference":"stable-a-2",
     "submission_date":null,"application_status":"DRAFT",
@@ -196,10 +208,9 @@ select throws_ok(
 );
 select throws_ok(
   $$insert into public.applications (
-      id, user_id, ipo_id, demat_account_id, category_id, lots, total_shares,
+      user_id, ipo_id, demat_account_id, category_id, lots, total_shares,
       application_amount, external_reference, rule_version, calculation_snapshot
     ) values (
-      '44444444-4444-4444-8444-444444444444',
       '11111111-1111-4111-8111-111111111111',
       '88888888-8888-4888-8888-888888888888',
       'cccccccc-cccc-4ccc-8ccc-cccccccccccc',

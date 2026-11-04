@@ -7,8 +7,7 @@
 - Maximum file size: 5 MiB.
 - Maximum: 500 data rows and 30 unique, non-empty columns.
 - XLSX must contain exactly one worksheet. The header row is the first row.
-- Only masked identifiers may be included. Do not upload passwords, credentials, or full
-  demat identifiers.
+- Do not upload passwords or other login credentials.
 
 Both browser affordances and the API enforce limits. The Worker parses and validates the uploaded
 file; file type is checked using the request content type and extension, while malformed data,
@@ -23,7 +22,7 @@ account dashboard with the dialog open.
 
 1. Select and upload a file.
 2. The API parses the header row and returns a sample; no account records are created.
-3. Map columns to holder name, depository, masked demat identifier, and optional fields.
+3. Map columns to holder name, bank name, username, and optional fields.
 4. The API validates every row and checks duplicates within the file and against the user's
    existing records.
 5. Review the complete report. Each row remains visible as ready, duplicate, or invalid with
@@ -32,8 +31,8 @@ account dashboard with the dialog open.
    visible in the report and are not imported.
 7. Review import history and download a CSV report of rows with errors or warnings.
 
-Duplicate detection uses the user's depository and normalized masked demat identifier. Duplicate
-rows are warnings that require the user to review before confirming; they are excluded from
+Duplicate detection uses the user's normalized bank name and username. Duplicate rows are warnings
+that require the user to review before confirming; they are excluded from
 insertion. Invalid rows retain validation messages. If a database failure occurs during confirm,
 the transaction rolls back without a partially imported batch.
 

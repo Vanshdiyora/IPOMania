@@ -12,6 +12,7 @@ interface PageHeaderProps {
   actions?: ReactNode;
   breadcrumbs?: BreadcrumbItem[];
   className?: string;
+  compact?: boolean;
 }
 
 export function PageHeader({
@@ -22,24 +23,46 @@ export function PageHeader({
   actions,
   breadcrumbs,
   className,
+  compact = false,
 }: PageHeaderProps) {
   const desc = description ?? subtitle;
 
   return (
     <header
       className={cn(
-        "rounded-2xl border border-border bg-surface px-4 py-5 shadow-card sm:px-6",
+        "rounded-2xl border border-border bg-surface shadow-card",
+        compact ? "px-4 py-3 sm:px-5" : "px-4 py-5 sm:px-6",
         className,
       )}
     >
       {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs items={breadcrumbs} />}
       {eyebrow && (
-        <p className="text-xs font-semibold uppercase tracking-widest text-action">{eyebrow}</p>
+        <p
+          className={cn(
+            "text-xs font-semibold uppercase tracking-widest text-action",
+            compact && "mb-0.5",
+          )}
+        >
+          {eyebrow}
+        </p>
       )}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">{title}</h1>
-          {desc && <p className="mt-1.5 text-base text-muted leading-relaxed">{desc}</p>}
+          <h1
+            className={cn("text-2xl font-bold tracking-tight text-ink", !compact && "sm:text-3xl")}
+          >
+            {title}
+          </h1>
+          {desc && (
+            <p
+              className={cn(
+                "text-muted leading-relaxed",
+                compact ? "mt-0.5 text-sm" : "mt-1.5 text-base",
+              )}
+            >
+              {desc}
+            </p>
+          )}
         </div>
         {actions && (
           <div className="flex w-full shrink-0 flex-col gap-2 [&>*]:w-full sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:[&>*]:w-auto">

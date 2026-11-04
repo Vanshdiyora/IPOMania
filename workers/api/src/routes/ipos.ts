@@ -11,7 +11,6 @@ import {
   ipoCatalogListQuerySchema,
   ipoCategoryConfigurationSchema,
   ipoListQuerySchema,
-  ipoSchema,
   ipoUpdateSchema,
   z,
 } from "@ipo-mania/validation";
@@ -107,54 +106,30 @@ type ApplicationAwareIpo<T extends IpoRecord | IpoCatalogRecord> = T & {
 };
 
 async function hydrateApplicationFlags(
-  supabase: SupabaseClient,
-  userId: string,
+  _supabase: SupabaseClient,
+  _userId: string,
   personalIpos: IpoRecord[],
   catalogIpos: Array<IpoCatalogRecord & { source: "CATALOG" }>,
 ) {
-  const ownedApplicationIds = personalIpos.map((ipo) => ipo.id);
-  if (ownedApplicationIds.length === 0) {
-    return {
-      personal: personalIpos.map((ipo) => ({ ...ipo, alreadyApplied: false, applicationStatus: null })),
-      catalog: catalogIpos.map((ipo) => ({ ...ipo, alreadyApplied: false, applicationStatus: null })),
-    };
-  }
-  const { data, error } = await supabase
-    .from("applications")
-    .select("ipo_id, application_status")
-    .eq("user_id", userId)
-    .in("ipo_id", ownedApplicationIds)
-    .is("archived_at", null);
-  if (error) throw error;
-  const statusByOwnedIpoId = new Map(
-    (data ?? []).map((application) => [application.ipo_id, application.application_status]),
-  );
   const appliedCatalogIds = new Set(
     personalIpos
-      .filter(
-        (ipo) =>
-          typeof ipo.source_catalog_id === "string" && statusByOwnedIpoId.has(ipo.id),
-      )
-      .map((ipo) => ipo.source_catalog_id as string),
+      .map((ipo) => ipo.source_catalog_id)
+      .filter((sourceCatalogId): sourceCatalogId is string => typeof sourceCatalogId === "string"),
   );
-  const catalogStatusByCatalogId = new Map<string, string>();
-  for (const ipo of personalIpos) {
-    if (typeof ipo.source_catalog_id === "string" && statusByOwnedIpoId.has(ipo.id)) {
-      catalogStatusByCatalogId.set(ipo.source_catalog_id, statusByOwnedIpoId.get(ipo.id)!);
-    }
-  }
+
   const hydratedPersonal: ApplicationAwareIpo<IpoRecord>[] = personalIpos.map((ipo) => ({
     ...ipo,
     source: "PERSONAL",
-    alreadyApplied: statusByOwnedIpoId.has(ipo.id),
-    applicationStatus: statusByOwnedIpoId.get(ipo.id) ?? null,
+    alreadyApplied: true,
+    applicationStatus: null,
   }));
   const hydratedCatalog: ApplicationAwareIpo<IpoCatalogRecord>[] = catalogIpos.map((ipo) => ({
     ...ipo,
     source: "CATALOG",
     alreadyApplied: appliedCatalogIds.has(ipo.id),
-    applicationStatus: catalogStatusByCatalogId.get(ipo.id) ?? null,
+    applicationStatus: null,
   }));
+
   return { personal: hydratedPersonal, catalog: hydratedCatalog };
 }
 
@@ -245,7 +220,10 @@ iposRoutes.get("/catalog", async (context) => {
     .is("archived_at", null);
   if (userApplications.error) throw userApplications.error;
   const applicationStatusByOwnedIpoId = new Map(
-    (userApplications.data ?? []).map((application) => [application.ipo_id, application.application_status]),
+    (userApplications.data ?? []).map((application) => [
+      application.ipo_id,
+      application.application_status,
+    ]),
   );
   const statusByCatalogId = new Map<string, string>();
   for (const ipo of userOwnedRows.data ?? []) {
@@ -509,12 +487,7 @@ iposRoutes.get("/", async (context) => {
 
   const personalIpos = ownedIpos.map((ipo) => ({ ...ipo, source: "PERSONAL" as const }));
   const catalogIpos = catalog.map((ipo) => ({ ...catalogRecord(ipo), source: "CATALOG" as const }));
-  const hydrated = await hydrateApplicationFlags(
-    supabase,
-    userId,
-    personalIpos,
-    catalogIpos,
-  );
+  const hydrated = await hydrateApplicationFlags(supabase, userId, personalIpos, catalogIpos);
   const combinedIpos = [...hydrated.personal, ...hydrated.catalog] as unknown as Array<{
     id: string;
     company_name: string;
@@ -590,60 +563,17 @@ iposRoutes.get("/", async (context) => {
   });
 });
 
-iposRoutes.post("/", validateJson(ipoSchema), async (context) => {
-  const submittedIpo = context.req.valid("json");
-  if (!(["UPCOMING", "OPEN", "CLOSED", "LISTED"] as string[]).includes(submittedIpo.status)) {
-    return context.json(
-      {
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Shared catalog IPOs must use Upcoming, Open, Closed, or Listed status.",
-        },
+iposRoutes.post("/", (context) =>
+  context.json(
+    {
+      error: {
+        code: "FORBIDDEN",
+        message: "IPO creation is restricted to administrators.",
       },
-      400,
-    );
-  }
-  const { data, error } = await context
-    .get("rlsSupabase")
-    .from("ipo_catalog")
-    .insert({
-      submitted_by: context.get("authenticatedUser").id,
-      company_name: submittedIpo.company_name,
-      symbol: submittedIpo.symbol,
-      issue_type: submittedIpo.ipo_type.toUpperCase() === "SME" ? "SME" : "mainboard",
-      exchange: submittedIpo.exchange,
-      price_band_min: submittedIpo.issue_price_min,
-      price_band_max: submittedIpo.issue_price_max,
-      issue_price: submittedIpo.cut_off_price,
-      lot_size: submittedIpo.lot_size,
-      issue_size: submittedIpo.issue_size,
-      bidding_start_date: submittedIpo.opening_date,
-      bidding_end_date: submittedIpo.closing_date,
-      allotment_date: submittedIpo.allotment_date,
-      listing_date: submittedIpo.listing_date,
-      ipo_status: submittedIpo.status.toLowerCase(),
-      data_source: "USER_SUBMITTED",
-      source_reference: submittedIpo.source_reference,
-      source_last_updated_at: submittedIpo.last_verified_at,
-      manual_override_fields: [],
-    })
-    .select(catalogColumns)
-    .single();
-
-  if (error?.code === "23505") {
-    return context.json(
-      {
-        error: {
-          code: "DUPLICATE_IPO",
-          message: "An active shared catalog IPO already uses this symbol and exchange.",
-        },
-      },
-      409,
-    );
-  }
-  if (error) return ipoDatabaseError(context, error);
-  return context.json({ data: catalogRecord(data as IpoCatalogDatabaseRow) }, 201);
-});
+    },
+    403,
+  ),
+);
 
 iposRoutes.get("/:ipoId/categories", async (context) => {
   const ipoId = context.req.param("ipoId");

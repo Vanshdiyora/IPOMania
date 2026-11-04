@@ -32,7 +32,7 @@ const dashboardData = {
     {
       account_id: accountId,
       holder_name: "Dashboard Holder",
-      masked_demat_identifier: "XXXX1234",
+      bank_name: "Dashboard Bank",
       count: 1,
     },
   ],
@@ -85,7 +85,7 @@ const dashboardData = {
       symbol: "DASH",
       account_id: accountId,
       holder_name: "Dashboard Holder",
-      masked_demat_identifier: "XXXX1234",
+      bank_name: "Dashboard Bank",
       category: "RETAIL",
       status: "SUBMITTED",
       created_at: "2026-10-31T12:00:00.000Z",
@@ -230,7 +230,13 @@ async function prepareDashboard(page: Page) {
       json: {
         data: {
           accounts: [
-            { id: accountId, holder_name: "Dashboard Holder", masked_demat_identifier: "XXXX1234" },
+            {
+              id: accountId,
+              holder_name: "Dashboard Holder",
+              bank_name: "Dashboard Bank",
+              username: "dashboard-user",
+              password_saved: true,
+            },
           ],
         },
       },

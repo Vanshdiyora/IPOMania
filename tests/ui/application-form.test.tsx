@@ -128,11 +128,12 @@ describe("application form IPO selection", () => {
 
     renderForm();
 
-    const addIpoLink = await screen.findByRole("link", { name: "Add to catalog" });
-    expect(addIpoLink).toHaveAttribute("href", "/ipos/new");
-    expect(addIpoLink.parentElement).toHaveTextContent(
-      "No IPOs are available in your records or the shared catalog. Add to catalog and record applications with manually selected lots.",
-    );
+    expect(
+      await screen.findByText(
+        "No IPOs are available in the catalog yet. Please check back after an administrator adds one.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Add to catalog" })).not.toBeInTheDocument();
   });
 
   it("uses shared catalog IPO data locally when the user selects an IPO", async () => {

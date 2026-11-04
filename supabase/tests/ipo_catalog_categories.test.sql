@@ -103,7 +103,7 @@ select throws_ok(
   'Regular users cannot create shared category rules'
 );
 
-select lives_ok(
+select throws_ok(
   $$insert into public.ipo_catalog (
     submitted_by, company_name, symbol, issue_type, ipo_status, exchange, data_source
   ) values (
@@ -115,12 +115,14 @@ select lives_ok(
     'NSE',
     'USER_SUBMITTED'
   )$$,
-  'Regular users can submit a shared IPO catalog entry under their verified identity'
+  '42501',
+  'new row violates row-level security policy for table "ipo_catalog"',
+  'Regular users cannot add IPOs to the shared catalog'
 );
 select is(
   (select count(*) from public.ipo_catalog where symbol = 'USERCAT'),
-  1::bigint,
-  'User-submitted IPO catalog entries are visible to other signed-in users'
+  0::bigint,
+  'Regular-user IPO creation leaves the shared catalog unchanged'
 );
 
 select * from finish();

@@ -232,7 +232,7 @@ applicationsRoutes.get("/export", async (context) => {
   let query = supabase
     .from("applications")
     .select(
-      `${applicationColumns}, ${filters.ipo_search ? "ipos!inner" : "ipos"}(symbol, company_name), demat_accounts(masked_demat_identifier), ${applicationCategoryEmbed}`,
+      `${applicationColumns}, ${filters.ipo_search ? "ipos!inner" : "ipos"}(symbol, company_name), demat_accounts(bank_name, username), ${applicationCategoryEmbed}`,
       { count: "exact" },
     )
     .eq("user_id", context.get("authenticatedUser").id)
@@ -296,13 +296,14 @@ applicationsRoutes.get("/export", async (context) => {
   const csvRows = rows.map((row) => {
     const ipo = row.ipos as { symbol?: string; company_name?: string } | null;
     const account = row.demat_accounts as {
-      masked_demat_identifier?: string;
+      bank_name?: string | null;
+      username?: string | null;
     } | null;
     const category = row.ipo_categories as { category?: string } | null;
     return [
       ipo?.symbol,
       ipo?.company_name,
-      account?.masked_demat_identifier,
+      account?.bank_name && account.username ? `${account.bank_name} (${account.username})` : "",
       category?.category ?? row.category_code,
       row.lots,
       row.total_shares,
@@ -470,7 +471,7 @@ applicationsRoutes.get("/:applicationId", async (context) => {
     .get("rlsSupabase")
     .from("applications")
     .select(
-      `${applicationColumns}, ipos(company_name, symbol), demat_accounts(holder_name, masked_demat_identifier), ${applicationCategoryEmbed}`,
+      `${applicationColumns}, ipos(company_name, symbol), demat_accounts(holder_name, bank_name, username), ${applicationCategoryEmbed}`,
     )
     .eq("id", applicationId)
     .eq("user_id", context.get("authenticatedUser").id)
@@ -489,10 +490,76 @@ applicationsRoutes.patch(
     if (!isUuid(applicationId)) return applicationNotFound(context);
     if (!Object.keys(updates).length)
       return validationError(context, "Provide at least one field.");
+    const { category_id, category_code, lots, price, ...details } = updates;
+    let terms: Record<string, unknown> = {};
+    if (
+      category_id !== undefined ||
+      category_code !== undefined ||
+      lots !== undefined ||
+      price !== undefined
+    ) {
+      const supabase = context.get("rlsSupabase");
+      const { data: existing, error: existingError } = await supabase
+        .from("applications")
+        .select(`${applicationColumns}, quota_calculation_id`)
+        .eq("id", applicationId)
+        .eq("user_id", context.get("authenticatedUser").id)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (existingError) throw existingError;
+      if (!existing) return applicationNotFound(context);
+      if (existing.quota_calculation_id) {
+        return context.json(
+          {
+            error: {
+              code: "APPLICATION_TERMS_LOCKED",
+              message:
+                "This application was created from a saved quota calculation, so its terms cannot be changed here.",
+            },
+          },
+          409,
+        );
+      }
+      const snapshot = (existing.calculation_snapshot ?? {}) as Record<string, unknown>;
+      const snapshotInput = (snapshot.calculation_input ?? {}) as Record<string, unknown>;
+      const existingPrice = applicationSnapshotPrice(existing, snapshotInput);
+      const parsed = applicationCreateSchema.safeParse({
+        ipo_id: existing.ipo_id,
+        demat_account_id: existing.demat_account_id,
+        category_id: category_id !== undefined ? category_id : existing.category_id,
+        category_code: category_code ?? existing.category_code,
+        lots: lots ?? existing.lots,
+        price_type: snapshotInput.price_type === "CUT_OFF" ? "CUT_OFF" : "BID",
+        price: price ?? existingPrice,
+        shareholder_shares: null,
+        eligibility_answers: {},
+        application_number: existing.application_number,
+        external_reference: existing.external_reference,
+        submission_date: existing.submission_date,
+        application_status: existing.application_status,
+        mandate_status: existing.mandate_status,
+        allotment_status: existing.allotment_status,
+        notes: existing.notes,
+      });
+      if (!parsed.success) return validationError(context, "The application terms are invalid.");
+      const prepared = await prepareApplication(context, parsed.data, undefined, {
+        allowUnconfirmedEligibility: true,
+      });
+      if (!prepared.ok) return context.json({ error: prepared.error }, 422);
+      terms = {
+        category_id: prepared.record.category_id,
+        category_code: prepared.record.category_code,
+        lots: prepared.record.lots,
+        total_shares: prepared.record.total_shares,
+        application_amount: prepared.record.application_amount,
+        rule_version: prepared.record.rule_version,
+        calculation_snapshot: prepared.record.calculation_snapshot,
+      };
+    }
     const { data, error } = await context
       .get("rlsSupabase")
       .from("applications")
-      .update(updates)
+      .update({ ...details, ...terms })
       .eq("id", applicationId)
       .eq("user_id", context.get("authenticatedUser").id)
       .is("archived_at", null)
@@ -642,20 +709,6 @@ async function prepareApplication(
     return failed("IPO_NOT_FOUND", "The IPO was not found or is archived.");
   if (!account || account.account_status !== "active" || account.archived_at) {
     return failed("INVALID_DEMAT_ACCOUNT", "Select an active, unarchived demat account you own.");
-  }
-  const { data: existingApplications, error: duplicateCheckError } = await supabase
-    .from("applications")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("ipo_id", input.ipo_id)
-    .is("archived_at", null)
-    .limit(1);
-  if (duplicateCheckError) throw duplicateCheckError;
-  if ((existingApplications ?? []).length > 0) {
-    return failed(
-      "DUPLICATE_IPO_APPLICATION",
-      "You have already applied for this IPO.",
-    );
   }
   if (input.category_id && (!rule || rule.ipo_id !== input.ipo_id)) {
     return failed("CATEGORY_NOT_FOUND", "The category configuration does not belong to this IPO.");
@@ -952,7 +1005,7 @@ async function previewImport(context: RouteContext) {
       .is("archived_at", null),
     supabase
       .from("demat_accounts")
-      .select("id, account_status, archived_at, masked_demat_identifier, masked_client_reference")
+      .select("id, account_status, archived_at, bank_name, username")
       .eq("user_id", userId)
       .is("archived_at", null),
     supabase
@@ -1008,13 +1061,14 @@ async function previewImport(context: RouteContext) {
       const accountMatches = (accounts ?? []).filter(
         (row) =>
           row.id.toLowerCase() === accountRef.toLowerCase() ||
-          row.masked_demat_identifier.toLowerCase() === accountRef.toLowerCase() ||
-          row.masked_client_reference?.toLowerCase() === accountRef.toLowerCase(),
+          row.username?.toLowerCase() === accountRef.toLowerCase() ||
+          `${row.bank_name ?? ""}:${row.username ?? ""}`.toLowerCase() ===
+            accountRef.toLowerCase(),
       );
       const account = accountMatches.length === 1 ? accountMatches[0] : null;
       if (!ipo) errors.push("IPO could not be matched by ID or symbol.");
       if (accountMatches.length !== 1)
-        errors.push("Demat account reference is missing or ambiguous.");
+        errors.push("Bank account reference is missing or ambiguous.");
       if (account?.account_status !== "active") errors.push("Demat account is not active.");
       const categoryText = String(raw.category ?? "")
         .trim()
@@ -1195,6 +1249,18 @@ function nullableString(value: unknown) {
 function normalizeStatus(value: unknown, fallback: string) {
   const text = nullableString(value);
   return text ? text.toUpperCase().replace(/[\s-]+/g, "_") : fallback;
+}
+
+function applicationSnapshotPrice(
+  application: { total_shares: number | string; application_amount: number | string },
+  snapshotInput: Record<string, unknown>,
+) {
+  const recorded = snapshotInput.price;
+  if (typeof recorded === "string" && recorded.trim()) return recorded.trim();
+  const shares = Number(application.total_shares);
+  const amount = Number(application.application_amount);
+  if (!Number.isFinite(shares) || shares <= 0 || !Number.isFinite(amount)) return "";
+  return (amount / shares).toFixed(2);
 }
 
 function failed(code: string, message: string) {

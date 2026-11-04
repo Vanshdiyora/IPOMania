@@ -7,9 +7,9 @@ const account = {
   id: recordId,
   user_id: userId,
   holder_name: "Form test holder",
-  depository_type: "CDSL",
-  masked_demat_identifier: "XXXX1234",
-  masked_client_reference: null,
+  bank_name: "Example Bank",
+  username: "form-user",
+  password_saved: true,
   account_status: "active",
   notes: null,
   archived_at: null,
@@ -102,6 +102,16 @@ async function prepare(page: Page, admin = false) {
       },
     }),
   );
+  await page.route(/\/api\/applications(?:\?|$)/, (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          applications: [],
+          pagination: { page: 1, page_size: 100, total: 0, total_pages: 0 },
+        },
+      },
+    }),
+  );
   await page.route(/\/api\/ipos\/catalog(?:\?|$)/, (route) =>
     route.fulfill({
       json: {
@@ -187,10 +197,9 @@ test("account form preserves typed values, validates, saves, and loads existing 
   await page.getByRole("button", { name: "Save account", exact: true }).click();
   await expect(page.getByLabel("Account holder name")).toHaveAttribute("aria-invalid", "true");
   await page.getByLabel("Account holder name").fill("New test holder");
-  const depository = page.getByRole("combobox", { name: "Depository" });
-  await depository.click();
-  await page.getByRole("option", { name: "CDSL", exact: true }).click();
-  await page.getByLabel("Masked demat identifier").fill("XXXX5678");
+  await page.getByLabel("Bank name").fill("Example Bank");
+  await page.getByLabel("Username").fill("new-user");
+  await page.getByLabel("Password").fill("new-password");
   await page.getByLabel("Notes (optional)").fill("A saved note");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("alertdialog")).toBeVisible();
@@ -199,7 +208,9 @@ test("account form preserves typed values, validates, saves, and loads existing 
   await page.route("**/api/accounts", async (route) => {
     expect(route.request().postDataJSON()).toMatchObject({
       holder_name: "New test holder",
-      depository_type: "CDSL",
+      bank_name: "Example Bank",
+      username: "new-user",
+      password: "new-password",
       notes: "A saved note",
     });
     await route.fulfill({ json: { data: account } });
@@ -209,50 +220,21 @@ test("account form preserves typed values, validates, saves, and loads existing 
   await expect(page.getByText("Account created.")).toBeVisible();
   await page.goto(`/accounts/${recordId}/edit`);
   await expect(page.getByLabel("Account holder name")).toHaveValue(account.holder_name);
-  await expect(page.getByRole("combobox", { name: "Depository" })).toContainText("CDSL");
+  await expect(page.getByLabel("Bank name")).toHaveValue(account.bank_name);
+  await expect(page.getByLabel("Username")).toHaveValue(account.username);
+  await expect(page.getByLabel("Password")).toHaveValue("");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
-test("shared-catalog IPO validation and close confirmation work inside the drawer", async ({
-  page,
-}) => {
+test("regular users cannot open the IPO creation form", async ({ page }) => {
   await prepare(page);
-  await page.goto("/ipos?source=personal");
-  await page.getByRole("link", { name: "Add to catalog", exact: true }).click();
-  await expect(page).toHaveURL(/\/ipos\?source=personal$/);
-  await page.getByRole("button", { name: "Add to catalog", exact: true }).click();
-  await expect(page.getByLabel("Company name")).toHaveAttribute("aria-invalid", "true");
-  await page.getByLabel("Company name").fill("Unsaved company");
-  await page
-    .getByRole("dialog", { name: "Add to shared catalog" })
-    .getByRole("button", { name: "Close drawer" })
-    .click();
-  await expect(page.getByRole("alertdialog")).toBeVisible();
-  await page.getByRole("button", { name: "Keep editing" }).click();
-  await expect(page.getByRole("alertdialog")).toHaveCount(0);
-  await expect(page.getByLabel("Company name")).toHaveValue("Unsaved company");
-  await page
-    .getByRole("dialog", { name: "Add to shared catalog" })
-    .getByRole("button", { name: "Cancel" })
-    .click();
-  await page.getByRole("button", { name: "Discard changes" }).click();
+  await page.goto("/ipos/new");
+  await expect(page).toHaveURL(/\/ipos$/);
+  await expect(page.getByRole("heading", { name: "IPO catalog", exact: true })).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.goto(`/ipos/${recordId}/edit`);
-  await expect(page.getByLabel("Lot size")).toHaveValue("10");
-  await page.getByLabel("Issue price minimum").fill("11.00");
-  await page.route(`**/api/ipos/${recordId}`, async (route) => {
-    if (route.request().method() === "PATCH")
-      expect(route.request().postDataJSON()).toMatchObject({
-        issue_price_min: "11.00",
-        cut_off_price: null,
-        listing_date: null,
-      });
-    await route.fulfill({ json: { data: ipo } });
-  });
-  await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page).toHaveURL(new RegExp(`/ipos/${recordId}$`));
+  await expect(page.getByRole("link", { name: "Add to catalog", exact: true })).toHaveCount(0);
 });
 
 test("application form hides financial statuses and preserves them on edit", async ({ page }) => {
@@ -271,8 +253,11 @@ test("application form hides financial statuses and preserves them on edit", asy
     id: recordId,
     ipo_id: recordId,
     demat_account_id: recordId,
-    category_id: recordId,
+    category_id: null,
+    category_code: "RETAIL",
     lots: 1,
+    total_shares: 10,
+    application_amount: "200.00",
     application_number: "EXISTING-1",
     external_reference: null,
     submission_date: null,
@@ -280,10 +265,17 @@ test("application form hides financial statuses and preserves them on edit", asy
     mandate_status: "APPROVED",
     allotment_status: "ALLOTTED",
     notes: null,
+    calculation_snapshot: { calculation_input: { price: "20.00", price_type: "BID" } },
   };
   await page.route(`**/api/applications/${recordId}`, async (route) => {
     if (route.request().method() === "PATCH") {
       const body = route.request().postDataJSON() as Record<string, unknown>;
+      expect(body).toMatchObject({
+        category_id: null,
+        category_code: "RETAIL",
+        lots: 1,
+        price: "20.00",
+      });
       expect(body).not.toHaveProperty("mandate_status");
       expect(body).not.toHaveProperty("allotment_status");
     }
@@ -291,7 +283,11 @@ test("application form hides financial statuses and preserves them on edit", asy
   });
   await page.goto(`/applications/${recordId}/edit`);
   await expect(page.getByRole("dialog", { name: "Edit application" })).toBeVisible();
-  await expect(page.getByLabel("Application number")).toHaveValue("EXISTING-1");
+  await expect(page.getByLabel("Application number")).toHaveCount(0);
+  await expect(page.getByLabel("External reference")).toHaveCount(0);
+  await expect(page.getByLabel("Investor category")).toBeVisible();
+  await expect(page.getByLabel("Lots")).toHaveValue("1");
+  await expect(page.getByLabel("Price")).toHaveValue("20.00");
   await expect(page.getByLabel("Mandate status")).toHaveCount(0);
   await expect(page.getByLabel("Allotment status")).toHaveCount(0);
   await page.getByRole("button", { name: "Save application" }).click();
@@ -430,13 +426,12 @@ test("admin typing remains focused, errors stay inline, and edits and archive ac
 });
 
 for (const width of [360, 390, 768, 1366, 1440, 1920]) {
-  test(`personal and admin drawers fit and keep their footers visible at ${width}px`, async ({
+  test(`account, application, and admin drawers fit and keep their footers visible at ${width}px`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     await prepare(page, true);
     for (const [path, action] of [
-      ["/ipos/new", "Add to catalog"],
       ["/accounts/new", "Save account"],
       ["/applications/new", "Save application"],
       ["/admin/ipos", "Create IPO"],
@@ -453,9 +448,9 @@ for (const width of [360, 390, 768, 1366, 1440, 1920]) {
         true,
       );
       expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
-      if (path === "/ipos/new" || path === "/admin/ipos") {
+      if (path === "/admin/ipos") {
         await page.screenshot({
-          path: testInfo.outputPath(`${path === "/ipos/new" ? "personal" : "admin"}-${width}.png`),
+          path: testInfo.outputPath(`admin-${width}.png`),
         });
         expect(await auditAccessibility(page)).toEqual([]);
       }

@@ -344,7 +344,8 @@ export function DashboardPage() {
               <option value="">All accounts</option>
               {accountOptions.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.holder_name} · {account.masked_demat_identifier}
+                  {account.holder_name} · {account.bank_name ?? "Bank not provided"} (
+                  {account.username ?? "Username not provided"})
                 </option>
               ))}
             </CustomSelect>
@@ -677,7 +678,7 @@ export function DashboardPage() {
                 <BarChart data={analytics.applications_by_account} margin={{ bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6E9F2" />
                   <XAxis
-                    dataKey="masked_demat_identifier"
+                    dataKey="bank_name"
                     angle={-25}
                     textAnchor="end"
                     interval={0}
@@ -824,7 +825,7 @@ export function DashboardPage() {
                           {" • "}
                           <span>{application.holder_name}</span>
                           {" • "}
-                          <span className="font-mono">{application.masked_demat_identifier}</span>
+                          <span className="font-mono">{application.bank_name}</span>
                         </p>
                       </div>
                     </div>

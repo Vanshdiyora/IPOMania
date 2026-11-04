@@ -29,7 +29,6 @@ import {
   IpoCatalogDetailsPage,
   IpoCategoryConfigurationPage,
   IpoDetailsPage,
-  IpoFormPage,
   IpoListPage,
   QuotaCalculatorPage,
 } from "../pages/ipos/IpoPages";
@@ -97,9 +96,12 @@ export const router = createBrowserRouter([
         path: "ipo-calendar",
         loader: ({ request }) => redirect(`/ipos${new URL(request.url).search}`),
       },
-      { path: "ipos/new", element: protectedPage(<IpoFormPage />) },
+      { path: "ipos/new", element: <Navigate replace to="/ipos" /> },
       { path: "ipos/catalog/:ipoId", element: protectedPage(<IpoCatalogDetailsPage />) },
-      { path: "ipos/:ipoId/edit", element: protectedPage(<IpoFormPage editing />) },
+      {
+        path: "ipos/:ipoId/edit",
+        loader: ({ params }) => redirect(`/ipos/${params.ipoId}`),
+      },
       { path: "ipos/:ipoId/categories", element: protectedPage(<IpoCategoryConfigurationPage />) },
       { path: "ipos/:ipoId", element: protectedPage(<IpoDetailsPage />) },
       { path: "quota-calculator", element: protectedPage(<QuotaCalculatorPage />) },

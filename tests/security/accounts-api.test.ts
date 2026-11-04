@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../workers/api/src/app";
+import { encryptAccountPassword } from "../../workers/api/src/lib/account-credentials";
 import { createSupabaseFetchMock } from "../helpers/supabase";
 
 const userId = "11111111-1111-4111-8111-111111111111";
@@ -17,15 +18,16 @@ const bindings = {
   RUNTIME_ENV: "test",
   SUPABASE_URL: "https://project.example.test",
   SUPABASE_ANON_KEY: "public-anon-key-for-tests",
+  ACCOUNT_CREDENTIAL_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
 } as const;
 const account = {
   holder_name: "Account Owner",
-  depository_type: "NSDL",
-  masked_demat_identifier: "XXXX1234",
-  masked_client_reference: null,
+  bank_name: "Example Bank",
+  username: "account-owner",
   account_status: "active",
   notes: null,
 };
+const accountInput = { ...account, password: "example-sensitive-password" };
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -49,7 +51,12 @@ describe("demat account API", () => {
       if (request.method === "POST") inserted = (await request.json()) as Record<string, unknown>;
       return new Response(
         JSON.stringify({
-          ...account,
+          holder_name: account.holder_name,
+          bank_name: account.bank_name,
+          username: account.username,
+          password_encrypted: inserted?.password_encrypted,
+          account_status: account.account_status,
+          notes: account.notes,
           id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
           user_id: userId,
         }),
@@ -62,20 +69,27 @@ describe("demat account API", () => {
       {
         method: "POST",
         headers: { ...bearerHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify(account),
+        body: JSON.stringify(accountInput),
       },
       bindings,
     );
 
     expect(response.status).toBe(201);
     expect(inserted?.user_id).toBe(userId);
+    expect(inserted?.password).toBeUndefined();
+    const encryptedPassword = String(inserted?.password_encrypted);
+    expect(encryptedPassword).toMatch(/^v1\./);
+    const responseBody = await response.text();
+    expect(responseBody).not.toContain(accountInput.password);
+    expect(responseBody).not.toContain(encryptedPassword);
+    expect(responseBody).toContain('"password_saved":true');
     expect(new URL(requests[0].url).searchParams.get("select")).toContain("user_id");
   });
 
   it.each([
-    ["forged owner", { ...account, user_id: otherUserId }],
-    ["unsupported depository", { ...account, depository_type: "OTHER" }],
-    ["removed broker field", { ...account, broker_name: "Example Broker" }],
+    ["forged owner", { ...accountInput, user_id: otherUserId }],
+    ["removed demat fields", { ...accountInput, depository_type: "NSDL" }],
+    ["removed broker field", { ...accountInput, broker_name: "Example Broker" }],
   ])("rejects %s before touching account storage", async (_case, payload) => {
     const requests = installSupabaseMock();
     const response = await createApp().request(
@@ -115,6 +129,49 @@ describe("demat account API", () => {
     expect(query.get("user_id")).not.toContain(otherUserId);
   });
 
+  it("reveals a password only through the authenticated owner-scoped endpoint", async () => {
+    const secret = "bank-login-password";
+    const encrypted = await encryptAccountPassword(
+      secret,
+      bindings.ACCOUNT_CREDENTIAL_ENCRYPTION_KEY,
+    );
+    expect(encrypted).not.toBeNull();
+    const requests = installSupabaseMock(async () =>
+      new Response(JSON.stringify({ password_encrypted: encrypted }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const response = await createApp().request(
+      "/api/accounts/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/password",
+      { headers: bearerHeaders() },
+      bindings,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    await expect(response.json()).resolves.toEqual({ data: { password: secret } });
+    expect(new URL(requests[0].url).searchParams.get("user_id")).toBe(`eq.${userId}`);
+  });
+
+  it("refuses password writes when the encryption key is unavailable", async () => {
+    const requests = installSupabaseMock();
+    const response = await createApp().request(
+      "/api/accounts",
+      {
+        method: "POST",
+        headers: { ...bearerHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(accountInput),
+      },
+      { ...bindings, ACCOUNT_CREDENTIAL_ENCRYPTION_KEY: undefined },
+    );
+
+    expect(response.status).toBe(503);
+    expect(requests).toHaveLength(0);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "CREDENTIAL_ENCRYPTION_UNAVAILABLE" },
+    });
+  });
+
   it("reports account totals without a remaining capacity", async () => {
     installSupabaseMock(async (request) => {
       const count =
@@ -124,6 +181,38 @@ describe("demat account API", () => {
         : new Response("[]", {
             headers: { "Content-Type": "application/json", "Content-Range": `*/${count}` },
           });
+    });
+
+    it("omits encrypted password data from account list responses", async () => {
+      const ciphertext = "v1.dGVzdC1jaXBoZXJ0ZXh0";
+      installSupabaseMock(async (request) =>
+        request.method === "HEAD"
+          ? new Response(null, { headers: { "Content-Range": "*/1" } })
+          : new Response(
+              JSON.stringify([
+                {
+                  ...account,
+                  password_encrypted: ciphertext,
+                  id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                  user_id: userId,
+                },
+              ]),
+              {
+                headers: { "Content-Type": "application/json", "Content-Range": "0-0/1" },
+              },
+            ),
+      );
+      const response = await createApp().request(
+        "/api/accounts",
+        { headers: bearerHeaders() },
+        bindings,
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.text();
+      expect(body).not.toContain(ciphertext);
+      expect(body).not.toContain('"password":');
+      expect(body).toContain('"password_saved":true');
     });
 
     const response = await createApp().request(
@@ -170,7 +259,7 @@ describe("demat account API", () => {
       });
     });
     const response = await createApp().request(
-      "/api/accounts?page=2&pageSize=50&holder_name=Ananya&depository=NSDL&status=active",
+      "/api/accounts?page=2&pageSize=50&holder_name=Ananya&status=active",
       { headers: bearerHeaders() },
       bindings,
     );
@@ -181,7 +270,7 @@ describe("demat account API", () => {
     const query = new URL(listRequest!.url).searchParams;
     expect(query.get("holder_name")).toBe("ilike.Ananya%");
     expect(query.get("broker_name")).toBeNull();
-    expect(query.get("depository_type")).toBe("eq.NSDL");
+    expect(query.get("bank_name")).toBeNull();
     expect(query.get("account_status")).toBe("eq.active");
     expect(query.get("offset")).toBe("50");
     expect(query.get("limit")).toBe("50");

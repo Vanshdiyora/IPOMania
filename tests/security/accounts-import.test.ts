@@ -21,8 +21,8 @@ const user = {
 };
 const mapping = {
   holder_name: "Holder",
-  depository_type: "Depository",
-  masked_demat_identifier: "Masked ID",
+  bank_name: "Bank",
+  username: "Username",
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -79,8 +79,8 @@ function fileForm(file: Blob, fileName: string, columns?: Record<string, string>
 function xlsxFile() {
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet([
-    ["Holder", "Depository", "Masked ID"],
-    ["Asha Mehta", "CDSL", "XXXX1234"],
+    ["Holder", "Bank", "Username"],
+    ["Asha Mehta", "Example Bank", "asha"],
   ]);
   XLSX.utils.book_append_sheet(workbook, sheet, "Accounts");
   const bytes = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
@@ -90,7 +90,7 @@ function xlsxFile() {
 describe("account import API", () => {
   it("reads CSV columns before requiring the user to map them", async () => {
     installImportMock();
-    const csv = new Blob(["Holder,Depository,Masked ID\r\nAsha Mehta,CDSL,XXXX1234\r\n"], {
+    const csv = new Blob(["Holder,Bank,Username\r\nAsha Mehta,Example Bank,asha\r\n"], {
       type: "text/csv",
     });
     const response = await createApp().request(
@@ -107,20 +107,41 @@ describe("account import API", () => {
     await expect(response.json()).resolves.toMatchObject({
       data: {
         requires_mapping: true,
-        headers: ["Holder", "Depository", "Masked ID"],
+        headers: ["Holder", "Bank", "Username"],
         total_rows: 1,
       },
     });
+  });
+
+  it("rejects password columns without echoing or staging credential data", async () => {
+    const requests = installImportMock();
+    const csv = new Blob(
+      ["Holder,Bank,Username,Password\r\nAsha Mehta,Example Bank,asha,secret-value\r\n"],
+      { type: "text/csv" },
+    );
+    const response = await createApp().request(
+      "/api/accounts/import/preview",
+      {
+        method: "POST",
+        headers: { Authorization: "******" },
+        body: fileForm(csv, "accounts.csv"),
+      },
+      bindings,
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).not.toContain("secret-value");
+    expect(requests).toHaveLength(0);
   });
 
   it("validates CSV rows and reports duplicates and invalid values instead of dropping them", async () => {
     const requests = installImportMock();
     const csv = new Blob(
       [
-        "Holder,Depository,Masked ID\r\n" +
-          "Asha Mehta,CDSL,XXXX1234\r\n" +
-          "Duplicate,CDSL,XXXX1234\r\n" +
-          "Invalid,BAD,XXXX9999\r\n",
+        "Holder,Bank,Username\r\n" +
+          "Asha Mehta,Example Bank,asha\r\n" +
+          "Duplicate,Example Bank,asha\r\n" +
+          "Invalid,Example Bank,\r\n",
       ],
       { type: "text/csv" },
     );
