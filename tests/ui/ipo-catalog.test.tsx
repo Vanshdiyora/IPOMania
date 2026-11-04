@@ -164,7 +164,8 @@ describe("user IPO catalog", () => {
       "href",
       `/ipos/${catalogIpo.id}`,
     );
-    expect(screen.getByText("Manual entry · unverified")).toBeInTheDocument();
+    expect(screen.queryByText("Manual entry · unverified")).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Source" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /calendar/i })).not.toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/api/ipos?page=1&page_size=25&sort=date_desc",
