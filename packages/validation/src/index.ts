@@ -788,7 +788,8 @@ const applicationFieldsSchema = z
   .object({
     ipo_id: z.uuid(),
     demat_account_id: z.uuid(),
-    category_id: z.uuid(),
+    category_id: z.uuid().nullable().optional(),
+    category_code: z.enum(["RETAIL", "SHNI", "BHNI", "SHAREHOLDER", "EMPLOYER"]).optional(),
     lots: z.number().int().positive().max(1_000_000),
     price_type: z.enum(["BID", "CUT_OFF"]),
     price: positivePriceSchema,

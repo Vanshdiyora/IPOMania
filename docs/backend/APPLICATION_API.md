@@ -38,14 +38,16 @@ List, export, and detail reads use the `applications_category_owner_issue_fk` re
 display the category selected on the application. The database also has category relationships
 for capital tracking, so the category embed must name this foreign key explicitly.
 
-Creation input includes IPO/account/category IDs, positive integer `lots`, explicit `price_type`
-and decimal `price`, nullable `shareholder_shares`, and explicit `eligibility_answers`. Optional
-application fields include number, external reference, submission date, statuses, and notes. Unknown
-properties are rejected. The server verifies all owned records, checks active account state and
-category/IPO linkage, runs the shared financial engine, and derives shares, amount, and rule version.
-The application form initializes lots from the selected category rule's configured `default_lots`.
-The IPO's `lot_size` is the number of shares per lot; preview responses return the calculated total
-shares and application amount based on the submitted lot quantity and price.
+Creation input includes an owned IPO and account, a category code, an optional configured
+`category_id`, positive integer `lots`, explicit `price_type` and decimal `price`, nullable
+`shareholder_shares`, and explicit `eligibility_answers`. Optional application fields include
+number, external reference, submission date, statuses, and notes. Unknown properties are rejected.
+The server verifies owned records and active account state. When `category_id` is provided, it
+checks category/IPO linkage and applies that rule. Without a configured category, the code is saved
+as a label, lots are manually configurable from 1 to 1,000,000, and price is checked against the
+IPO's issue-price range. The IPO's `lot_size` is the number of shares per lot; preview responses
+return the calculated total shares and application amount. Rule version is null when no rule was
+used.
 The client cannot supply amount, shares, snapshot, owner, or rule version.
 
 Bulk creation validates every row before one insert. If any row is invalid, it returns an
@@ -55,8 +57,8 @@ non-blocking except for the unique stable external reference constraint.
 ## Statuses and errors
 
 Application, mandate, and allotment statuses are distinct columns. Imported rows default to
-`DRAFT`; no import route automatically marks an application submitted. Unconfigured category rules
-fail closed. Unowned/missing records are not disclosed.
+`DRAFT`; no import route automatically marks an application submitted. Unowned/missing records are
+not disclosed.
 
 Common errors include `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `APPLICATION_NOT_FOUND` /
 `IMPORT_NOT_FOUND` (404), `DUPLICATE_EXTERNAL_REFERENCE` (409),

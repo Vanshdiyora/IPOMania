@@ -232,7 +232,8 @@ export interface IpoApplication {
   user_id: string;
   ipo_id: string;
   demat_account_id: string;
-  category_id: string;
+  category_id: string | null;
+  category_code: IpoCategoryCode;
   lots: number;
   total_shares: number;
   application_amount: string;
@@ -243,7 +244,7 @@ export interface IpoApplication {
   mandate_status: MandateStatus;
   allotment_status: AllotmentStatus;
   notes: string | null;
-  rule_version: number;
+  rule_version: number | null;
   calculation_snapshot: Record<string, unknown>;
   created_at: string;
   updated_at: string;

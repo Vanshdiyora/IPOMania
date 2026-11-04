@@ -10,6 +10,8 @@ import {
   applicationUpdateSchema,
 } from "@ipo-mania/validation";
 import {
+  calculateApplicationAmount,
+  calculateTotalShares,
   validateApplicationConfiguration,
   type CategoryRules,
   type CalculationInput,
@@ -22,7 +24,7 @@ const xlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sh
 const maxUploadBytes = 5 * 1024 * 1024;
 const maxImportRows = 500;
 const applicationColumns =
-  "id, user_id, ipo_id, demat_account_id, category_id, lots, total_shares, application_amount, application_number, external_reference, submission_date, application_status, mandate_status, allotment_status, notes, rule_version, calculation_snapshot, created_at, updated_at, archived_at";
+  "id, user_id, ipo_id, demat_account_id, category_id, category_code, lots, total_shares, application_amount, application_number, external_reference, submission_date, application_status, mandate_status, allotment_status, notes, rule_version, calculation_snapshot, created_at, updated_at, archived_at";
 const applicationCategoryEmbed = "ipo_categories!applications_category_owner_issue_fk(category)";
 
 type ApplicationContext = {
@@ -85,7 +87,8 @@ type ApplicationPreparationCache = {
   existingApplications: Array<{
     ipo_id: string;
     demat_account_id: string;
-    category_id: string;
+    category_id: string | null;
+    category_code: string;
     application_number: string | null;
     external_reference: string | null;
   }>;
@@ -100,18 +103,26 @@ applicationsRoutes.get("/summary", async (context) => {
   if (!parsed.success) return validationError(context, "Application summary filters are invalid.");
   const supabase = context.get("rlsSupabase");
   const userId = context.get("authenticatedUser").id;
-  const applications: Array<{ ipo_id: string; ipo_categories: unknown }> = [];
+  const applications: Array<{
+    ipo_id: string;
+    category_code: string;
+    ipo_categories: unknown;
+  }> = [];
   const pageSize = 1000;
   for (let from = 0; ; from += pageSize) {
     let query = supabase
       .from("applications")
-      .select(`ipo_id, ${applicationCategoryEmbed}`)
+      .select(`ipo_id, category_code, ${applicationCategoryEmbed}`)
       .eq("user_id", userId)
       .is("archived_at", null);
     if (parsed.data.ipo_id) query = query.eq("ipo_id", parsed.data.ipo_id);
     const { data, error } = await query.range(from, from + pageSize - 1);
     if (error) throw error;
-    const page = (data ?? []) as Array<{ ipo_id: string; ipo_categories: unknown }>;
+    const page = (data ?? []) as Array<{
+      ipo_id: string;
+      category_code: string;
+      ipo_categories: unknown;
+    }>;
     applications.push(...page);
     if (page.length < pageSize) break;
   }
@@ -128,7 +139,7 @@ applicationsRoutes.get("/summary", async (context) => {
     const category =
       categoryRow && typeof categoryRow === "object" && "category" in categoryRow
         ? categoryRow.category
-        : null;
+        : application.category_code;
     if (typeof category === "string" && category in categoryCounts) categoryCounts[category] += 1;
   });
   return context.json({
@@ -299,7 +310,7 @@ applicationsRoutes.get("/export", async (context) => {
       ipo?.company_name,
       account?.masked_demat_identifier,
       account?.broker_name,
-      category?.category,
+      category?.category ?? row.category_code,
       row.lots,
       row.total_shares,
       row.application_amount,
@@ -398,8 +409,12 @@ applicationsRoutes.post("/", validateJson(applicationCreateSchema), async (conte
   });
   if (!prepared.ok) return context.json({ error: prepared.error }, 422);
   // The server, rather than an editable form field, is the source of the submission timestamp.
+  const ruleVersion: number | null = prepared.record.rule_version;
+  const calculationSnapshot: Record<string, unknown> = prepared.record.calculation_snapshot;
   const record = {
     ...prepared.record,
+    rule_version: ruleVersion,
+    calculation_snapshot: calculationSnapshot,
     application_number: null,
     external_reference: null,
     notes: null,
@@ -594,7 +609,7 @@ async function prepareApplication(
   if (cache) {
     ipo = cache.ipos.get(input.ipo_id) ?? null;
     account = cache.accounts.get(input.demat_account_id) ?? null;
-    rule = cache.categories.get(input.category_id) ?? null;
+    rule = input.category_id ? (cache.categories.get(input.category_id) ?? null) : null;
   } else {
     const [ipoResult, accountResult, categoryResult] = await Promise.all([
       supabase
@@ -611,15 +626,17 @@ async function prepareApplication(
         .eq("user_id", userId)
         .is("archived_at", null)
         .maybeSingle(),
-      supabase
-        .from("ipo_categories")
-        .select(
-          "id, ipo_id, category, rule_version, lot_limit_status, default_lots, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment",
-        )
-        .eq("id", input.category_id)
-        .eq("ipo_id", input.ipo_id)
-        .eq("user_id", userId)
-        .maybeSingle(),
+      input.category_id
+        ? supabase
+            .from("ipo_categories")
+            .select(
+              "id, ipo_id, category, rule_version, lot_limit_status, default_lots, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment",
+            )
+            .eq("id", input.category_id)
+            .eq("ipo_id", input.ipo_id)
+            .eq("user_id", userId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
     ]);
     if (ipoResult.error) throw ipoResult.error;
     if (accountResult.error) throw accountResult.error;
@@ -633,43 +650,120 @@ async function prepareApplication(
   if (!account || account.account_status !== "active" || account.archived_at) {
     return failed("INVALID_DEMAT_ACCOUNT", "Select an active, unarchived demat account you own.");
   }
-  if (!rule || rule.ipo_id !== input.ipo_id) {
+  if (input.category_id && (!rule || rule.ipo_id !== input.ipo_id)) {
     return failed("CATEGORY_NOT_FOUND", "The category configuration does not belong to this IPO.");
   }
 
-  const rules: CategoryRules = {
-    category: rule.category as CategoryRules["category"],
-    rule_version: rule.rule_version,
-    lot_limit_status: rule.lot_limit_status as CategoryRules["lot_limit_status"],
-    minimum_lots: rule.minimum_lots,
-    maximum_lots: rule.maximum_lots,
-    lot_increment: rule.lot_increment,
-    investment_limit_status:
-      rule.investment_limit_status as CategoryRules["investment_limit_status"],
-    minimum_investment: rule.minimum_investment,
-    maximum_investment: rule.maximum_investment,
-    shareholder_record_date: rule.shareholder_record_date,
-    minimum_shareholding: rule.minimum_shareholding,
-    eligibility_conditions: rule.eligibility_conditions as CategoryRules["eligibility_conditions"],
-    allowed_price_types: rule.allowed_price_types as CategoryRules["allowed_price_types"],
-    minimum_price_increment: rule.minimum_price_increment,
-  };
-  const calculationInput: CalculationInput = {
-    ipo: {
-      issue_price_min: ipo.issue_price_min,
-      issue_price_max: ipo.issue_price_max,
-      cut_off_price: ipo.cut_off_price,
-      lot_size: ipo.lot_size,
-    },
-    category: rules.category,
-    rules,
-    lots: input.lots,
-    price_type: input.price_type,
-    price: input.price,
-    shareholder_shares: input.shareholder_shares,
-    eligibility_answers: input.eligibility_answers,
-  };
-  const calculation = validateApplicationConfiguration(calculationInput);
+  const categoryCode = input.category_code ?? rule?.category;
+  if (!categoryCode) {
+    return failed("CATEGORY_REQUIRED", "Select an investor category.");
+  }
+  if (rule && rule.category !== categoryCode) {
+    return failed("CATEGORY_MISMATCH", "The selected category does not match its configuration.");
+  }
+  const rules: CategoryRules | null = rule
+    ? {
+        category: rule.category as CategoryRules["category"],
+        rule_version: rule.rule_version,
+        lot_limit_status: rule.lot_limit_status as CategoryRules["lot_limit_status"],
+        minimum_lots: rule.minimum_lots,
+        maximum_lots: rule.maximum_lots,
+        lot_increment: rule.lot_increment,
+        investment_limit_status:
+          rule.investment_limit_status as CategoryRules["investment_limit_status"],
+        minimum_investment: rule.minimum_investment,
+        maximum_investment: rule.maximum_investment,
+        shareholder_record_date: rule.shareholder_record_date,
+        minimum_shareholding: rule.minimum_shareholding,
+        eligibility_conditions:
+          rule.eligibility_conditions as CategoryRules["eligibility_conditions"],
+        allowed_price_types: rule.allowed_price_types as CategoryRules["allowed_price_types"],
+        minimum_price_increment: rule.minimum_price_increment,
+      }
+    : null;
+  const calculationInput: CalculationInput | null = rules
+    ? {
+        ipo: {
+          issue_price_min: ipo.issue_price_min,
+          issue_price_max: ipo.issue_price_max,
+          cut_off_price: ipo.cut_off_price,
+          lot_size: ipo.lot_size,
+        },
+        category: categoryCode as CategoryRules["category"],
+        rules,
+        lots: input.lots,
+        price_type: input.price_type,
+        price: input.price,
+        shareholder_shares: input.shareholder_shares,
+        eligibility_answers: input.eligibility_answers,
+      }
+    : null;
+  const calculation = calculationInput ? validateApplicationConfiguration(calculationInput) : null;
+  if (!calculation) {
+    const price = Number(input.price);
+    if (
+      !Number.isFinite(price) ||
+      price < Number(ipo.issue_price_min) ||
+      price > Number(ipo.issue_price_max) ||
+      (input.price_type === "CUT_OFF" &&
+        (ipo.cut_off_price === null || price !== Number(ipo.cut_off_price)))
+    ) {
+      return failed("INVALID_PRICE", "Price must match the IPO price range and price type.");
+    }
+    try {
+      const totalShares = calculateTotalShares(input.lots, ipo.lot_size);
+      const applicationAmount = calculateApplicationAmount(totalShares, input.price);
+      const snapshot = {
+        captured_at: new Date().toISOString(),
+        ipo: {
+          issue_price_min: ipo.issue_price_min,
+          issue_price_max: ipo.issue_price_max,
+          cut_off_price: ipo.cut_off_price,
+          lot_size: ipo.lot_size,
+        },
+        category_configuration: null,
+        demat_account_id: input.demat_account_id,
+        calculation_input: {
+          category: categoryCode,
+          lots: input.lots,
+          price_type: input.price_type,
+          price: input.price,
+        },
+        calculation_result: { total_shares: totalShares, application_amount: applicationAmount },
+      };
+      const record = {
+        user_id: userId,
+        ipo_id: input.ipo_id,
+        demat_account_id: input.demat_account_id,
+        category_id: input.category_id ?? null,
+        category_code: categoryCode,
+        lots: input.lots,
+        total_shares: totalShares,
+        application_amount: applicationAmount,
+        application_number: input.application_number,
+        external_reference: input.external_reference,
+        submission_date: input.submission_date,
+        application_status: input.application_status,
+        mandate_status: input.mandate_status,
+        allotment_status: input.allotment_status,
+        notes: input.notes,
+        rule_version: null,
+        calculation_snapshot: snapshot,
+      };
+      return {
+        ok: true as const,
+        record,
+        warnings: cache
+          ? findCachedDuplicateWarnings(cache, input)
+          : await findDuplicateWarnings(context, input),
+      };
+    } catch (error) {
+      if (error instanceof RangeError) {
+        return failed("INVALID_APPLICATION", error.message);
+      }
+      throw error;
+    }
+  }
   const blockingErrors = calculation.validation_errors.filter(
     ({ code }) =>
       !options.allowUnconfirmedEligibility ||
@@ -690,9 +784,12 @@ async function prepareApplication(
       },
     };
   }
+  if (calculation.total_shares === null || calculation.application_amount === null) {
+    return failed("INVALID_APPLICATION", "The application calculation could not be completed.");
+  }
   const snapshot = {
     captured_at: new Date().toISOString(),
-    ipo: calculationInput.ipo,
+    ipo: calculationInput!.ipo,
     category_configuration: rule,
     demat_account_id: input.demat_account_id,
     calculation_input: calculationInput,
@@ -702,7 +799,8 @@ async function prepareApplication(
     user_id: userId,
     ipo_id: input.ipo_id,
     demat_account_id: input.demat_account_id,
-    category_id: input.category_id,
+    category_id: input.category_id ?? null,
+    category_code: categoryCode,
     lots: input.lots,
     total_shares: calculation.total_shares,
     application_amount: calculation.application_amount,
@@ -713,7 +811,7 @@ async function prepareApplication(
     mandate_status: input.mandate_status,
     allotment_status: input.allotment_status,
     notes: input.notes,
-    rule_version: rules.rule_version,
+    rule_version: rules?.rule_version ?? null,
     calculation_snapshot: snapshot,
   };
   return {
@@ -727,16 +825,17 @@ async function prepareApplication(
 
 async function findDuplicateWarnings(context: RouteContext, input: ApplicationInput) {
   const supabase = context.get("rlsSupabase");
+  const identityQuery = supabase
+    .from("applications")
+    .select("id")
+    .eq("user_id", context.get("authenticatedUser").id)
+    .eq("ipo_id", input.ipo_id)
+    .eq("demat_account_id", input.demat_account_id)
+    .is("archived_at", null);
+  if (input.category_id) identityQuery.eq("category_id", input.category_id);
+  else identityQuery.eq("category_code", input.category_code ?? "");
   const [identity, number, externalReference] = await Promise.all([
-    supabase
-      .from("applications")
-      .select("id")
-      .eq("user_id", context.get("authenticatedUser").id)
-      .eq("ipo_id", input.ipo_id)
-      .eq("demat_account_id", input.demat_account_id)
-      .eq("category_id", input.category_id)
-      .is("archived_at", null)
-      .limit(1),
+    identityQuery.limit(1),
     input.application_number
       ? supabase
           .from("applications")
@@ -858,7 +957,9 @@ async function previewImport(context: RouteContext) {
       .order("rule_version", { ascending: false }),
     supabase
       .from("applications")
-      .select("ipo_id, demat_account_id, category_id, application_number, external_reference")
+      .select(
+        "ipo_id, demat_account_id, category_id, category_code, application_number, external_reference",
+      )
       .eq("user_id", userId)
       .is("archived_at", null)
       .limit(5000),
@@ -916,11 +1017,16 @@ async function previewImport(context: RouteContext) {
           row.ipo_id === ipo?.id &&
           (row.id.toLowerCase() === categoryText.toLowerCase() || row.category === categoryText),
       );
-      if (!category) errors.push("Category does not have a configured rule for this IPO.");
+      const categoryCode =
+        category?.category ??
+        (["RETAIL", "SHNI", "BHNI", "SHAREHOLDER", "EMPLOYER"].includes(categoryText)
+          ? categoryText
+          : null);
+      if (!categoryCode) errors.push("Select a valid investor category.");
       const lots = Number(raw.lots);
       if (!Number.isSafeInteger(lots) || lots <= 0)
         errors.push("Lots must be a positive whole number.");
-      if (!ipo || !account || !category || errors.length) {
+      if (!ipo || !account || !categoryCode || errors.length) {
         return { row_number, record: raw, row_status: "invalid", errors, warnings };
       }
       const priceType = String(raw.price_type ?? "").toUpperCase();
@@ -928,7 +1034,8 @@ async function previewImport(context: RouteContext) {
       const parsedInput = applicationCreateSchema.safeParse({
         ipo_id: ipo.id,
         demat_account_id: account.id,
-        category_id: category.id,
+        category_id: category?.id ?? null,
+        category_code: categoryCode,
         lots,
         price_type: priceType,
         price,
@@ -959,7 +1066,7 @@ async function previewImport(context: RouteContext) {
       const applicationCombination = [
         parsedInput.data.ipo_id,
         parsedInput.data.demat_account_id,
-        parsedInput.data.category_id,
+        parsedInput.data.category_code,
         parsedInput.data.application_number ?? "",
       ].join(":");
       const duplicateInFile = seenApplicationCombinations.has(applicationCombination);
@@ -1158,7 +1265,10 @@ function findCachedDuplicateWarnings(cache: ApplicationPreparationCache, input: 
     (item) =>
       item.ipo_id === input.ipo_id &&
       item.demat_account_id === input.demat_account_id &&
-      item.category_id === input.category_id,
+      item.category_id === (input.category_id ?? null) &&
+      item.category_code ===
+        (input.category_code ??
+          (input.category_id ? cache.categories.get(input.category_id)?.category : undefined)),
   );
   const applicationNumber = input.application_number
     ? cache.existingApplications.some(

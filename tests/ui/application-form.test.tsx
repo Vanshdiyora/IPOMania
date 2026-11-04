@@ -99,7 +99,7 @@ describe("application form IPO selection", () => {
     const categorySelect = await screen.findByRole("combobox", { name: "Investor category" });
     await waitFor(() => expect(categorySelect).not.toBeDisabled());
     fireEvent.click(categorySelect);
-    expect(await screen.findByRole("option", { name: /Retail — .*rules v1/ })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Retail" })).toBeInTheDocument();
   });
 
   it("explains how to add an IPO to the catalog when no options are returned", async () => {
@@ -131,7 +131,7 @@ describe("application form IPO selection", () => {
     const addIpoLink = await screen.findByRole("link", { name: "Add to catalog" });
     expect(addIpoLink).toHaveAttribute("href", "/ipos/new");
     expect(addIpoLink.parentElement).toHaveTextContent(
-      "No IPOs are available in your records or the shared catalog. Add to catalog and configure its category before recording an application.",
+      "No IPOs are available in your records or the shared catalog. Add to catalog and record applications with manually selected lots.",
     );
   });
 
@@ -276,7 +276,7 @@ describe("application form IPO selection", () => {
     );
   });
 
-  it("links to category setup when the selected IPO has no configured rules", async () => {
+  it("allows category and lot selection when an IPO has no category rules", async () => {
     const ipoId = "88888888-8888-4888-8888-888888888888";
     apiRequestMock.mockImplementation(async (path: string) => {
       if (path.startsWith("/api/ipos/catalog?")) {
@@ -306,30 +306,23 @@ describe("application form IPO selection", () => {
 
     await chooseIpo("Category Test IPO");
 
-    const setupLink = await screen.findByRole("link", { name: "Configure categories" });
-    expect(setupLink).toHaveAttribute("href", `/ipos/${ipoId}/categories`);
-    expect(setupLink.parentElement).toHaveTextContent(
-      "No category rules are configured for this IPO.",
-    );
-
     const categorySelect = screen.getByRole("combobox", { name: "Investor category" });
+    await waitFor(() => expect(categorySelect).toBeEnabled());
     fireEvent.click(categorySelect);
-    const categoryOptions = [
-      /Retail — .*not configured for this IPO/,
-      /sHNI — .*not configured for this IPO/,
-      /bHNI — .*not configured for this IPO/,
-      /Shareholder — .*not configured for this IPO/,
-    ];
-    const options = categoryOptions.map((name) => screen.getByRole("option", { name }));
+    const options = ["Retail", "sHNI", "bHNI", "Shareholder"].map((name) =>
+      screen.getByRole("option", { name }),
+    );
     options.forEach((option) => expect(option).toBeEnabled());
     const shniOption = options[1];
     if (!shniOption) throw new Error("The sHNI category option was not rendered.");
     fireEvent.click(shniOption);
 
-    expect(
-      screen.getByText(/Small HNI; limits follow the IPO configuration/, { selector: "p" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Category selected for reference/)).toBeInTheDocument();
+    const lots = screen.getByRole("spinbutton", { name: "Lots" });
+    expect(lots).toBeEnabled();
+    fireEvent.change(lots, { target: { value: "12" } });
+    expect(lots).toHaveValue(12);
+    expect(screen.queryByText(/category rules are configured/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/configure issue-specific rules/i)).not.toBeInTheDocument();
   });
 
   it("shows only the latest rule version for each category", async () => {
@@ -373,9 +366,9 @@ describe("application form IPO selection", () => {
     await chooseIpo("Versioned IPO");
 
     fireEvent.click(await screen.findByRole("combobox", { name: "Investor category" }));
-    expect(await screen.findByRole("option", { name: /Retail — .*rules v2/ })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /Retail — .*rules v1/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /sHNI — .*rules v1/ })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Retail" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /rules v1|rules v2/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "sHNI" })).toBeInTheDocument();
   });
 
   it("uses the category initial lots and shows the share count from the IPO lot size", async () => {
