@@ -101,7 +101,8 @@ describe("user IPO catalog", () => {
       "aria-pressed",
       "true",
     );
-    expect(screen.getByText("Admin-managed", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Source" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Admin-managed", { exact: true })).not.toBeInTheDocument();
     expect(screen.getAllByText("Not published")).toHaveLength(2);
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",
@@ -163,7 +164,8 @@ describe("user IPO catalog", () => {
       "href",
       `/ipos/${catalogIpo.id}`,
     );
-    expect(screen.getByText("Manual entry · unverified")).toBeInTheDocument();
+    expect(screen.queryByText("Manual entry · unverified")).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Source" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /calendar/i })).not.toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/api/ipos?page=1&page_size=25&sort=date_desc",

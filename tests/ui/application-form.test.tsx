@@ -311,6 +311,25 @@ describe("application form IPO selection", () => {
     expect(setupLink.parentElement).toHaveTextContent(
       "No category rules are configured for this IPO.",
     );
+
+    const categorySelect = screen.getByRole("combobox", { name: "Investor category" });
+    fireEvent.click(categorySelect);
+    const categoryOptions = [
+      /Retail — .*not configured for this IPO/,
+      /sHNI — .*not configured for this IPO/,
+      /bHNI — .*not configured for this IPO/,
+      /Shareholder — .*not configured for this IPO/,
+    ];
+    const options = categoryOptions.map((name) => screen.getByRole("option", { name }));
+    options.forEach((option) => expect(option).toBeEnabled());
+    const shniOption = options[1];
+    if (!shniOption) throw new Error("The sHNI category option was not rendered.");
+    fireEvent.click(shniOption);
+
+    expect(
+      screen.getByText(/Small HNI; limits follow the IPO configuration/, { selector: "p" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Category selected for reference/)).toBeInTheDocument();
   });
 
   it("shows only the latest rule version for each category", async () => {

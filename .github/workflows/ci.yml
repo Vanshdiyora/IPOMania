@@ -110,6 +110,6 @@ jobs:
           npm run build --workspace @ipo-mania/financial-engine
 
       - name: Run browser tests
-        run: npm run test:e2e
+        run: npm run test:e2e -- --workers=3
         env:
           CI: "true"

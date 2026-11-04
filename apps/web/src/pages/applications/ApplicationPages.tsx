@@ -679,6 +679,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const [ipoId, setIpoId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [categoryCode, setCategoryCode] = useState("");
   const [lots, setLots] = useState("1");
   const [price, setPrice] = useState("");
   const [applicationNumber, setApplicationNumber] = useState("");
@@ -884,7 +885,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   return (
     <RouteFormDrawer
       title={editing ? "Edit application" : "Add application"}
-      description="Choose an issue, an account, and a configured category. This records an application for tracking; it does not submit an IPO application to a broker or exchange."
+      description="Choose an issue, an account, and a category with configured issue rules. This records an application for tracking; it does not submit an IPO application to a broker or exchange."
       cancelTo={returnTo}
       formId="application-form"
       submitLabel="Save application"
@@ -989,6 +990,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                       setSelectedCatalogIpo(catalogIpo ?? null);
                       setIpoId(nextValue);
                       setCategoryId("");
+                      setCategoryCode("");
                       const ownedIpo = personalIpos.find((item) => item.id === nextValue);
                       setPrice(catalogIpo?.issue_price_max ?? ownedIpo?.issue_price_max ?? "");
                     }}
@@ -1037,11 +1039,12 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                   label="Investor category"
                   error={validation.errors.category_id}
                   required
-                  value={categoryId}
+                  value={categoryId || categoryCode}
                   disabled={categoriesQuery.isLoading || Boolean(categoriesQuery.error)}
                   onChange={(event) => {
                     const nextCategory = categories.find((item) => item.id === event.target.value);
-                    setCategoryId(event.target.value);
+                    setCategoryId(nextCategory?.id ?? "");
+                    setCategoryCode(nextCategory?.category ?? event.target.value);
                     if (nextCategory) {
                       const bounds = getApplicationLotBounds(
                         selectedIpo && typeof selectedIpo.lot_size === "number"
@@ -1070,7 +1073,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                   {(["RETAIL", "SHNI", "BHNI", "SHAREHOLDER"] as const).map((code) => {
                     const item = categories.find((category) => category.category === code);
                     return (
-                      <option key={code} value={item?.id ?? ""} disabled={!item}>
+                      <option key={code} value={item?.id ?? code}>
                         {formatCategory(code)} — {investorCategoryDescription(code)}
                         {item ? ` (rules v${item.rule_version})` : " (not configured for this IPO)"}
                       </option>
@@ -1090,6 +1093,11 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                     {typeof activeCategory.minimum_shareholding === "number"
                       ? ` Minimum eligible holding: ${activeCategory.minimum_shareholding.toLocaleString("en-IN")} shares.`
                       : ""}
+                  </p>
+                ) : categoryCode ? (
+                  <p className="text-sm text-muted sm:col-span-2" role="status">
+                    {investorCategoryDescription(categoryCode)} Category selected for reference;
+                    configure issue-specific rules before saving an application.
                   </p>
                 ) : null}
                 {ipoId &&
