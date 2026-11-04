@@ -70,8 +70,10 @@ normal application form. This private snapshot preserves the existing owner-boun
 application audit constraints while the shared catalog remains the issue-data source of truth.
 
 The application form's IPO selector includes existing personal snapshots and active shared catalog
-IPOs. Choosing a shared record imports it through the same endpoint before category and application
-operations run, so those operations remain owner-bound.
+IPOs. Selecting a shared IPO uses its catalog lot size and maximum price locally for an editable,
+live amount preview; no import request is made at selection. When the user saves, the current
+catalog issue and category rule are copied into the caller-owned audit snapshot and validated on
+the server before the application is created.
 
 Calculation inputs include `ipo_id`, owned `demat_account_id`, category, lots, `BID` or `CUT_OFF`
 price type, decimal-string price, optional user-provided shareholder shares, and a map of explicit

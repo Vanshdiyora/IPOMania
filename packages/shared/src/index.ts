@@ -60,7 +60,7 @@ export interface IpoRecord {
   id: string;
   company_name: string;
   source_catalog_id?: string | null;
-  symbol: string;
+  symbol: string | null;
   ipo_type: string;
   exchange: string;
   issue_price_min: string;
@@ -85,7 +85,6 @@ export interface IpoRecord {
 export interface IpoCatalogRecord
   extends Omit<
     IpoRecord,
-    | "symbol"
     | "exchange"
     | "issue_price_min"
     | "issue_price_max"
@@ -96,7 +95,6 @@ export interface IpoCatalogRecord
     | "status"
     | "data_source"
   > {
-  symbol: string | null;
   exchange: string | null;
   issue_price_min: string | null;
   issue_price_max: string | null;
@@ -106,6 +104,56 @@ export interface IpoCatalogRecord
   closing_date: string | null;
   status: "UPCOMING" | "OPEN" | "CLOSED" | "LISTED";
   data_source: string;
+}
+
+/** Whether a catalog record has the published issue fields needed for application calculations. */
+export type IpoApplicationReadyIssue = Pick<
+  IpoCatalogRecord,
+  | "exchange"
+  | "issue_price_min"
+  | "issue_price_max"
+  | "lot_size"
+  | "issue_size"
+  | "opening_date"
+  | "closing_date"
+> & {
+  exchange: string;
+  issue_price_min: string;
+  issue_price_max: string;
+  lot_size: number;
+  issue_size: string;
+  opening_date: string;
+  closing_date: string;
+};
+
+export function isIpoReadyForApplication(
+  issue: Pick<
+    IpoCatalogRecord,
+    | "exchange"
+    | "issue_price_min"
+    | "issue_price_max"
+    | "lot_size"
+    | "issue_size"
+    | "opening_date"
+    | "closing_date"
+  >,
+): issue is IpoApplicationReadyIssue {
+  const hasText = (value: string | null) => Boolean(value?.trim());
+  const hasPositiveNumber = (value: string | null) =>
+    value !== null && value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) > 0;
+
+  return (
+    hasText(issue.exchange) &&
+    hasPositiveNumber(issue.issue_price_min) &&
+    hasPositiveNumber(issue.issue_price_max) &&
+    Number(issue.issue_price_max) >= Number(issue.issue_price_min) &&
+    typeof issue.lot_size === "number" &&
+    Number.isSafeInteger(issue.lot_size) &&
+    issue.lot_size > 0 &&
+    hasPositiveNumber(issue.issue_size) &&
+    hasText(issue.opening_date) &&
+    hasText(issue.closing_date)
+  );
 }
 
 export interface IpoEligibilityCondition {

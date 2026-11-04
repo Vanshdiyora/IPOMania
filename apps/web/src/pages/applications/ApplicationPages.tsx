@@ -4,10 +4,13 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from "reac
 import type {
   DematAccount,
   IpoApplication,
+  IpoCatalogCategoryConfiguration,
   IpoCatalogRecord,
   IpoCategoryConfiguration,
   IpoRecord,
 } from "@ipo-mania/shared";
+import { isIpoReadyForApplication } from "@ipo-mania/shared";
+import { calculateApplicationAmount, calculateTotalShares } from "@ipo-mania/financial-engine";
 import { useAuth } from "../../auth/useAuth";
 import { ConfirmButton } from "../../components/ui/ConfirmButton";
 import { Button } from "../../components/ui/Button";
@@ -74,20 +77,13 @@ type IpoResponse = { data: IpoRecord };
 type AccountListResponse = {
   data: { accounts: DematAccount[]; pagination?: { page: number; totalPages: number } };
 };
-type CategoryResponse = { data: { configurations: IpoCategoryConfiguration[] } };
+type ApplicationCategoryConfiguration = IpoCategoryConfiguration | IpoCatalogCategoryConfiguration;
+type CategoryResponse = { data: { configurations: ApplicationCategoryConfiguration[] } };
 type ApplicationResponse = {
   data: IpoApplication & {
     ipos?: { company_name: string; symbol: string };
     demat_accounts?: { holder_name: string; broker_name: string; masked_demat_identifier: string };
     ipo_categories?: { category: string };
-  };
-};
-type CalculationResponse = {
-  data: {
-    total_shares: number | null;
-    application_amount: string | null;
-    rule_version: number;
-    warnings: string[];
   };
 };
 type ValidationRow = {
@@ -664,7 +660,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const navigate = useNavigate();
   const { session } = useAuth();
   const { notify } = useToast();
-  const queryClient = useQueryClient();
   const lists = useOwnedLists();
   const [dirty, setDirty] = useState(false);
   const validation = useFormValidation();
@@ -676,11 +671,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const [applicationNumber, setApplicationNumber] = useState("");
   const [externalReference, setExternalReference] = useState("");
   const [notes, setNotes] = useState("");
-  const [preparedCatalogIpo, setPreparedCatalogIpo] = useState<IpoRecord | null>(null);
-  const [reviewedApplication, setReviewedApplication] = useState<{
-    fingerprint: string;
-    data: CalculationResponse["data"];
-  } | null>(null);
+  const [selectedCatalogIpo, setSelectedCatalogIpo] = useState<IpoCatalogRecord | null>(null);
   const preselectedAccountId = searchParams.get("demat_account_id");
   const preselectedIpoId = searchParams.get("ipo_id");
   const preselectedIpo = useQuery({
@@ -702,29 +693,16 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       return page && totalPages && page < totalPages ? page + 1 : undefined;
     },
   });
-  const importCatalogIpo = useMutation({
-    mutationFn: (catalogIpoId: string) =>
-      apiRequest<IpoResponse>(`/api/ipos/catalog/${catalogIpoId}/import`, session!, {
-        method: "POST",
-      }),
-    onSuccess: async (result) => {
-      setPreparedCatalogIpo(result.data);
-      setIpoId(result.data.id);
-      setCategoryId("");
-      setReviewedApplication(null);
-      await queryClient.invalidateQueries({ queryKey: ["ipos", "application-options"] });
-    },
-    onError: (error) =>
-      notify({
-        title: "IPO could not be prepared for an application",
-        description: errorMessage(error),
-        tone: "error",
-      }),
-  });
   const categoriesQuery = useQuery({
-    queryKey: ["ipo-categories", ipoId],
+    queryKey: [selectedCatalogIpo ? "ipo-catalog-categories" : "ipo-categories", ipoId],
     enabled: Boolean(session && ipoId),
-    queryFn: () => apiRequest<CategoryResponse>(`/api/ipos/${ipoId}/categories`, session!),
+    queryFn: () =>
+      apiRequest<CategoryResponse>(
+        selectedCatalogIpo
+          ? `/api/ipos/catalog/${ipoId}/categories`
+          : `/api/ipos/${ipoId}/categories`,
+        session!,
+      ),
   });
   const categoryConfigurations = categoriesQuery.data?.data.configurations ?? [];
   // A category can have several immutable rule versions. An application must use the
@@ -735,25 +713,19 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       if (!current || configuration.rule_version > current.rule_version)
         latest.set(configuration.category, configuration);
       return latest;
-    }, new Map<IpoCategoryConfiguration["category"], IpoCategoryConfiguration>()),
+    }, new Map<IpoCategoryConfiguration["category"], ApplicationCategoryConfiguration>()),
   ).map(([, configuration]) => configuration);
   const activeCategory = categories.find((category) => category.id === categoryId);
-  const personalIpos =
-    preparedCatalogIpo && !lists.ipos.some((item) => item.id === preparedCatalogIpo.id)
-      ? [preparedCatalogIpo, ...lists.ipos]
-      : lists.ipos;
-  const importedCatalogIds = new Set(
-    personalIpos.flatMap((item) => (item.source_catalog_id ? [item.source_catalog_id] : [])),
-  );
-  const sharedCatalogIpos = (
-    catalogIpos.data?.pages.flatMap((page) => page.data.ipos) ?? []
-  ).filter((item) => !importedCatalogIds.has(item.id));
+  const personalIpos = lists.ipos.filter((item) => !item.source_catalog_id);
+  const sharedCatalogIpos = catalogIpos.data?.pages.flatMap((page) => page.data.ipos) ?? [];
   const selectedIpo =
+    selectedCatalogIpo ??
     personalIpos.find((item) => item.id === ipoId) ??
     (preselectedIpo.data?.data.id === ipoId ? preselectedIpo.data.data : null);
   const enteredLots = Number(lots);
   const estimatedTotalShares =
     selectedIpo &&
+    typeof selectedIpo.lot_size === "number" &&
     Number.isSafeInteger(enteredLots) &&
     enteredLots > 0 &&
     Number.isSafeInteger(selectedIpo.lot_size * enteredLots)
@@ -788,18 +760,22 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     allotment_status: "UNKNOWN",
     notes: notes || null,
   };
-  const applicationFingerprint = JSON.stringify(applicationPayload);
-  const currentReview =
-    reviewedApplication?.fingerprint === applicationFingerprint ? reviewedApplication.data : null;
-  const calculation = useMutation({
-    mutationFn: () =>
-      apiRequest<CalculationResponse>("/api/applications/preview", session!, {
-        method: "POST",
-        body: JSON.stringify(validation.validate(applicationCreateSchema, applicationPayload)),
-      }),
-    onSuccess: (result) =>
-      setReviewedApplication({ fingerprint: applicationFingerprint, data: result.data }),
-  });
+  const localCalculation = (() => {
+    if (
+      !selectedIpo ||
+      typeof selectedIpo.lot_size !== "number" ||
+      !Number.isSafeInteger(enteredLots) ||
+      enteredLots <= 0 ||
+      !price
+    )
+      return null;
+    try {
+      const totalShares = calculateTotalShares(enteredLots, selectedIpo.lot_size);
+      return { totalShares, applicationAmount: calculateApplicationAmount(totalShares, price) };
+    } catch {
+      return null;
+    }
+  })();
   const detail = useQuery({
     queryKey: ["applications", applicationId],
     enabled: Boolean(session && editing && applicationId),
@@ -808,13 +784,34 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const mutation = useMutation({
     mutationFn: async () => {
       if (!session) throw new Error("Sign in to save applications.");
-      const body = editing
+      let body = editing
         ? {
             application_number: applicationNumber || null,
             external_reference: externalReference || null,
             notes: notes || null,
           }
         : applicationPayload;
+      if (!editing && selectedCatalogIpo) {
+        const imported = await apiRequest<IpoResponse>(
+          `/api/ipos/catalog/${selectedCatalogIpo.id}/import`,
+          session,
+          { method: "POST" },
+        );
+        const importedCategories = await apiRequest<{
+          data: { configurations: IpoCategoryConfiguration[] };
+        }>(`/api/ipos/${imported.data.id}/categories`, session);
+        const importedCategory = importedCategories.data.configurations.find(
+          (configuration) => configuration.source_catalog_rule_id === categoryId,
+        );
+        if (!importedCategory) {
+          throw new Error("The selected shared IPO category could not be prepared.");
+        }
+        body = {
+          ...applicationPayload,
+          ipo_id: imported.data.id,
+          category_id: importedCategory.id,
+        };
+      }
       return apiRequest(
         editing ? `/api/applications/${applicationId}` : "/api/applications",
         session,
@@ -862,12 +859,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       disabled={
         Boolean(detail.error || lists.error) ||
         (editing && !application) ||
-        (!editing &&
-          (!ipoId ||
-            !accountId ||
-            !categoryId ||
-            !price ||
-            reviewedApplication?.fingerprint !== applicationFingerprint))
+        (!editing && (!ipoId || !accountId || !categoryId || !price || !localCalculation))
       }
     >
       <form
@@ -922,16 +914,8 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                     label="IPO"
                     placeholder="Choose an IPO"
                     value={ipoId}
-                    loading={
-                      lists.optionLoading.ipos ||
-                      catalogIpos.isLoading ||
-                      importCatalogIpo.isPending
-                    }
-                    disabled={
-                      lists.optionLoading.ipos ||
-                      catalogIpos.isLoading ||
-                      importCatalogIpo.isPending
-                    }
+                    loading={lists.optionLoading.ipos || catalogIpos.isLoading}
+                    disabled={lists.optionLoading.ipos || catalogIpos.isLoading}
                     emptyLabel={
                       personalIpos.length === 0 && sharedCatalogIpos.length === 0
                         ? "No IPOs are available."
@@ -943,9 +927,12 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                         label: item.company_name,
                       })),
                       ...sharedCatalogIpos.map((item) => ({
-                        value: `catalog:${item.id}`,
+                        value: item.id,
                         label: item.company_name,
-                        description: "Shared catalog",
+                        description: isIpoReadyForApplication(item)
+                          ? "Shared catalog"
+                          : "Shared catalog · Issue data incomplete",
+                        disabled: !isIpoReadyForApplication(item),
                       })),
                     ]}
                     hasMore={Boolean(lists.iposInfinite.hasNextPage || catalogIpos.hasNextPage)}
@@ -958,14 +945,12 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                     }}
                     onChange={(value) => {
                       const nextValue = Array.isArray(value) ? (value[0] ?? "") : value;
-                      if (nextValue.startsWith("catalog:")) {
-                        importCatalogIpo.mutate(nextValue.slice("catalog:".length));
-                        return;
-                      }
-                      setPreparedCatalogIpo(null);
+                      const catalogIpo = sharedCatalogIpos.find((item) => item.id === nextValue);
+                      setSelectedCatalogIpo(catalogIpo ?? null);
                       setIpoId(nextValue);
                       setCategoryId("");
-                      setReviewedApplication(null);
+                      const ownedIpo = personalIpos.find((item) => item.id === nextValue);
+                      setPrice(catalogIpo?.issue_price_max ?? ownedIpo?.issue_price_max ?? "");
                     }}
                   />
                   {!lists.optionLoading.ipos &&
@@ -1039,13 +1024,19 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                 categories.length === 0 ? (
                   <p className="text-sm text-muted sm:col-span-2" role="status">
                     No category rules are configured for this IPO.{" "}
-                    <DrawerRouteLink
-                      className="font-semibold text-action underline underline-offset-2 hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
-                      to={`/ipos/${ipoId}/categories`}
-                    >
-                      Configure categories
-                    </DrawerRouteLink>{" "}
-                    to make Retail, HNI, Shareholder, or Employer categories available.
+                    {selectedCatalogIpo ? (
+                      "An administrator must publish shared catalog rules before it can be used."
+                    ) : (
+                      <>
+                        <DrawerRouteLink
+                          className="font-semibold text-action underline underline-offset-2 hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
+                          to={`/ipos/${ipoId}/categories`}
+                        >
+                          Configure categories
+                        </DrawerRouteLink>{" "}
+                        to make Retail, HNI, Shareholder, or Employer categories available.
+                      </>
+                    )}
                   </p>
                 ) : null}
                 <FormInput
@@ -1081,28 +1072,14 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
               Calculation inputs and rule version are preserved and cannot be changed here.
             </p>
           )}
-          <Button
-            className="mt-4"
-            variant="outline"
-            disabled={!ipoId || !accountId || !categoryId || !price || calculation.isPending}
-            onClick={() => calculation.mutate()}
-          >
-            Calculate total amount
-          </Button>
-          {currentReview ? (
+          {localCalculation ? (
             <p role="status" className="mt-3 rounded-lg bg-canvas p-4 text-lg font-semibold">
-              Total amount: {currentReview.application_amount}
+              Total amount: ₹{localCalculation.applicationAmount}
               <span className="mt-1 block text-base font-normal">
-                Total shares: {currentReview.total_shares?.toLocaleString("en-IN") ?? "—"}
+                Total shares: {localCalculation.totalShares.toLocaleString("en-IN")}
               </span>
-              {currentReview.warnings.map((warning) => (
-                <span className="mt-2 block text-base font-normal text-danger" key={warning}>
-                  Potential duplicate: {warning}
-                </span>
-              ))}
             </p>
           ) : null}
-          {calculation.error ? <ErrorMessage error={calculation.error} /> : null}
           {activeCategory ? (
             <p className="mt-3 text-sm text-muted">
               Rule version {activeCategory.rule_version}. This account/category combination will be

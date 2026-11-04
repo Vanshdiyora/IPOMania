@@ -135,10 +135,9 @@ describe("application form IPO selection", () => {
     );
   });
 
-  it("lists shared catalog IPOs and imports the selected IPO for the user", async () => {
+  it("uses shared catalog IPO data locally when the user selects an IPO", async () => {
     const catalogIpoId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-    const preparedIpoId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-    apiRequestMock.mockImplementation(async (path: string, _session, init?: RequestInit) => {
+    apiRequestMock.mockImplementation(async (path: string) => {
       if (path.startsWith("/api/ipos?")) {
         return {
           data: {
@@ -150,22 +149,26 @@ describe("application form IPO selection", () => {
       if (path.startsWith("/api/ipos/catalog?")) {
         return {
           data: {
-            ipos: [{ id: catalogIpoId, company_name: "Shared Catalog IPO", status: "OPEN" }],
+            ipos: [
+              {
+                id: catalogIpoId,
+                company_name: "Shared Catalog IPO",
+                status: "OPEN",
+                symbol: "SHARED",
+                exchange: "NSE",
+                issue_price_min: "100",
+                issue_price_max: "110",
+                lot_size: 10,
+                issue_size: "100000",
+                opening_date: "2026-11-01",
+                closing_date: "2026-11-03",
+              },
+            ],
             pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
           },
         };
       }
-      if (path === `/api/ipos/catalog/${catalogIpoId}/import` && init?.method === "POST") {
-        return {
-          data: {
-            id: preparedIpoId,
-            company_name: "Shared Catalog IPO",
-            source_catalog_id: catalogIpoId,
-            lot_size: 10,
-          },
-        };
-      }
-      if (path === `/api/ipos/${preparedIpoId}/categories`) {
+      if (path === `/api/ipos/catalog/${catalogIpoId}/categories`) {
         return { data: { configurations: [] } };
       }
       if (path.startsWith("/api/accounts?")) {
@@ -192,13 +195,84 @@ describe("application form IPO selection", () => {
 
     await waitFor(() =>
       expect(apiRequestMock).toHaveBeenCalledWith(
-        `/api/ipos/catalog/${catalogIpoId}/import`,
+        `/api/ipos/catalog/${catalogIpoId}/categories`,
         expect.anything(),
-        { method: "POST" },
       ),
     );
+    expect(screen.getByRole("textbox", { name: /Price/ })).toHaveValue("110");
+    expect(screen.getByText("Total amount: ₹1100")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("spinbutton", { name: /Lots/ }), { target: { value: "2" } });
+    expect(screen.getByText("Total amount: ₹2200")).toBeInTheDocument();
+    expect(screen.getByText("Total shares: 20")).toBeInTheDocument();
+    expect(apiRequestMock).not.toHaveBeenCalledWith(
+      `/api/ipos/catalog/${catalogIpoId}/import`,
+      expect.anything(),
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("shows incomplete shared IPOs as unavailable instead of attempting an import", async () => {
+    const catalogIpoId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos?")) {
+        return {
+          data: {
+            ipos: [],
+            pagination: { page: 1, page_size: 25, total: 0, total_pages: 0 },
+          },
+        };
+      }
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return {
+          data: {
+            ipos: [
+              {
+                id: catalogIpoId,
+                company_name: "Incomplete Catalog IPO",
+                status: "UPCOMING",
+                symbol: null,
+                exchange: null,
+                issue_price_min: null,
+                issue_price_max: null,
+                lot_size: null,
+                issue_size: null,
+                opening_date: null,
+                closing_date: null,
+              },
+            ],
+            pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+          },
+        };
+      }
+      if (path.startsWith("/api/accounts?")) {
+        return {
+          data: {
+            accounts: [],
+            pagination: { page: 1, pageSize: 100, total: 0, totalPages: 1 },
+          },
+        };
+      }
+      throw new Error("Unexpected request: " + path);
+    });
+
+    renderForm();
+
     await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "IPO" })).toHaveTextContent("Shared Catalog IPO"),
+      expect(screen.getByRole("combobox", { name: "IPO" })).not.toHaveAttribute(
+        "aria-busy",
+        "true",
+      ),
+    );
+    fireEvent.click(screen.getByRole("combobox", { name: "IPO" }));
+
+    const option = await screen.findByRole("option", { name: /Incomplete Catalog IPO/ });
+    expect(option).toBeDisabled();
+    expect(option).toHaveTextContent("Issue data incomplete");
+    fireEvent.click(option);
+    expect(apiRequestMock).not.toHaveBeenCalledWith(
+      `/api/ipos/catalog/${catalogIpoId}/import`,
+      expect.anything(),
+      expect.anything(),
     );
   });
 

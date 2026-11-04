@@ -14,6 +14,7 @@ import type {
   IpoRecord,
   IpoStatus,
 } from "@ipo-mania/shared";
+import { isIpoReadyForApplication } from "@ipo-mania/shared";
 import { ipoCategoryConfigurationSchema, ipoSchema, ipoStatusSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
 import { useAuth } from "../../auth/useAuth";
@@ -424,6 +425,7 @@ export function IpoCatalogDetailsPage() {
   if (error) return <ErrorNotice error={error} onRetry={() => void refetch()} />;
   const ipo = data?.data;
   if (!ipo) return <p role="alert">IPO record not found.</p>;
+  const applicationReady = isIpoReadyForApplication(ipo);
 
   return (
     <div className="space-y-6">
@@ -451,12 +453,20 @@ export function IpoCatalogDetailsPage() {
               </p>
             </div>
             <Button
-              disabled={importForApplication.isPending || categoriesQuery.isLoading}
+              disabled={
+                !applicationReady || importForApplication.isPending || categoriesQuery.isLoading
+              }
               onClick={() => importForApplication.mutate()}
             >
               {importForApplication.isPending ? "Preparing IPO…" : "Use for application"}
             </Button>
           </div>
+          {!applicationReady ? (
+            <p className="mt-3 text-sm text-muted">
+              Application preparation is unavailable until this IPO has its exchange, price band,
+              lot size, issue size, and bidding dates.
+            </p>
+          ) : null}
           {categoriesQuery.isLoading ? (
             <p className="mt-4 text-sm text-muted" role="status" aria-busy="true">
               Loading category rules…
@@ -741,7 +751,12 @@ export function IpoFormPage({ editing = false }: { editing?: boolean }) {
     if (existing.data?.data && loadedRecordId.current !== existing.data.data.id) {
       loadedRecordId.current = existing.data.data.id;
       const { last_verified_at } = existing.data.data;
-      form.reset(formValuesFromRecord(blankIpo, existing.data.data));
+      form.reset(
+        formValuesFromRecord(blankIpo, {
+          ...existing.data.data,
+          symbol: existing.data.data.symbol ?? "",
+        }),
+      );
       setVerificationTime(last_verified_at ? toLocalDateTime(last_verified_at) : "");
     }
   }, [existing.data, form]);

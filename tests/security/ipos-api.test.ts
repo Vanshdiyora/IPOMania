@@ -353,7 +353,7 @@ describe("IPO management API", () => {
   it("copies shared IPO data and latest category rules into the user's IPO record", async () => {
     const completeCatalogRow = {
       ...catalogRow,
-      symbol: "CATALOG",
+      symbol: null,
       exchange: "NSE",
       issue_size: 100000,
       bidding_start_date: "2026-11-01",
@@ -418,7 +418,7 @@ describe("IPO management API", () => {
     expect(insertedIpo).toMatchObject({
       user_id: userId,
       source_catalog_id: ipoId,
-      symbol: "CATALOG",
+      symbol: null,
       data_source: "PUBLISHED_SOURCE",
     });
     expect(insertedCategories).toHaveLength(1);

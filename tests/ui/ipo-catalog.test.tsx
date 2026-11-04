@@ -245,24 +245,35 @@ describe("user IPO catalog", () => {
 
   it("shows shared category rules and prepares the IPO for application tracking", async () => {
     const personalIpoId = "99999999-9999-4999-8999-999999999999";
+    const readyCatalogIpo = {
+      ...catalogIpo,
+      symbol: "CATALOG",
+      exchange: "NSE",
+      issue_price_min: "100",
+      issue_price_max: "110",
+      lot_size: 10,
+      issue_size: "100000",
+      opening_date: "2026-11-01",
+      closing_date: "2026-11-03",
+    };
     apiRequestMock.mockImplementation(async (path: string, _session, init?: RequestInit) => {
-      if (path === `/api/ipos/catalog/${catalogIpo.id}`) return { data: catalogIpo };
-      if (path === `/api/ipos/catalog/${catalogIpo.id}/categories`) {
+      if (path === `/api/ipos/catalog/${readyCatalogIpo.id}`) return { data: readyCatalogIpo };
+      if (path === `/api/ipos/catalog/${readyCatalogIpo.id}/categories`) {
         return {
           data: {
             configurations: [{ id: "shared-retail-rule", category: "RETAIL", rule_version: 2 }],
           },
         };
       }
-      if (path === `/api/ipos/catalog/${catalogIpo.id}/import` && init?.method === "POST") {
-        return { data: { ...catalogIpo, id: personalIpoId } };
+      if (path === `/api/ipos/catalog/${readyCatalogIpo.id}/import` && init?.method === "POST") {
+        return { data: { ...readyCatalogIpo, id: personalIpoId } };
       }
       throw new Error(`Unexpected request: ${path}`);
     });
 
-    renderPage(`/ipos/catalog/${catalogIpo.id}`);
+    renderPage(`/ipos/catalog/${readyCatalogIpo.id}`);
     expect(
-      await screen.findByRole("heading", { name: catalogIpo.company_name }),
+      await screen.findByRole("heading", { name: readyCatalogIpo.company_name }),
     ).toBeInTheDocument();
     expect(screen.getByText("Admin-managed", { exact: true })).toBeInTheDocument();
     expect(await screen.findByText("Retail (rules v2)")).toBeInTheDocument();
@@ -273,10 +284,29 @@ describe("user IPO catalog", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Use for application" }));
     expect(await screen.findByText("Application form")).toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
-      `/api/ipos/catalog/${catalogIpo.id}/import`,
+      `/api/ipos/catalog/${readyCatalogIpo.id}/import`,
       expect.anything(),
       { method: "POST" },
     );
+  });
+
+  it("keeps application preparation unavailable until catalog issue data is complete", async () => {
+    apiRequestMock.mockImplementation(async (path: string) => {
+      if (path === `/api/ipos/catalog/${catalogIpo.id}`) return { data: catalogIpo };
+      if (path === `/api/ipos/catalog/${catalogIpo.id}/categories`) {
+        return { data: { configurations: [] } };
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    renderPage(`/ipos/catalog/${catalogIpo.id}`);
+
+    expect(await screen.findByRole("button", { name: "Use for application" })).toBeDisabled();
+    expect(
+      screen.getByText(
+        "Application preparation is unavailable until this IPO has its exchange, price band, lot size, issue size, and bidding dates.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("loads the admin editor for shared catalog category rules", async () => {
