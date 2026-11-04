@@ -1,10 +1,11 @@
 import { Hono, type Context } from "hono";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import type {
-  IpoCatalogCategoryConfiguration,
-  IpoCategoryConfiguration,
-  IpoCatalogRecord,
-  IpoRecord,
+import {
+  isIpoReadyForApplication,
+  type IpoCatalogCategoryConfiguration,
+  type IpoCategoryConfiguration,
+  type IpoCatalogRecord,
+  type IpoRecord,
 } from "@ipo-mania/shared";
 import {
   ipoCatalogListQuerySchema,
@@ -215,21 +216,7 @@ iposRoutes.post("/catalog/:ipoId/import", async (context) => {
     if (!catalogResult.data) return ipoNotFound(context);
     const row = catalogResult.data;
     const issue = catalogRecord(row);
-    if (
-      !issue.symbol ||
-      !issue.exchange ||
-      !issue.issue_price_min ||
-      !issue.issue_price_max ||
-      !issue.lot_size ||
-      !issue.issue_size ||
-      !issue.opening_date ||
-      !issue.closing_date ||
-      Number(issue.issue_price_min) <= 0 ||
-      Number(issue.issue_price_max) < Number(issue.issue_price_min) ||
-      !Number.isSafeInteger(issue.lot_size) ||
-      issue.lot_size <= 0 ||
-      Number(issue.issue_size) <= 0
-    ) {
+    if (!isIpoReadyForApplication(issue)) {
       return context.json(
         {
           error: {
@@ -247,7 +234,7 @@ iposRoutes.post("/catalog/:ipoId/import", async (context) => {
         user_id: userId,
         source_catalog_id: catalogIpoId,
         company_name: issue.company_name.trim(),
-        symbol: issue.symbol.trim().toUpperCase(),
+        symbol: issue.symbol?.trim().toUpperCase() ?? null,
         ipo_type: issue.ipo_type,
         exchange: issue.exchange.trim(),
         issue_price_min: issue.issue_price_min,
