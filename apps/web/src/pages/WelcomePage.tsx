@@ -92,7 +92,7 @@ export function WelcomePage() {
             <ul className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-muted">
               <li className="flex items-center gap-2">
                 <Lock size={16} className="text-action-emerald" aria-hidden="true" />
-                No broker credentials
+                No third-party credentials
               </li>
               <li className="flex items-center gap-2">
                 <Users size={16} className="text-action-emerald" aria-hidden="true" />

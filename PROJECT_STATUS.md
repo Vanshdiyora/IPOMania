@@ -201,7 +201,7 @@ contains direct two-user pgTAP coverage; that test was not run as part of Phase 
 checks pass. Repository-wide formatting and production-scale performance verification remain open.**
 
 The authenticated home dashboard now reports caller-owned IPO applications, account and IPO
-inventory, status/category/IPO/account/broker counts, trends, allotment/refund performance, recent
+inventory, status/category/IPO/account counts, trends, allotment/refund performance, recent
 activity, and upcoming closing dates. PostgreSQL aggregates the data through a bounded,
 invoker-rights RPC with explicit caller scoping and forced RLS. Capital-ledger totals remain
 separate by currency and event type; blocked capital, actual debits, allotment debits, refunds, and

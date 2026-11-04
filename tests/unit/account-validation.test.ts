@@ -7,8 +7,6 @@ import {
 
 const validAccount = {
   holder_name: "  Ananya Rao ",
-  broker_name: "  Example Securities ",
-  broker_code: "EX123",
   depository_type: "NSDL",
   masked_demat_identifier: "XXXX1234",
   masked_client_reference: "XXXX5678",
@@ -20,13 +18,12 @@ describe("demat account validation", () => {
   it("trims and accepts a valid account", () => {
     expect(dematAccountSchema.parse(validAccount)).toMatchObject({
       holder_name: "Ananya Rao",
-      broker_name: "Example Securities",
       account_status: "active",
     });
   });
 
   it.each([
-    ["blank broker", { ...validAccount, broker_name: "   " }],
+    ["unknown field", { ...validAccount, broker_name: "Example Securities" }],
     ["unknown depository", { ...validAccount, depository_type: "OTHER" }],
     ["missing masked identifier", { ...validAccount, masked_demat_identifier: "" }],
     ["unmasked identifier", { ...validAccount, masked_demat_identifier: "123456789" }],
@@ -36,7 +33,7 @@ describe("demat account validation", () => {
   });
 
   it("allows only valid fields in partial updates", () => {
-    expect(dematAccountUpdateSchema.safeParse({ broker_name: "Updated Broker" }).success).toBe(
+    expect(dematAccountUpdateSchema.safeParse({ holder_name: "Updated Holder" }).success).toBe(
       true,
     );
     expect(

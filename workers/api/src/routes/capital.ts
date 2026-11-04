@@ -47,7 +47,7 @@ const allotmentColumns =
 const ledgerColumns =
   "id, user_id, application_id, transaction_type, amount, currency, effective_at, created_at, source, audit_reference, idempotency_key, quantity, unit_price, adjustment_direction, blocked_consumed";
 const applicationRelation =
-  "application:applications!inner(id, ipo_id, demat_account_id, category, currency, created_at, ipo:ipos!applications_ipo_owner_fk(company_name, symbol), demat_account:demat_accounts!applications_account_owner_fk(id, holder_name, broker_name))";
+  "application:applications!inner(id, ipo_id, demat_account_id, category, currency, created_at, ipo:ipos!applications_ipo_owner_fk(company_name, symbol), demat_account:demat_accounts!applications_account_owner_fk(id, holder_name))";
 
 export const capitalRoutes = new Hono<CapitalContext>();
 for (const path of [
@@ -72,7 +72,7 @@ capitalRoutes.get("/capital/applications", async (context) => {
     .get("rlsSupabase")
     .from("applications")
     .select(
-      `${applicationColumns}, ipo:ipos!applications_ipo_owner_fk(company_name, symbol), demat_account:demat_accounts!applications_account_owner_fk(id, holder_name, broker_name)`,
+      `${applicationColumns}, ipo:ipos!applications_ipo_owner_fk(company_name, symbol), demat_account:demat_accounts!applications_account_owner_fk(id, holder_name)`,
       { count: "exact" },
     )
     .eq("user_id", userId)
@@ -82,8 +82,6 @@ capitalRoutes.get("/capital/applications", async (context) => {
   if (query.ipo_id) request = request.eq("ipo_id", query.ipo_id);
   if (query.account_id) request = request.eq("demat_account_id", query.account_id);
   if (query.category) request = request.eq("category", query.category);
-  if (query.broker)
-    request = request.ilike("demat_account.broker_name", `${escapeLike(query.broker)}%`);
   request = applyDateFilters(request, query.date_from, query.date_to);
   const { data, error, count } = await request.range(
     (query.page - 1) * query.page_size,
@@ -105,7 +103,7 @@ capitalRoutes.get("/capital/applications/:applicationId", async (context) => {
     .get("rlsSupabase")
     .from("applications")
     .select(
-      `${applicationColumns}, ipo:ipos!applications_ipo_owner_fk(company_name, symbol), demat_account:demat_accounts!applications_account_owner_fk(id, holder_name, broker_name)`,
+      `${applicationColumns}, ipo:ipos!applications_ipo_owner_fk(company_name, symbol), demat_account:demat_accounts!applications_account_owner_fk(id, holder_name)`,
     )
     .eq("id", applicationId)
     .eq("user_id", context.get("authenticatedUser").id)
@@ -315,7 +313,7 @@ capitalRoutes.get("/capital/summary", async (context) => {
       let request = supabase
         .from("applications")
         .select(
-          "id, application_amount, currency, ipo:ipos!applications_ipo_owner_fk(company_name), demat_account:demat_accounts!applications_account_owner_fk(broker_name)",
+          "id, application_amount, currency, ipo:ipos!applications_ipo_owner_fk(company_name)",
         )
         .eq("user_id", userId)
         .order("created_at", { ascending: true });
@@ -331,7 +329,7 @@ capitalRoutes.get("/capital/summary", async (context) => {
         supabase
           .from("mandates")
           .select(
-            "mandate_amount, mandate_status, application:applications!inner(currency, ipo_id, demat_account_id, category, demat_account:demat_accounts!applications_account_owner_fk(broker_name))",
+            "mandate_amount, mandate_status, application:applications!inner(currency, ipo_id, demat_account_id, category)",
           )
           .eq("user_id", userId)
           .order("created_at", { ascending: true }),
@@ -347,7 +345,7 @@ capitalRoutes.get("/capital/summary", async (context) => {
         supabase
           .from("allotments")
           .select(
-            "application_id, allotment_status, allotted_shares, allotment_price, refund_amount, application:applications!inner(currency, ipo_id, demat_account_id, category, demat_account:demat_accounts!applications_account_owner_fk(broker_name))",
+            "application_id, allotment_status, allotted_shares, allotment_price, refund_amount, application:applications!inner(currency, ipo_id, demat_account_id, category)",
           )
           .eq("user_id", userId)
           .order("created_at", { ascending: true }),
@@ -358,7 +356,7 @@ capitalRoutes.get("/capital/summary", async (context) => {
       let request = supabase
         .from("capital_ledger")
         .select(
-          "application_id, transaction_type, amount, currency, quantity, unit_price, blocked_consumed, effective_at, created_at, adjustment_direction, application:applications(ipo_id, demat_account_id, category, demat_account:demat_accounts!applications_account_owner_fk(broker_name))",
+          "application_id, transaction_type, amount, currency, quantity, unit_price, blocked_consumed, effective_at, created_at, adjustment_direction, application:applications(ipo_id, demat_account_id, category)",
         )
         .eq("user_id", userId)
         .order("effective_at", { ascending: true });
@@ -526,7 +524,6 @@ function applyManagementFilters<T>(
   query: {
     ipo_id?: string;
     account_id?: string;
-    broker?: string;
     category?: string;
     date_from?: string;
     date_to?: string;
@@ -542,11 +539,6 @@ function applyManagementFilters<T>(
   if (query.ipo_id) filtered = filtered.eq("application.ipo_id", query.ipo_id) as typeof filtered;
   if (query.account_id)
     filtered = filtered.eq("application.demat_account_id", query.account_id) as typeof filtered;
-  if (query.broker)
-    filtered = filtered.ilike(
-      "application.demat_account.broker_name",
-      `${escapeLike(query.broker)}%`,
-    ) as typeof filtered;
   if (query.category)
     filtered = filtered.eq("application.category", query.category) as typeof filtered;
   if (query.date_from)
@@ -572,7 +564,6 @@ function applyApplicationFilters<T>(
   query: {
     ipo_id?: string;
     account_id?: string;
-    broker?: string;
     category?: string;
     date_from?: string;
     date_to?: string;
@@ -587,11 +578,6 @@ function applyApplicationFilters<T>(
   if (query.ipo_id) filtered = filtered.eq("ipo_id", query.ipo_id) as typeof filtered;
   if (query.account_id)
     filtered = filtered.eq("demat_account_id", query.account_id) as typeof filtered;
-  if (query.broker)
-    filtered = filtered.ilike(
-      "demat_account.broker_name",
-      `${escapeLike(query.broker)}%`,
-    ) as typeof filtered;
   if (query.category) filtered = filtered.eq("category", query.category) as typeof filtered;
   if (query.date_from)
     filtered = filtered.gte("created_at", `${query.date_from}T00:00:00.000Z`) as typeof filtered;
@@ -790,10 +776,6 @@ function relatedCurrency(application: { currency: string } | Array<{ currency: s
   const currency = Array.isArray(application) ? application[0]?.currency : application.currency;
   if (!currency) throw new Error("Capital summary is missing an application currency.");
   return currency;
-}
-
-function escapeLike(value: string) {
-  return value.replace(/[\\%_]/g, "\\$&");
 }
 
 function isUuid(value: string): boolean {

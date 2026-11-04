@@ -129,7 +129,7 @@ function installMock(
                 updated_at: "2026-10-31T00:00:00.000Z",
                 archived_at: null,
                 ipos: { symbol: "TEST", company_name: "Test IPO" },
-                demat_accounts: { masked_demat_identifier: "XXXX1234", broker_name: "Test Broker" },
+                demat_accounts: { masked_demat_identifier: "XXXX1234" },
                 ipo_categories: { category: "RETAIL" },
               },
             ]),
@@ -232,11 +232,11 @@ describe("application API", () => {
     }
   });
 
-  it("filters parent application rows for IPO name and broker in list and export", async () => {
+  it("filters parent application rows for IPO name in list and export", async () => {
     const requests = installMock({ exportRows: true });
     for (const path of [
-      "/api/applications?ipo_search=Example&broker=Broker",
-      "/api/applications/export?ipo_search=Example&broker=Broker",
+      "/api/applications?ipo_search=Example",
+      "/api/applications/export?ipo_search=Example",
     ]) {
       const response = await createApp().request(
         path,
@@ -254,9 +254,9 @@ describe("application API", () => {
     for (const request of applicationReads) {
       const url = new URL(request.url);
       expect(url.searchParams.get("select")).toContain("ipos!inner(");
-      expect(url.searchParams.get("select")).toContain("demat_accounts!inner(");
+      expect(url.searchParams.get("select")).toContain("demat_accounts(");
       expect(url.searchParams.get("ipos.or")).toContain("company_name.ilike");
-      expect(url.searchParams.get("demat_accounts.broker_name")).toContain("ilike.");
+      expect(url.searchParams.get("demat_accounts.broker_name")).toBeNull();
     }
   });
 

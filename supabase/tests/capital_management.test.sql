@@ -58,18 +58,18 @@ values
   );
 
 insert into public.demat_accounts (
-  id, user_id, holder_name, broker_name, depository_type, masked_demat_identifier
+  id, user_id, holder_name, depository_type, masked_demat_identifier
 )
 values
   (
     '78787878-7878-4787-8787-787878787878',
     '12121212-1212-4121-8121-121212121212',
-    'Capital Holder A', 'Test Broker', 'NSDL', 'XXXXCAPA'
+    'Capital Holder A', 'NSDL', 'XXXXCAPA'
   ),
   (
     '89898989-8989-4898-8989-898989898989',
     '23232323-2323-4232-8232-232323232323',
-    'Capital Holder B', 'Test Broker', 'NSDL', 'XXXXCAPB'
+    'Capital Holder B', 'NSDL', 'XXXXCAPB'
   );
 
 insert into public.ipo_quota_calculations (

@@ -178,7 +178,7 @@ applicationsRoutes.get("/", async (context) => {
   let query = supabase
     .from("applications")
     .select(
-      `${applicationColumns}, ${filters.ipo_search ? "ipos!inner" : "ipos"}(company_name, symbol), ${filters.broker ? "demat_accounts!inner" : "demat_accounts"}(holder_name, broker_name), ${applicationCategoryEmbed}`,
+      `${applicationColumns}, ${filters.ipo_search ? "ipos!inner" : "ipos"}(company_name, symbol), demat_accounts(holder_name), ${applicationCategoryEmbed}`,
       { count: "exact" },
     )
     .eq("user_id", userId)
@@ -196,8 +196,6 @@ applicationsRoutes.get("/", async (context) => {
   if (filters.submission_from) query = query.gte("submission_date", filters.submission_from);
   if (filters.submission_to)
     query = query.lte("submission_date", `${filters.submission_to}T23:59:59.999Z`);
-  if (filters.broker)
-    query = query.ilike("demat_accounts.broker_name", `${escapeLike(filters.broker)}%`);
   if (filters.search) {
     const search = escapeOrFilter(filters.search);
     query = query.or(`application_number.ilike.%${search}%,external_reference.ilike.%${search}%`);
@@ -234,7 +232,7 @@ applicationsRoutes.get("/export", async (context) => {
   let query = supabase
     .from("applications")
     .select(
-      `${applicationColumns}, ${filters.ipo_search ? "ipos!inner" : "ipos"}(symbol, company_name), ${filters.broker ? "demat_accounts!inner" : "demat_accounts"}(masked_demat_identifier, broker_name), ${applicationCategoryEmbed}`,
+      `${applicationColumns}, ${filters.ipo_search ? "ipos!inner" : "ipos"}(symbol, company_name), demat_accounts(masked_demat_identifier), ${applicationCategoryEmbed}`,
       { count: "exact" },
     )
     .eq("user_id", context.get("authenticatedUser").id)
@@ -251,8 +249,6 @@ applicationsRoutes.get("/export", async (context) => {
   if (filters.submission_from) query = query.gte("submission_date", filters.submission_from);
   if (filters.submission_to)
     query = query.lte("submission_date", `${filters.submission_to}T23:59:59.999Z`);
-  if (filters.broker)
-    query = query.ilike("demat_accounts.broker_name", `${escapeLike(filters.broker)}%`);
   if (filters.search) {
     const search = escapeOrFilter(filters.search);
     query = query.or(`application_number.ilike.%${search}%,external_reference.ilike.%${search}%`);
@@ -284,7 +280,6 @@ applicationsRoutes.get("/export", async (context) => {
     "IPO symbol",
     "Company",
     "Demat account",
-    "Broker",
     "Category",
     "Lots",
     "Total shares",
@@ -302,14 +297,12 @@ applicationsRoutes.get("/export", async (context) => {
     const ipo = row.ipos as { symbol?: string; company_name?: string } | null;
     const account = row.demat_accounts as {
       masked_demat_identifier?: string;
-      broker_name?: string;
     } | null;
     const category = row.ipo_categories as { category?: string } | null;
     return [
       ipo?.symbol,
       ipo?.company_name,
       account?.masked_demat_identifier,
-      account?.broker_name,
       category?.category ?? row.category_code,
       row.lots,
       row.total_shares,
@@ -477,7 +470,7 @@ applicationsRoutes.get("/:applicationId", async (context) => {
     .get("rlsSupabase")
     .from("applications")
     .select(
-      `${applicationColumns}, ipos(company_name, symbol), demat_accounts(holder_name, broker_name, masked_demat_identifier), ${applicationCategoryEmbed}`,
+      `${applicationColumns}, ipos(company_name, symbol), demat_accounts(holder_name, masked_demat_identifier), ${applicationCategoryEmbed}`,
     )
     .eq("id", applicationId)
     .eq("user_id", context.get("authenticatedUser").id)
@@ -1250,10 +1243,6 @@ function databaseError(context: RouteContext, error: { code?: string; message: s
     );
   }
   throw error;
-}
-
-function escapeLike(value: string) {
-  return value.replace(/[\\%_]/g, "\\$&");
 }
 
 function escapeOrFilter(value: string) {

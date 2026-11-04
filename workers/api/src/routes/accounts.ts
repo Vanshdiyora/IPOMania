@@ -15,7 +15,7 @@ const maxUploadBytes = 5 * 1024 * 1024;
 const maxImportRows = 500;
 const xlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const accountColumns =
-  "id, user_id, holder_name, broker_name, broker_code, depository_type, masked_demat_identifier, masked_client_reference, account_status, notes, created_at, updated_at, archived_at";
+  "id, user_id, holder_name, depository_type, masked_demat_identifier, masked_client_reference, account_status, notes, created_at, updated_at, archived_at";
 
 type AccountContext = {
   Bindings: EnvironmentBindings;
@@ -26,8 +26,6 @@ type AccountRouteContext = Context<AccountContext>;
 type ColumnMapping = Partial<
   Record<
     | "holder_name"
-    | "broker_name"
-    | "broker_code"
     | "depository_type"
     | "masked_demat_identifier"
     | "masked_client_reference"
@@ -70,8 +68,6 @@ accountsRoutes.get("/", async (context) => {
   if (query.holder_name) {
     accountsQuery = accountsQuery.ilike("holder_name", `${escapeLike(query.holder_name)}%`);
   }
-  if (query.broker)
-    accountsQuery = accountsQuery.ilike("broker_name", `${escapeLike(query.broker)}%`);
   if (query.depository) accountsQuery = accountsQuery.eq("depository_type", query.depository);
   if (query.status) accountsQuery = accountsQuery.eq("account_status", query.status);
   if (query.created_from) accountsQuery = accountsQuery.gte("created_at", query.created_from);
@@ -419,15 +415,9 @@ async function previewImport(context: AccountRouteContext) {
       400,
     );
   }
-  const required = [
-    "holder_name",
-    "broker_name",
-    "depository_type",
-    "masked_demat_identifier",
-  ] as const;
+  const required = ["holder_name", "depository_type", "masked_demat_identifier"] as const;
   const allowedTargets = new Set([
     ...required,
-    "broker_code",
     "masked_client_reference",
     "account_status",
     "notes",
@@ -514,7 +504,6 @@ async function previewImport(context: AccountRouteContext) {
       row_number,
       record: {
         ...record,
-        broker_code: record.broker_code ?? null,
         masked_client_reference: record.masked_client_reference ?? null,
         notes: record.notes ?? null,
       },

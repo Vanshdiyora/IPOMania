@@ -1,6 +1,6 @@
 # Account database schema
 
-Migration: `supabase/migrations/20261031120000_demat_accounts_rls.sql`.
+Current shape: `supabase/migrations/20261104180000_remove_broker_fields.sql`.
 
 ## `public.demat_accounts`
 
@@ -8,8 +8,6 @@ The table stores one user's masked demat account record. `id` is a generated UUI
 `user_id` is non-null and references `auth.users(id) ON DELETE CASCADE`. Fields and constraints:
 
 - `holder_name`: trimmed non-empty text, maximum 160 characters.
-- `broker_name`: trimmed non-empty text, maximum 120 characters.
-- `broker_code`: optional, maximum 40 characters.
 - `depository_type`: `NSDL` or `CDSL`.
 - `masked_demat_identifier`: required printable masked value containing `X` or `*`, 3–80
   characters.
@@ -20,7 +18,7 @@ The table stores one user's masked demat account record. `id` is a generated UUI
 - `created_at`, trigger-maintained `updated_at`, and nullable `archived_at`.
 
 A unique index on `(user_id, depository_type, masked_demat_identifier_normalized)` prevents
-duplicate records, including archived ones. Owner/date, broker, status/depository/archive, and
+duplicate records, including archived ones. Owner/date, status/depository/archive, and
 trigram search indexes support the API filters.
 
 ## Account count

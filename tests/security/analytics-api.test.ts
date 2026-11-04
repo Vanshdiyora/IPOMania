@@ -32,7 +32,6 @@ const analytics = {
   ],
   applications_by_category: [{ category: "RETAIL", count: 1 }],
   applications_by_account: [],
-  applications_by_broker: [],
   monthly_application_trends: [],
   capital_utilization_trends: [],
   capital_event_totals: [

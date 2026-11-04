@@ -20,8 +20,6 @@ const bindings = {
 } as const;
 const account = {
   holder_name: "Account Owner",
-  broker_name: "Example Broker",
-  broker_code: null,
   depository_type: "NSDL",
   masked_demat_identifier: "XXXX1234",
   masked_client_reference: null,
@@ -77,7 +75,7 @@ describe("demat account API", () => {
   it.each([
     ["forged owner", { ...account, user_id: otherUserId }],
     ["unsupported depository", { ...account, depository_type: "OTHER" }],
-    ["blank broker", { ...account, broker_name: "  " }],
+    ["removed broker field", { ...account, broker_name: "Example Broker" }],
   ])("rejects %s before touching account storage", async (_case, payload) => {
     const requests = installSupabaseMock();
     const response = await createApp().request(
@@ -172,7 +170,7 @@ describe("demat account API", () => {
       });
     });
     const response = await createApp().request(
-      "/api/accounts?page=2&pageSize=50&holder_name=Ananya&broker=Example&depository=NSDL&status=active",
+      "/api/accounts?page=2&pageSize=50&holder_name=Ananya&depository=NSDL&status=active",
       { headers: bearerHeaders() },
       bindings,
     );
@@ -182,7 +180,7 @@ describe("demat account API", () => {
     expect(listRequest).toBeDefined();
     const query = new URL(listRequest!.url).searchParams;
     expect(query.get("holder_name")).toBe("ilike.Ananya%");
-    expect(query.get("broker_name")).toBe("ilike.Example%");
+    expect(query.get("broker_name")).toBeNull();
     expect(query.get("depository_type")).toBe("eq.NSDL");
     expect(query.get("account_status")).toBe("eq.active");
     expect(query.get("offset")).toBe("50");

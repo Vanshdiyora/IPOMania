@@ -42,8 +42,8 @@ type RelatedApplication = CapitalApplication & {
     | Pick<IpoRecord, "company_name" | "symbol">
     | Array<Pick<IpoRecord, "company_name" | "symbol">>;
   demat_account?:
-    | Pick<DematAccount, "id" | "holder_name" | "broker_name">
-    | Array<Pick<DematAccount, "id" | "holder_name" | "broker_name">>;
+    | Pick<DematAccount, "id" | "holder_name">
+    | Array<Pick<DematAccount, "id" | "holder_name">>;
 };
 type MandateDetail = IpoMandate & { application?: RelatedApplication | RelatedApplication[] };
 type AllotmentDetail = IpoAllotment & { application?: RelatedApplication | RelatedApplication[] };
@@ -63,7 +63,6 @@ type Pagination = { page: number; page_size: number; total: number; total_pages:
 type Filters = {
   ipo_id: string;
   account_id: string;
-  broker: string;
   category: string;
   date_from: string;
   date_to: string;
@@ -72,7 +71,6 @@ type Filters = {
 const blankFilters: Filters = {
   ipo_id: "",
   account_id: "",
-  broker: "",
   category: "",
   date_from: "",
   date_to: "",
@@ -1408,19 +1406,10 @@ function FinancialFilters({
             </option>
             {(accounts.data?.data.accounts ?? []).map((account) => (
               <option key={account.id} value={account.id}>
-                {account.holder_name} · {account.broker_name}
+                {account.holder_name}
               </option>
             ))}
           </CustomSelect>
-        </label>
-        <label className="text-sm font-semibold text-ink">
-          Broker
-          <input
-            className={inputClass}
-            value={filters.broker}
-            placeholder="Filter by broker name..."
-            onChange={(event) => onChange({ ...filters, broker: event.target.value })}
-          />
         </label>
         <label className="text-sm font-semibold text-ink">
           Category
@@ -1492,7 +1481,7 @@ function RecordContext({ application }: { application?: RelatedApplication }) {
       <h2 className="text-lg font-bold text-ink">Application reference</h2>
       <dl className="mt-3 grid gap-3 sm:grid-cols-2">
         <Value label="IPO" value={applicationTitle(application)} />
-        <Value label="Account / broker" value={accountTitle(application)} />
+        <Value label="Account" value={accountTitle(application)} />
         <Value
           label="Category / rules"
           value={`${application.category} · v${application.rule_version}`}
@@ -1612,7 +1601,7 @@ function accountTitle(application?: RelatedApplication): string {
   const account = Array.isArray(application?.demat_account)
     ? application.demat_account[0]
     : application?.demat_account;
-  return account ? `${account.holder_name} · ${account.broker_name}` : "Account unavailable";
+  return account ? account.holder_name : "Account unavailable";
 }
 
 function queryString(filters: Filters, page = 1): string {

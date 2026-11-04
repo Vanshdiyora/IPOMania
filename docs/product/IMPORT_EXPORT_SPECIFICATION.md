@@ -62,6 +62,6 @@ and create a new preview. The original preview remains auditable and is not chan
 
 The authenticated CSV export uses the active application filters, is capped at 50,000 rows per
 request, and quotes fields. Formula-leading values are prefixed to avoid spreadsheet formula
-execution. Export includes IPO/company, masked account, broker, category, lots/shares/amount,
+execution. Export includes IPO/company, masked account, category, lots/shares/amount,
 external/application references, date, three independent statuses, rule version, and creation
 time. It does not expose unmasked account credentials.

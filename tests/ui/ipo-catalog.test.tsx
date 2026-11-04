@@ -267,6 +267,22 @@ describe("user IPO catalog", () => {
           },
         };
       }
+      if (path.startsWith("/api/accounts?")) {
+        return {
+          data: {
+            accounts: [],
+            pagination: { page: 1, pageSize: 100, total: 0, totalPages: 1 },
+          },
+        };
+      }
+      if (path === "/api/ipos?page=1&page_size=100&source=personal") {
+        return {
+          data: {
+            ipos: [],
+            pagination: { page: 1, page_size: 100, total: 0, total_pages: 1 },
+          },
+        };
+      }
       if (path === `/api/ipos/catalog/${readyCatalogIpo.id}/import` && init?.method === "POST") {
         return { data: { ...readyCatalogIpo, id: personalIpoId } };
       }
@@ -284,6 +300,97 @@ describe("user IPO catalog", () => {
     expect(screen.queryByRole("link", { name: "Configure categories" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "Use for application" }));
+    expect(await screen.findByText("Application form")).toBeInTheDocument();
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      `/api/ipos/catalog/${readyCatalogIpo.id}/import`,
+      expect.anything(),
+      { method: "POST" },
+    );
+  });
+
+  it("lists catalog-IPO accounts with their category and applied state", async () => {
+    const accountId = "66666666-6666-4666-8666-666666666666";
+    const otherAccountId = "77777777-7777-4777-8777-777777777777";
+    const personalIpoId = "99999999-9999-4999-8999-999999999999";
+    const readyCatalogIpo = {
+      ...catalogIpo,
+      symbol: "CATALOG",
+      exchange: "NSE",
+      issue_price_min: "100",
+      issue_price_max: "110",
+      lot_size: 10,
+      issue_size: "100000",
+      opening_date: "2026-11-01",
+      closing_date: "2026-11-03",
+    };
+    apiRequestMock.mockImplementation(async (path: string, _session, init?: RequestInit) => {
+      if (path === `/api/ipos/catalog/${readyCatalogIpo.id}`) return { data: readyCatalogIpo };
+      if (path === `/api/ipos/catalog/${readyCatalogIpo.id}/categories`) {
+        return { data: { configurations: [] } };
+      }
+      if (path.startsWith("/api/accounts?")) {
+        return {
+          data: {
+            accounts: [
+              {
+                id: accountId,
+                holder_name: "Applied Holder",
+                account_status: "active",
+                archived_at: null,
+              },
+              {
+                id: otherAccountId,
+                holder_name: "Ready Holder",
+                account_status: "active",
+                archived_at: null,
+              },
+            ],
+            pagination: { page: 1, pageSize: 100, total: 2, totalPages: 1 },
+          },
+        };
+      }
+      if (path === "/api/ipos?page=1&page_size=100&source=personal") {
+        return {
+          data: {
+            ipos: [
+              { ...readyCatalogIpo, id: personalIpoId, source_catalog_id: readyCatalogIpo.id },
+            ],
+            pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 },
+          },
+        };
+      }
+      if (path === `/api/applications?ipo_id=${personalIpoId}&page=1&page_size=100`) {
+        return {
+          data: {
+            applications: [
+              {
+                id: "55555555-5555-4555-8555-555555555555",
+                demat_account_id: accountId,
+                category_code: "RETAIL",
+                application_status: "DRAFT",
+              },
+            ],
+            pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 },
+          },
+        };
+      }
+      if (path === `/api/ipos/catalog/${readyCatalogIpo.id}/import` && init?.method === "POST") {
+        return { data: { ...readyCatalogIpo, id: personalIpoId } };
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    renderPage(`/ipos/catalog/${readyCatalogIpo.id}`);
+
+    expect(
+      await screen.findByRole("heading", { name: "Demat account applications" }),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole("row", { name: /Applied Holder/ })).toHaveTextContent("Retail");
+    expect(screen.getByRole("row", { name: /Applied Holder/ })).toHaveTextContent("Applied");
+    expect(screen.getByRole("row", { name: /Ready Holder/ })).toHaveTextContent("Not Applied");
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
     expect(await screen.findByText("Application form")).toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
       `/api/ipos/catalog/${readyCatalogIpo.id}/import`,
@@ -340,7 +447,6 @@ describe("user IPO catalog", () => {
               {
                 id: "66666666-6666-4666-8666-666666666666",
                 holder_name: "Test Holder",
-                broker_name: "Test Broker",
                 account_status: "active",
                 archived_at: null,
               },
@@ -364,7 +470,7 @@ describe("user IPO catalog", () => {
                 submission_date: "2026-11-02T10:00:00.000Z",
                 created_at: "2026-11-02T10:00:00.000Z",
                 application_status: "SUBMITTED",
-                demat_accounts: { holder_name: "Test Holder", broker_name: "Test Broker" },
+                demat_accounts: { holder_name: "Test Holder" },
                 ipo_categories: { category: "RETAIL" },
                 calculation_snapshot: {
                   calculation_input: { price: "200.00", price_type: "BID" },
@@ -407,7 +513,6 @@ describe("user IPO catalog", () => {
               {
                 id: accountId,
                 holder_name: "Ready Holder",
-                broker_name: "Quick Broker",
                 account_status: "active",
                 archived_at: null,
               },

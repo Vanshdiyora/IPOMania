@@ -23,11 +23,11 @@ Sidebar dashboard links match their exact routes, so a nested list page highligh
 Account and application lists retain filter and page state in URL parameters. Their detail pages
 use the originating list URL when navigating back, with a safe parent fallback for direct links.
 The application list has an IPO name search toolbar, active filter chips, and a mobile-friendly
-filter drawer with searchable IPO, account, broker, category, status, and date controls. Applied
+filter drawer with searchable IPO, account, category, status, and date controls. Applied
 filters drive both the paginated list and CSV export.
 The application table keeps IPO/company search visible while its advanced filters use a reusable,
 focus-managed side drawer with separate draft and applied URL-backed state. Searchable selects use
-the user's actual IPO, account, broker, category, and status records; list and CSV endpoints apply
+the user's actual IPO, account, category, and status records; list and CSV endpoints apply
 the same server-validated criteria, including multi-IPO selection.
 
 Protected IPO list and opening-date calendar routes show the shared admin-managed catalog by

@@ -94,8 +94,6 @@ type ValidAccountValues = z.output<typeof dematAccountSchema>;
 
 const blankAccount: AccountValues = {
   holder_name: "",
-  broker_name: "",
-  broker_code: null,
   depository_type: "NSDL",
   masked_demat_identifier: "",
   masked_client_reference: null,
@@ -111,7 +109,6 @@ const accountColumns: ColumnDef<DematAccount>[] = [
       <AccountDetailLink account={row.original}>{row.original.holder_name}</AccountDetailLink>
     ),
   },
-  { accessorKey: "broker_name", header: "Broker" },
   { accessorKey: "depository_type", header: "Depository" },
   { accessorKey: "masked_demat_identifier", header: "Masked ID" },
   {
@@ -275,14 +272,12 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
   const pageValue = Number(listParams.get("page"));
   const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
   const holderName = listParams.get("holder_name") ?? "";
-  const broker = listParams.get("broker") ?? "";
   const depository = listParams.get("depository") ?? "";
   const status = listParams.get("status") ?? "";
   const archived = listParams.get("archived") ?? "false";
   const createdFrom = listParams.get("created_from") ?? "";
   const createdTo = listParams.get("created_to") ?? "";
   const [draftFilters, setDraftFilters] = useState(() => ({
-    broker,
     depository,
     status,
     archived,
@@ -314,7 +309,6 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
     pageSize: "50",
     archived,
     ...(holderName ? { holder_name: holderName } : {}),
-    ...(broker ? { broker } : {}),
     ...(depository ? { depository } : {}),
     ...(status ? { status } : {}),
     ...(createdFrom ? { created_from: `${createdFrom}T00:00:00.000Z` } : {}),
@@ -345,14 +339,9 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
     setListParams({}, { replace: true });
   }
 
-  const filterCount = [
-    broker,
-    depository,
-    status,
-    archived !== "false",
-    createdFrom,
-    createdTo,
-  ].filter(Boolean).length;
+  const filterCount = [depository, status, archived !== "false", createdFrom, createdTo].filter(
+    Boolean,
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -375,7 +364,7 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
               activeFilterCount={filterCount}
               onSearchChange={(value) => updateFilter("holder_name", value)}
               onOpenFilters={() => {
-                setDraftFilters({ broker, depository, status, archived, createdFrom, createdTo });
+                setDraftFilters({ depository, status, archived, createdFrom, createdTo });
                 setFiltersOpen(true);
               }}
               onClearFilters={resetFilters}
@@ -394,7 +383,7 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
           activeFilterCount={filterCount}
           onSearchChange={(value) => updateFilter("holder_name", value)}
           onOpenFilters={() => {
-            setDraftFilters({ broker, depository, status, archived, createdFrom, createdTo });
+            setDraftFilters({ depository, status, archived, createdFrom, createdTo });
             setFiltersOpen(true);
           }}
           onClearFilters={resetFilters}
@@ -407,7 +396,6 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
         onClose={() => setFiltersOpen(false)}
         onReset={() => {
           setDraftFilters({
-            broker: "",
             depository: "",
             status: "",
             archived: "false",
@@ -419,10 +407,9 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
           setListParams(
             (previous) => {
               const next = new URLSearchParams(previous);
-              ["broker", "depository", "status", "created_from", "created_to"].forEach((key) => {
+              ["depository", "status", "created_from", "created_to"].forEach((key) => {
                 next.delete(key);
               });
-              if (draftFilters.broker) next.set("broker", draftFilters.broker);
               if (draftFilters.depository) next.set("depository", draftFilters.depository);
               if (draftFilters.status) next.set("status", draftFilters.status);
               if (draftFilters.createdFrom) next.set("created_from", draftFilters.createdFrom);
@@ -439,11 +426,6 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
       >
         <FilterSection title="Account">
           <div className="grid gap-4">
-            <FilterInput
-              label="Broker"
-              value={draftFilters.broker}
-              onChange={(broker) => setDraftFilters((current) => ({ ...current, broker }))}
-            />
             <label className="block text-sm font-semibold text-ink">
               Depository
               <CustomSelect
@@ -520,7 +502,6 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
               <colgroup>
                 {[
                   ["holder_name", "16%"],
-                  ["broker_name", "14%"],
                   ["depository_type", "12%"],
                   ["masked_demat_identifier", "15%"],
                   ["account_status", "10%"],
@@ -641,8 +622,6 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
     if (!account || isDirty) return;
     reset({
       holder_name: account.holder_name,
-      broker_name: account.broker_name,
-      broker_code: account.broker_code,
       depository_type: account.depository_type,
       masked_demat_identifier: account.masked_demat_identifier,
       masked_client_reference: account.masked_client_reference,
@@ -663,7 +642,6 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
         method: editing ? "PATCH" : "POST",
         body: JSON.stringify({
           ...values,
-          broker_code: values.broker_code || null,
           masked_client_reference: values.masked_client_reference || null,
           notes: values.notes || null,
         }),
@@ -717,17 +695,6 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
               error={errors.holder_name?.message}
               required
               {...register("holder_name")}
-            />
-            <FormInput
-              label="Broker name"
-              error={errors.broker_name?.message}
-              required
-              {...register("broker_name")}
-            />
-            <FormInput
-              label="Broker code (optional)"
-              error={errors.broker_code?.message}
-              {...register("broker_code")}
             />
             <Controller
               control={control}
@@ -846,8 +813,6 @@ export function AccountDetailsPage() {
         <Card>
           <dl className="grid gap-5 sm:grid-cols-2">
             <DetailItem label="Account holder" value={account.holder_name} />
-            <DetailItem label="Broker" value={account.broker_name} />
-            <DetailItem label="Broker code" value={account.broker_code ?? "Not provided"} />
             <DetailItem label="Depository" value={account.depository_type} />
             <DetailItem label="Masked demat identifier" value={account.masked_demat_identifier} />
             <DetailItem
@@ -1143,7 +1108,6 @@ export function AccountImportDialog({ onClose }: { onClose: () => void }) {
                       <tr className="border-b border-border">
                         <th className="p-3">Row</th>
                         <th className="p-3">Holder</th>
-                        <th className="p-3">Broker</th>
                         <th className="p-3">Depository</th>
                         <th className="p-3">Masked ID</th>
                         <th className="p-3">Result</th>
@@ -1155,7 +1119,6 @@ export function AccountImportDialog({ onClose }: { onClose: () => void }) {
                         <tr key={row.row_number} className="border-b border-border align-top">
                           <td className="p-3">{row.row_number}</td>
                           <td className="p-3">{row.record.holder_name}</td>
-                          <td className="p-3">{row.record.broker_name}</td>
                           <td className="p-3">{row.record.depository_type}</td>
                           <td className="p-3">{row.record.masked_demat_identifier}</td>
                           <td className="p-3 capitalize">{row.row_status}</td>
@@ -1424,7 +1387,6 @@ function MobileAccountCard({ account }: { account: DematAccount }) {
             </AccountDetailLink>
             <StatusBadge status={status} />
           </div>
-          <p className="mt-1 truncate text-sm font-medium text-muted">{account.broker_name}</p>
         </div>
       </div>
 
@@ -1456,28 +1418,6 @@ function AccountCardDetail({
       <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">{label}</dt>
       <dd className="mt-1 break-words text-sm font-semibold text-ink">{value}</dd>
     </div>
-  );
-}
-
-function FilterInput({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="block text-base font-semibold text-ink">
-      {label}
-      <input
-        className={inputClass}
-        value={value}
-        placeholder={`Search ${label.toLowerCase()}...`}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
   );
 }
 
@@ -1531,8 +1471,6 @@ const secondaryLinkClass =
 
 const importFields = [
   { key: "holder_name", label: "Holder name", required: true },
-  { key: "broker_name", label: "Broker name", required: true },
-  { key: "broker_code", label: "Broker code", required: false },
   { key: "depository_type", label: "Depository", required: true },
   { key: "masked_demat_identifier", label: "Masked demat identifier", required: true },
   { key: "masked_client_reference", label: "Masked client reference", required: false },

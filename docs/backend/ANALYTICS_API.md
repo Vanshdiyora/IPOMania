@@ -22,7 +22,7 @@ details, and upcoming dates. Personal upcoming IPOs are selected from the caller
 whose status is `UPCOMING` or `OPEN` and whose closing date has not passed. Shared upcoming IPOs
 come from active catalog records with a published, unexpired closing date.
 
-The IPO, account, and broker charts return the top `limit` groups. Recent activity and upcoming IPO
+The IPO and account charts return the top `limit` groups. Recent activity and upcoming IPO
 lists are bounded by the same limit. The dashboard loads personal and shared IPO filter options
 from their respective paginated endpoints, without downloading records for aggregation.
 

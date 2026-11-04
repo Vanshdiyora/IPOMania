@@ -75,8 +75,6 @@ export const accountStatusSchema = z.enum(["active", "inactive", "closed"]);
 export const dematAccountSchema = z
   .object({
     holder_name: z.string().trim().min(1).max(160),
-    broker_name: z.string().trim().min(1).max(120),
-    broker_code: z.string().trim().min(1).max(40).nullable().optional(),
     depository_type: depositoryTypeSchema,
     masked_demat_identifier: z
       .string()
@@ -104,7 +102,6 @@ export const accountListQuerySchema = z
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(25),
     holder_name: z.string().trim().max(160).optional(),
-    broker: z.string().trim().max(120).optional(),
     depository: depositoryTypeSchema.optional(),
     status: accountStatusSchema.optional(),
     created_from: z.iso.datetime().optional(),
@@ -627,7 +624,6 @@ function validateAllotmentShape(
 const managementFilterFields = {
   ipo_id: z.uuid().optional(),
   account_id: z.uuid().optional(),
-  broker: z.string().trim().min(1).max(120).optional(),
   category: ipoCategorySchema.optional(),
   date_from: z.iso.date().optional(),
   date_to: z.iso.date().optional(),
@@ -853,7 +849,6 @@ export const applicationListQuerySchema = z
       )
       .optional(),
     demat_account_id: z.uuid().optional(),
-    broker: z.string().trim().max(120).optional(),
     category_id: z.uuid().optional(),
     application_status: applicationStatusSchema.optional(),
     mandate_status: applicationMandateStatusSchema.optional(),

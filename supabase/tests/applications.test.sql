@@ -57,17 +57,17 @@ values
   );
 
 insert into public.demat_accounts (
-  id, user_id, holder_name, broker_name, depository_type, masked_demat_identifier
+  id, user_id, holder_name, depository_type, masked_demat_identifier
 )
 values
   (
     'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-    '11111111-1111-4111-8111-111111111111', 'Application Holder A', 'Test Broker',
+    '11111111-1111-4111-8111-111111111111', 'Application Holder A',
     'NSDL', 'XXXXAPPA'
   ),
   (
     'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-    '22222222-2222-4222-8222-222222222222', 'Application Holder B', 'Test Broker',
+    '22222222-2222-4222-8222-222222222222', 'Application Holder B',
     'NSDL', 'XXXXAPPB'
   );
 

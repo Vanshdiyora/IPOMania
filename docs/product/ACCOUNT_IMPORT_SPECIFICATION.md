@@ -7,7 +7,7 @@
 - Maximum file size: 5 MiB.
 - Maximum: 500 data rows and 30 unique, non-empty columns.
 - XLSX must contain exactly one worksheet. The header row is the first row.
-- Only masked identifiers may be included. Do not upload passwords, broker credentials, or full
+- Only masked identifiers may be included. Do not upload passwords, credentials, or full
   demat identifiers.
 
 Both browser affordances and the API enforce limits. The Worker parses and validates the uploaded
@@ -23,7 +23,7 @@ account dashboard with the dialog open.
 
 1. Select and upload a file.
 2. The API parses the header row and returns a sample; no account records are created.
-3. Map columns to holder name, broker, depository, masked demat identifier, and optional fields.
+3. Map columns to holder name, depository, masked demat identifier, and optional fields.
 4. The API validates every row and checks duplicates within the file and against the user's
    existing records.
 5. Review the complete report. Each row remains visible as ready, duplicate, or invalid with

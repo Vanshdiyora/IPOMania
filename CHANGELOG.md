@@ -24,7 +24,7 @@ Notable project changes are recorded here.
 
 ### Phase 7 — Dashboard and analytics
 
-- Added caller-scoped PostgreSQL dashboard aggregation, application/category/account/broker
+- Added caller-scoped PostgreSQL dashboard aggregation, application/category/account
   breakdowns, monthly trends, allotment/refund performance, recent activity, and upcoming IPO dates.
 - Added responsive Recharts dashboard filters and exact-decimal financial cards that reuse the
   Phase 6 capital summary, plus formula-safe CSV and multi-sheet Excel exports.

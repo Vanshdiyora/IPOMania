@@ -11,7 +11,7 @@ market data.
 
 The manager stores manually entered IPO facts and issue-specific category rules. An eligible saved
 quota calculation may be recorded as a private application-tracking record; this does not submit
-an application to a broker, exchange, or issuer. The application does not provide investment
+an application to an exchange or issuer. The application does not provide investment
 advice, promise allocation, or import fabricated market data.
 
 ## IPO fields

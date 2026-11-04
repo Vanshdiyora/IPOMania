@@ -35,7 +35,7 @@ block is recorded as `CAPITAL_RELEASED`, not as a cash refund.
 ## Interfaces
 
 The allotment and refund pages are temporarily hidden from the web UI. The API supports
-`GET`/`POST /api/allotments` and `PATCH /api/allotments/:allotmentId`, with IPO, account, broker,
+`GET`/`POST /api/allotments` and `PATCH /api/allotments/:allotmentId`, with IPO, account,
 category, date, status, and refund status filters on list reads. Repeating an identical allotment
 create returns the existing record;
 a different result for the same application returns `409`.

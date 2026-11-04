@@ -55,16 +55,16 @@ values
   );
 
 insert into public.demat_accounts (
-  id, user_id, holder_name, broker_name, depository_type, masked_demat_identifier
+  id, user_id, holder_name, depository_type, masked_demat_identifier
 )
 values
   (
     'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-    '66666666-6666-4666-8666-666666666666', 'IPO Holder A', 'Test Broker', 'NSDL', 'XXXXIPOA'
+    '66666666-6666-4666-8666-666666666666', 'IPO Holder A', 'NSDL', 'XXXXIPOA'
   ),
   (
     'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-    '77777777-7777-4777-8777-777777777777', 'IPO Holder B', 'Test Broker', 'NSDL', 'XXXXIPOB'
+    '77777777-7777-4777-8777-777777777777', 'IPO Holder B', 'NSDL', 'XXXXIPOB'
   );
 
 select is(

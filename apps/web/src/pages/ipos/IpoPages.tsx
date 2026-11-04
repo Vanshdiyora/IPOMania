@@ -68,8 +68,8 @@ type IpoApplicationsResponse = {
   data: {
     applications: Array<
       IpoApplication & {
-        demat_accounts?: { holder_name: string; broker_name: string };
-        ipo_categories?: { category: string };
+        demat_accounts?: { holder_name: string };
+        ipo_categories?: { category: IpoCategoryCode };
       }
     >;
     pagination: { page: number; page_size: number; total: number; total_pages: number };
@@ -406,11 +406,101 @@ export function IpoCatalogDetailsPage() {
     queryFn: () =>
       apiRequest<IpoCatalogCategoryResponse>(`/api/ipos/catalog/${ipoId}/categories`, session!),
   });
-  const importForApplication = useMutation({
+  const applicationReady = data?.data ? isIpoReadyForApplication(data.data) : false;
+  const accountsQuery = useQuery({
+    queryKey: ["accounts", "catalog-ipo-application-table"],
+    enabled: Boolean(session && applicationReady),
+    queryFn: async () => {
+      const first = await apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!);
+      const totalPages = first.data.pagination?.totalPages ?? 1;
+      if (totalPages <= 1) return first;
+      const pages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) =>
+          apiRequest<AccountListResponse>(`/api/accounts?page=${index + 2}&pageSize=100`, session!),
+        ),
+      );
+      return {
+        data: {
+          ...first.data,
+          accounts: [first.data.accounts, ...pages.map((page) => page.data.accounts)].flat(),
+        },
+      };
+    },
+  });
+  const ownedIpoQuery = useQuery({
+    queryKey: ["ipos", "catalog-application-status", ipoId],
+    enabled: Boolean(session && applicationReady),
+    queryFn: async () => {
+      const first = await apiRequest<IpoListResponse>(
+        "/api/ipos?page=1&page_size=100&source=personal",
+        session!,
+      );
+      const totalPages = first.data.pagination.total_pages;
+      if (totalPages <= 1) return first;
+      const pages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) =>
+          apiRequest<IpoListResponse>(
+            `/api/ipos?page=${index + 2}&page_size=100&source=personal`,
+            session!,
+          ),
+        ),
+      );
+      return {
+        data: {
+          ...first.data,
+          ipos: [first.data.ipos, ...pages.map((page) => page.data.ipos)].flat(),
+        },
+      };
+    },
+  });
+  const ownedIpo = (ownedIpoQuery.data?.data.ipos ?? []).find(
+    (item) => item.source_catalog_id === ipoId,
+  );
+  const applicationsQuery = useQuery({
+    queryKey: ["catalog-ipo-applications", ownedIpo?.id],
+    enabled: Boolean(session && ownedIpo?.id),
+    queryFn: async () => {
+      const first = await apiRequest<IpoApplicationsResponse>(
+        `/api/applications?ipo_id=${ownedIpo!.id}&page=1&page_size=100`,
+        session!,
+      );
+      const totalPages = first.data.pagination.total_pages;
+      if (totalPages <= 1) return first;
+      const pages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) =>
+          apiRequest<IpoApplicationsResponse>(
+            `/api/applications?ipo_id=${ownedIpo!.id}&page=${index + 2}&page_size=100`,
+            session!,
+          ),
+        ),
+      );
+      return {
+        data: {
+          ...first.data,
+          applications: [
+            first.data.applications,
+            ...pages.map((page) => page.data.applications),
+          ].flat(),
+        },
+      };
+    },
+  });
+  const catalogReturnTo = `/ipos/catalog/${ipoId}`;
+  const importForApplication = useMutation<IpoResponse, Error, string | undefined>({
     mutationFn: () =>
       apiRequest<IpoResponse>(`/api/ipos/catalog/${ipoId}/import`, session!, { method: "POST" }),
-    onSuccess: (result) =>
-      navigate(`/applications/new?ipo_id=${encodeURIComponent(result.data.id)}`),
+    onSuccess: (result, accountId) => {
+      if (accountId) {
+        navigate(applicationDrawerPath(accountId, result.data.id, catalogReturnTo));
+        return;
+      }
+      navigate(
+        `/applications/new?${new URLSearchParams({
+          ipo_id: result.data.id,
+          return_to: catalogReturnTo,
+        }).toString()}`,
+      );
+    },
     onError: (cause) =>
       notify({
         title: "IPO could not be prepared for an application",
@@ -422,7 +512,15 @@ export function IpoCatalogDetailsPage() {
   if (error) return <ErrorNotice error={error} onRetry={() => void refetch()} />;
   const ipo = data?.data;
   if (!ipo) return <p role="alert">IPO record not found.</p>;
-  const applicationReady = isIpoReadyForApplication(ipo);
+  const accounts = (accountsQuery.data?.data.accounts ?? []).filter(
+    (account) => !account.archived_at,
+  );
+  const applicationsByAccount = new Map(
+    (applicationsQuery.data?.data.applications ?? []).map((application) => [
+      application.demat_account_id,
+      application,
+    ]),
+  );
 
   return (
     <div className="space-y-6">
@@ -453,7 +551,7 @@ export function IpoCatalogDetailsPage() {
               disabled={
                 !applicationReady || importForApplication.isPending || categoriesQuery.isLoading
               }
-              onClick={() => importForApplication.mutate()}
+              onClick={() => importForApplication.mutate(undefined)}
             >
               {importForApplication.isPending ? "Preparing IPO…" : "Use for application"}
             </Button>
@@ -489,6 +587,104 @@ export function IpoCatalogDetailsPage() {
           )}
         </Card>
       )}
+      <Card>
+        <div className="mb-4">
+          <h2 className="text-xl font-bold text-ink">Demat account applications</h2>
+          <p className="mt-1 text-sm text-muted">
+            Choose an account to prefill an application with this IPO and its account details.
+          </p>
+        </div>
+        {!applicationReady ? (
+          <p className="text-sm text-muted">
+            Account applications are available after the issue and bidding details are published.
+          </p>
+        ) : accountsQuery.error || ownedIpoQuery.error || applicationsQuery.error ? (
+          <ErrorNotice
+            error={accountsQuery.error ?? ownedIpoQuery.error ?? applicationsQuery.error}
+            onRetry={() =>
+              void Promise.all([
+                accountsQuery.refetch(),
+                ownedIpoQuery.refetch(),
+                applicationsQuery.refetch(),
+              ])
+            }
+          />
+        ) : accountsQuery.isLoading || ownedIpoQuery.isLoading || applicationsQuery.isLoading ? (
+          <p role="status">Loading accounts and applications…</p>
+        ) : accounts.length ? (
+          <DataTable minWidth="860px">
+            <thead>
+              <tr className="border-b border-border text-sm text-muted">
+                <th scope="col" className="p-3 text-left">
+                  Demat account
+                </th>
+                <th scope="col" className="p-3 text-left">
+                  Category
+                </th>
+                <th scope="col" className="p-3 text-center">
+                  Applied
+                </th>
+                <th scope="col" className="p-3 text-right">
+                  Action
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {accounts.map((account) => {
+                const application = applicationsByAccount.get(account.id);
+                const canApply = account.account_status === "active";
+                return (
+                  <tr
+                    key={account.id}
+                    className="border-b border-border transition-colors hover:bg-canvas/60"
+                  >
+                    <td className="p-3">
+                      <span className="font-semibold text-ink">{account.holder_name}</span>
+                    </td>
+                    <td className="p-3">
+                      {application
+                        ? formatCategory(
+                            application.ipo_categories?.category ?? application.category_code,
+                          )
+                        : "—"}
+                    </td>
+                    <td className="p-3 text-center">
+                      <StatusBadge status={application ? "APPLIED" : "NOT_APPLIED"} />
+                    </td>
+                    <td className="p-3 text-right">
+                      {application ? (
+                        <DrawerRouteLink
+                          className="font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
+                          to={`/applications/${application.id}/edit?${new URLSearchParams({ return_to: catalogReturnTo }).toString()}`}
+                        >
+                          Edit
+                        </DrawerRouteLink>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={!canApply || importForApplication.isPending}
+                          loading={
+                            importForApplication.isPending &&
+                            importForApplication.variables === account.id
+                          }
+                          onClick={() => importForApplication.mutate(account.id)}
+                        >
+                          Apply
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </DataTable>
+        ) : (
+          <p className="py-6 text-center font-semibold text-muted">
+            Add a demat account to apply for this IPO.
+          </p>
+        )}
+      </Card>
     </div>
   );
 }
@@ -730,10 +926,6 @@ export function IpoDetailsPage() {
                   ({ account, application }) => {
                     const accountName =
                       account?.holder_name ?? application?.demat_accounts?.holder_name ?? "Account";
-                    const brokerName =
-                      account?.broker_name ??
-                      application?.demat_accounts?.broker_name ??
-                      "Broker not available";
                     return (
                       <tr
                         key={application?.id ?? account?.id}
@@ -741,8 +933,6 @@ export function IpoDetailsPage() {
                       >
                         <td className="p-3">
                           <span className="font-semibold text-ink">{accountName}</span>
-                          <br />
-                          <span className="text-sm text-muted">{brokerName}</span>
                           {application?.application_number ? (
                             <span className="block text-xs text-muted">
                               Application {application.application_number}
@@ -1606,7 +1796,7 @@ export function QuotaCalculatorPage() {
               </option>
               {accountOptions.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.holder_name} · {account.broker_name} · {account.masked_demat_identifier}
+                  {account.holder_name} · {account.masked_demat_identifier}
                 </option>
               ))}
             </CustomSelect>

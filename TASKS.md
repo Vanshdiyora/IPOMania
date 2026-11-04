@@ -124,7 +124,7 @@ expectation mismatch, and import fixture/grant issues; these remain outside the 
       documentation before implementation.
 - [x] Add an authenticated, validated analytics API backed by bounded PostgreSQL aggregation,
       caller-JWT access, explicit owner scoping, and existing forced RLS.
-- [x] Add date, IPO, category, and demat-account filters; count-based IPO/category/account/broker
+- [x] Add date, IPO, category, and demat-account filters; count-based IPO/category/account
       groupings; monthly trends; allotment/refund metrics; recent activity; and upcoming IPO dates.
 - [x] Add the responsive, fixed-light dashboard with accessible charts, loading/empty/error states,
       paginated filter options, and formula-safe CSV/XLSX exports.

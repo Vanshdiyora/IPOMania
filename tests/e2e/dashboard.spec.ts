@@ -33,11 +33,9 @@ const dashboardData = {
       account_id: accountId,
       holder_name: "Dashboard Holder",
       masked_demat_identifier: "XXXX1234",
-      broker_name: "Dashboard Broker",
       count: 1,
     },
   ],
-  applications_by_broker: [{ broker_name: "Dashboard Broker", count: 1 }],
   monthly_application_trends: [{ month: "2026-10", count: 1 }],
   capital_utilization_trends: [
     {

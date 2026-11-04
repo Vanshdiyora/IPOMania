@@ -28,7 +28,7 @@ ACCOUNT_HAS_HISTORY`.
 
 `page` defaults to 1; `pageSize` defaults to 25 and is limited to 100. Optional filters:
 
-- `holder_name`, `broker`: case-insensitive prefix search
+- `holder_name`: case-insensitive prefix search
 - `depository`: `NSDL` or `CDSL`
 - `status`: `active`, `inactive`, or `closed`
 - `created_from`, `created_to`: ISO-8601 timestamps, inclusive
@@ -50,8 +50,8 @@ closed records; `active` counts only unarchived active records.
 
 Preview accepts `file` and optional JSON `mapping` multipart fields. Without `mapping`, it returns
 the detected header names and a small sample without staging any data. With a mapping, required
-fields are `holder_name`, `broker_name`, `depository_type`, and `masked_demat_identifier`. Optional
-fields are `broker_code`, `masked_client_reference`, `account_status`, and `notes`. Mapping
+fields are `holder_name`, `depository_type`, and `masked_demat_identifier`. Optional
+fields are `masked_client_reference`, `account_status`, and `notes`. Mapping
 values must name a header in the uploaded file.
 
 The API accepts CSV (`text/csv`) and XLSX

@@ -27,7 +27,7 @@ it is not evidence of a debit and does not increase invested capital.
 - Mandate pages are temporarily hidden from the web UI. The API remains available.
 - `POST /api/mandates` records a pending mandate.
 - `PATCH /api/mandates/:mandateId` applies a permitted manual update.
-- `GET /api/mandates` supports IPO, account, broker, category, date, and status filters.
+- `GET /api/mandates` supports IPO, account, category, date, and status filters.
 
 The application reference must belong to the authenticated user. Mandate references are unique
 per user. Repeating the same create request returns the existing record; a conflicting reference

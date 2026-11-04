@@ -38,7 +38,7 @@ deleted; corrections are new, audited adjustments.
   available.
 - `GET /api/capital/summary` calculates summaries from owner-scoped applications, mandates,
   allotments, and ledger rows.
-- `GET /api/capital/ledger` lists immutable events with IPO, account, broker, category, and date
+- `GET /api/capital/ledger` lists immutable events with IPO, account, category, and date
   filters. `POST /api/capital/ledger` records manual events with strict validation and idempotency.
 
 Do not treat an approved mandate as a completed debit. Listing P&L requires a valid allotment,

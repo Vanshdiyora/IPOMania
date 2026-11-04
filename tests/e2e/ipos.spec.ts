@@ -48,7 +48,7 @@ const application = {
   created_at: "2026-11-02T10:00:00.000Z",
   updated_at: "2026-11-02T10:00:00.000Z",
   archived_at: null,
-  demat_accounts: { holder_name: "Test Holder", broker_name: "Test Broker" },
+  demat_accounts: { holder_name: "Test Holder" },
   ipo_categories: { category: "RETAIL" },
 };
 const catalogIpo = {
@@ -155,7 +155,6 @@ async function prepareAuthenticatedPage(page: Page) {
               id: application.demat_account_id,
               user_id: userId,
               holder_name: "Test Holder",
-              broker_name: "Test Broker",
               account_status: "active",
               archived_at: null,
             },

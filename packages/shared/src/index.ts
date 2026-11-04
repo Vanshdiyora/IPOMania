@@ -26,8 +26,6 @@ export interface DematAccount {
   id: string;
   user_id: string;
   holder_name: string;
-  broker_name: string;
-  broker_code: string | null;
   depository_type: "NSDL" | "CDSL";
   masked_demat_identifier: string;
   masked_client_reference: string | null;
@@ -368,11 +366,6 @@ export interface DashboardAnalytics {
     account_id: string;
     holder_name: string;
     masked_demat_identifier: string;
-    broker_name: string;
-    count: number;
-  }>;
-  applications_by_broker: Array<{
-    broker_name: string;
     count: number;
   }>;
   monthly_application_trends: Array<{

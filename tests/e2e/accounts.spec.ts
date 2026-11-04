@@ -5,8 +5,6 @@ const account = {
   id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   user_id: "11111111-1111-4111-8111-111111111111",
   holder_name: "Asha Mehta",
-  broker_name: "Example Broker",
-  broker_code: null,
   depository_type: "CDSL",
   masked_demat_identifier: "XXXX1234",
   masked_client_reference: null,

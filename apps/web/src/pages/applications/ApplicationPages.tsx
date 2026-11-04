@@ -57,7 +57,7 @@ type ApplicationListResponse = {
     applications: Array<
       IpoApplication & {
         ipos?: { symbol: string; company_name: string };
-        demat_accounts?: { holder_name: string; broker_name: string };
+        demat_accounts?: { holder_name: string };
         ipo_categories?: { category: string };
       }
     >;
@@ -90,7 +90,7 @@ type ApplicationLotBounds = { minimum: number | null; maximum: number | null; in
 type ApplicationResponse = {
   data: IpoApplication & {
     ipos?: { company_name: string; symbol: string };
-    demat_accounts?: { holder_name: string; broker_name: string; masked_demat_identifier: string };
+    demat_accounts?: { holder_name: string; masked_demat_identifier: string };
     ipo_categories?: { category: string };
   };
 };
@@ -143,7 +143,6 @@ const linkClass =
   "inline-flex min-h-touch items-center justify-center rounded-lg border border-border bg-white px-4 py-2 font-semibold text-ink hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy";
 const defaultApplicationFilters: ApplicationFilters = {
   dematAccountId: "",
-  broker: "",
   archiveStatus: "active",
   reference: "",
   categoryId: "",
@@ -154,7 +153,6 @@ const defaultApplicationFilters: ApplicationFilters = {
 function filtersFromParams(params: URLSearchParams): ApplicationFilters {
   return {
     dematAccountId: params.get("demat_account_id") ?? "",
-    broker: params.get("broker") ?? "",
     archiveStatus:
       params.get("include_archived") === "true"
         ? "archived"
@@ -171,7 +169,6 @@ function filtersFromParams(params: URLSearchParams): ApplicationFilters {
 function filterCount(filters: ApplicationFilters) {
   return [
     filters.dematAccountId,
-    filters.broker,
     filters.archiveStatus !== "active",
     filters.reference,
     filters.categoryId,
@@ -180,7 +177,7 @@ function filterCount(filters: ApplicationFilters) {
 }
 
 function applicationReturnPath(value: string | null) {
-  return value && /^\/ipos\/[0-9a-f-]{36}$/i.test(value) ? value : "/applications";
+  return value && /^\/ipos\/(?:catalog\/)?[0-9a-f-]{36}$/i.test(value) ? value : "/applications";
 }
 
 function useOwnedLists() {
@@ -330,7 +327,6 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
   const applyFilters = (filters: ApplicationFilters) => {
     updateListParams({
       demat_account_id: filters.dematAccountId || null,
-      broker: filters.broker || null,
       include_archived:
         filters.archiveStatus === "active"
           ? null
@@ -380,7 +376,6 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
     ...(selectedIpoId ? { ipo_id: selectedIpoId } : {}),
     ...(appliedFilters.dematAccountId ? { demat_account_id: appliedFilters.dematAccountId } : {}),
     ...(appliedFilters.categoryId ? { category_id: appliedFilters.categoryId } : {}),
-    ...(appliedFilters.broker ? { broker: appliedFilters.broker } : {}),
     ...(appliedFilters.reference ? { search: appliedFilters.reference } : {}),
     ...(ipoSearch ? { ipo_search: ipoSearch } : {}),
     ...(appliedFilters.submissionFrom ? { submission_from: appliedFilters.submissionFrom } : {}),
@@ -406,11 +401,8 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
   const accountOptions = lists.accounts.map((account) => ({
     value: account.id,
     label: account.holder_name,
-    description: `${account.broker_name} · ${account.masked_demat_identifier}`,
+    description: account.masked_demat_identifier,
   }));
-  const brokerOptions = Array.from(
-    new Set(lists.accounts.map((account) => account.broker_name).filter(Boolean)),
-  ).map((name) => ({ value: name, label: name }));
   const categoryOptions = (categoriesQuery.data ?? []).map((category) => ({
     value: category.id,
     label: category.category,
@@ -425,9 +417,6 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
                 ?.label ?? "Demat account",
           },
         ]
-      : []),
-    ...(appliedFilters.broker
-      ? [{ key: "broker", label: `Broker: ${appliedFilters.broker}` }]
       : []),
     ...(appliedFilters.archiveStatus !== "active"
       ? [
@@ -538,11 +527,9 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
         filters={draftFilters}
         activeCount={filterCount(draftFilters)}
         accountOptions={accountOptions}
-        brokerOptions={brokerOptions}
         categoryOptions={categoryOptions}
         loading={{
           accounts: lists.optionLoading.accounts,
-          brokers: lists.optionLoading.accounts,
           categories: categoriesQuery.isLoading,
         }}
         onChange={(key, value) => setDraftFilters((current) => ({ ...current, [key]: value }))}
@@ -594,10 +581,13 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
             <thead>
               <tr className="border-b border-border text-sm text-muted">
                 <th scope="col" className="p-3 text-left">
-                  IPO / category
+                  IPO
                 </th>
                 <th scope="col" className="p-3 text-left">
-                  Account / broker
+                  Category
+                </th>
+                <th scope="col" className="p-3 text-left">
+                  Account
                 </th>
                 <th scope="col" className="p-3 text-right">
                   Lots / amount
@@ -609,7 +599,7 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
             </thead>
             <tbody aria-busy={isLoading}>
               {isLoading ? (
-                <SkeletonTableRows rows={6} cols={4} />
+                <SkeletonTableRows rows={6} cols={5} />
               ) : (
                 rows.map((row) => (
                   <tr key={row.id} className="border-b border-border">
@@ -619,14 +609,11 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
                         to={`/applications/${row.id}`}
                         state={{ from: `${location.pathname}${location.search}` }}
                       >
-                        {row.ipos?.symbol ?? "IPO"} · {row.ipo_categories?.category ?? "Category"}
+                        {row.ipos?.symbol ?? "IPO"}
                       </Link>
                     </td>
-                    <td className="p-3">
-                      {row.demat_accounts?.holder_name ?? "Account"}
-                      <br />
-                      <span className="text-sm text-muted">{row.demat_accounts?.broker_name}</span>
-                    </td>
+                    <td className="p-3">{row.ipo_categories?.category ?? "Category"}</td>
+                    <td className="p-3">{row.demat_accounts?.holder_name ?? "Account"}</td>
                     <td className="p-3 text-right tabular-nums whitespace-nowrap">
                       {row.lots} lots · {row.application_amount}
                     </td>
@@ -899,7 +886,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   return (
     <RouteFormDrawer
       title={editing ? "Edit application" : "Add application"}
-      description="Choose an issue, account, category, and lot count. This records an application for tracking; it does not submit an IPO application to a broker or exchange."
+      description="Choose an issue, account, category, and lot count. This records an application for tracking; it does not submit an IPO application."
       cancelTo={returnTo}
       formId="application-form"
       submitLabel="Save application"
@@ -1281,7 +1268,6 @@ export function ApplicationDetailsPage() {
                 ? `${item.demat_accounts.holder_name} — ${item.demat_accounts.masked_demat_identifier}`
                 : item.demat_account_id,
             ],
-            ["Broker", item.demat_accounts?.broker_name ?? "Not available"],
             ["Category", item.ipo_categories?.category ?? formatCategory(item.category_code)],
             ["Lots", item.lots],
             ["Total shares", item.total_shares],
@@ -1536,10 +1522,7 @@ export function BulkApplicationPage() {
                 />
                 <span>
                   <span className="font-semibold">{account.holder_name}</span>
-                  <br />
-                  <span className="text-sm text-muted">
-                    {account.broker_name} · {account.masked_demat_identifier}
-                  </span>
+                  <span className="text-sm text-muted">{account.masked_demat_identifier}</span>
                 </span>
               </label>
             ))}

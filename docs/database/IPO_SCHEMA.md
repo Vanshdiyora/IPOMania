@@ -65,7 +65,7 @@ readable and insertable only by their owner and cannot be changed through authen
 `public.applications` stores an immutable, user-owned record copied only from one of that user's
 eligible quota calculation snapshots. Composite foreign keys bind its IPO, demat account, category
 rule version, and calculation to the same owner. The database rechecks issue lot, price, rule, and
-amount constraints. Recording an application does not submit it to a broker, exchange, or issuer.
+amount constraints. Recording an application does not submit it to an exchange or issuer.
 Mandates, allotments, and the capital ledger link to this record using owner-bound foreign keys;
 their details and RLS are documented in [CAPITAL_LEDGER.md](./CAPITAL_LEDGER.md).
 

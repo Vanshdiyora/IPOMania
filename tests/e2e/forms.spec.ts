@@ -7,8 +7,6 @@ const account = {
   id: recordId,
   user_id: userId,
   holder_name: "Form test holder",
-  broker_name: "Test broker",
-  broker_code: null,
   depository_type: "CDSL",
   masked_demat_identifier: "XXXX1234",
   masked_client_reference: null,
@@ -189,7 +187,6 @@ test("account form preserves typed values, validates, saves, and loads existing 
   await page.getByRole("button", { name: "Save account", exact: true }).click();
   await expect(page.getByLabel("Account holder name")).toHaveAttribute("aria-invalid", "true");
   await page.getByLabel("Account holder name").fill("New test holder");
-  await page.getByRole("textbox", { name: "Broker name", exact: true }).fill("New test broker");
   const depository = page.getByRole("combobox", { name: "Depository" });
   await depository.click();
   await page.getByRole("option", { name: "CDSL", exact: true }).click();
@@ -198,14 +195,10 @@ test("account form preserves typed values, validates, saves, and loads existing 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.getByRole("button", { name: "Keep editing" }).click();
-  await expect(page.getByRole("textbox", { name: "Broker name", exact: true })).toHaveValue(
-    "New test broker",
-  );
   expect(await auditAccessibility(page)).toEqual([]);
   await page.route("**/api/accounts", async (route) => {
     expect(route.request().postDataJSON()).toMatchObject({
       holder_name: "New test holder",
-      broker_name: "New test broker",
       depository_type: "CDSL",
       notes: "A saved note",
     });

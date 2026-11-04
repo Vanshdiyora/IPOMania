@@ -23,7 +23,7 @@ Responses use `{ data }` or `{ error: { code, message } }`.
 | `POST /api/quota/calculate`                      | Calculate and save a reproducibility snapshot.                                                                                |
 | `POST /api/capital/applications`                 | Record an owned application from an eligible saved calculation; does not submit it.                                           |
 | `GET /api/capital/applications`                  | List capital-tracked applications with IPO/account/date filters.                                                              |
-| `GET /api/mandates`                              | List owned mandates with IPO/account/broker/category/date/status filters.                                                     |
+| `GET /api/mandates`                              | List owned mandates with IPO/account/category/date/status filters.                                                            |
 | `POST /api/mandates`                             | Record a pending UPI mandate; never initiates or approves a payment.                                                          |
 | `PATCH /api/mandates/:mandateId`                 | Manually update a mandate using validated state transitions.                                                                  |
 | `GET /api/allotments`                            | List owned allotments and refund state with issue/account/date filters.                                                       |

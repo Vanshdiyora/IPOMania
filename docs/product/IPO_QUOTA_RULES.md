@@ -49,7 +49,7 @@ published criterion.
 Additional published criteria are stored as individual strict `{ id, description }` records. The
 applicant must explicitly confirm each one. The result always reports
 `eligibility_verified: false`; it means only that supplied information satisfied the configured
-checks. No brokerage, depository, exchange, or issuer confirmation is performed.
+checks. No depository, exchange, or issuer confirmation is performed.
 
 ## Change control
 

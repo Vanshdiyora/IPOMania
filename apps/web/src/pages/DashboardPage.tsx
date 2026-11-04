@@ -16,11 +16,9 @@ import {
 } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { DataTable } from "../components/ui/DataTable";
 import { Select as CustomSelect } from "../components/ui/Input";
 import {
   BriefcaseBusiness,
-  Building2,
   CalendarDays,
   ChevronRight,
   ClipboardList,
@@ -710,60 +708,7 @@ export function DashboardPage() {
       </section>
 
       {/* ─── Operational Tables & Upcoming Activity ───────────────────────── */}
-      <section className="grid gap-6 xl:grid-cols-2" aria-label="Broker and upcoming activity">
-        {/* Broker Breakdown */}
-        <Card hoverable className="border-border/80">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Building2 size={18} className="text-action" />
-              <CardTitle>Broker-Wise Application Volume</CardTitle>
-            </div>
-            <CardDescription>Bids grouped by executing depository participant</CardDescription>
-          </CardHeader>
-          <CardContent noPadding>
-            {analytics?.applications_by_broker.length ? (
-              <div className="overflow-x-auto">
-                <DataTable minWidth="640px">
-                  <thead>
-                    <tr className="border-b border-border bg-canvas/40 text-xs font-semibold uppercase text-muted">
-                      <th scope="col" className="px-5 py-3">
-                        Broker
-                      </th>
-                      <th scope="col" className="px-5 py-3 text-right">
-                        Applications
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {analytics.applications_by_broker.map((row) => (
-                      <tr key={row.broker_name} className="hover:bg-canvas/30 transition-colors">
-                        <td className="px-5 py-3 font-semibold text-ink flex items-center gap-2.5">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-navy/5 text-xs font-bold text-navy">
-                            {row.broker_name.slice(0, 2).toUpperCase()}
-                          </span>
-                          <span>{row.broker_name}</span>
-                        </td>
-                        <td className="px-5 py-3 text-right font-semibold tabular text-navy">
-                          {row.count}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </DataTable>
-              </div>
-            ) : (
-              <div className="p-5">
-                <AnalyticsStateMessage
-                  label="No broker data is available."
-                  loading={analyticsQuery.isLoading}
-                  error={analyticsQuery.error}
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Upcoming IPOs */}
+      <section className="grid gap-6" aria-label="Upcoming activity">
         <Card hoverable className="border-border/80">
           <CardHeader>
             <div className="flex items-center justify-between">

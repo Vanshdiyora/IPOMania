@@ -90,23 +90,23 @@ values
   );
 
 insert into public.demat_accounts (
-  id, user_id, holder_name, broker_name, depository_type, masked_demat_identifier
+  id, user_id, holder_name, depository_type, masked_demat_identifier
 )
 values
   (
     '88888888-8888-4888-8888-888888888888',
     '11111111-1111-4111-8111-111111111111',
-    'Dashboard Holder A', 'Dashboard Broker', 'NSDL', 'XXXXDASHA'
+    'Dashboard Holder A', 'NSDL', 'XXXXDASHA'
   ),
   (
     '99999999-9999-4999-8999-999999999999',
     '22222222-2222-4222-8222-222222222222',
-    'Dashboard Holder B', 'Dashboard Broker', 'NSDL', 'XXXXDASHB'
+    'Dashboard Holder B', 'NSDL', 'XXXXDASHB'
   ),
   (
     '15151515-1515-4151-8151-151515151515',
     '12121212-1212-4121-8121-121212121212',
-    'Dashboard Holder Large', 'Dashboard Broker', 'NSDL', 'XXXXDASHL'
+    'Dashboard Holder Large', 'NSDL', 'XXXXDASHL'
   );
 
 insert into public.applications (

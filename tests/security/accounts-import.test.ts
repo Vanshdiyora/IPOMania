@@ -21,7 +21,6 @@ const user = {
 };
 const mapping = {
   holder_name: "Holder",
-  broker_name: "Broker",
   depository_type: "Depository",
   masked_demat_identifier: "Masked ID",
 };
@@ -80,8 +79,8 @@ function fileForm(file: Blob, fileName: string, columns?: Record<string, string>
 function xlsxFile() {
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet([
-    ["Holder", "Broker", "Depository", "Masked ID"],
-    ["Asha Mehta", "Example Broker", "CDSL", "XXXX1234"],
+    ["Holder", "Depository", "Masked ID"],
+    ["Asha Mehta", "CDSL", "XXXX1234"],
   ]);
   XLSX.utils.book_append_sheet(workbook, sheet, "Accounts");
   const bytes = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
@@ -91,10 +90,9 @@ function xlsxFile() {
 describe("account import API", () => {
   it("reads CSV columns before requiring the user to map them", async () => {
     installImportMock();
-    const csv = new Blob(
-      ["Holder,Broker,Depository,Masked ID\r\nAsha Mehta,Example Broker,CDSL,XXXX1234\r\n"],
-      { type: "text/csv" },
-    );
+    const csv = new Blob(["Holder,Depository,Masked ID\r\nAsha Mehta,CDSL,XXXX1234\r\n"], {
+      type: "text/csv",
+    });
     const response = await createApp().request(
       "/api/accounts/import/preview",
       {
@@ -109,7 +107,7 @@ describe("account import API", () => {
     await expect(response.json()).resolves.toMatchObject({
       data: {
         requires_mapping: true,
-        headers: ["Holder", "Broker", "Depository", "Masked ID"],
+        headers: ["Holder", "Depository", "Masked ID"],
         total_rows: 1,
       },
     });
@@ -119,10 +117,10 @@ describe("account import API", () => {
     const requests = installImportMock();
     const csv = new Blob(
       [
-        "Holder,Broker,Depository,Masked ID\r\n" +
-          "Asha Mehta,Example Broker,CDSL,XXXX1234\r\n" +
-          "Duplicate,Example Broker,CDSL,XXXX1234\r\n" +
-          "Invalid, ,BAD,XXXX9999\r\n",
+        "Holder,Depository,Masked ID\r\n" +
+          "Asha Mehta,CDSL,XXXX1234\r\n" +
+          "Duplicate,CDSL,XXXX1234\r\n" +
+          "Invalid,BAD,XXXX9999\r\n",
       ],
       { type: "text/csv" },
     );

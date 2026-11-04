@@ -26,12 +26,11 @@ describe.skipIf(!databaseUrl)("demat account creation concurrency", () => {
 
     await sql`
       insert into public.demat_accounts (
-        user_id, holder_name, broker_name, depository_type, masked_demat_identifier
+        user_id, holder_name, depository_type, masked_demat_identifier
       )
       select
         ${userId}::uuid,
         'Concurrency seed ' || account_number,
-        'Concurrency Test Broker',
         'NSDL',
         'XXXXCONC' || lpad(account_number::text, 6, '0')
       from generate_series(1, 500) as account_number
@@ -51,9 +50,9 @@ describe.skipIf(!databaseUrl)("demat account creation concurrency", () => {
         await transaction`select set_config('request.jwt.claim.sub', ${userId}, true)`;
         await transaction`
           insert into public.demat_accounts (
-            user_id, holder_name, broker_name, depository_type, masked_demat_identifier
+            user_id, holder_name, depository_type, masked_demat_identifier
           ) values (
-            ${userId}::uuid, ${`Concurrent ${suffix}`}, 'Concurrency Test Broker',
+            ${userId}::uuid, ${`Concurrent ${suffix}`},
             'CDSL', ${`XXXXCONCURRENT${suffix}`}
           )
         `;

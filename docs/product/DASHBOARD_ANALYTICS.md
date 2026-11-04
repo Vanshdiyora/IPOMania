@@ -12,7 +12,7 @@ from the web dashboard.
 - Current active demat accounts, personal tracked IPOs, and active shared catalog IPOs. These inventory counts are
   independent of application date filters.
 - Applications by IPO, category (`RETAIL`, `SHNI`, `BHNI`, `SHAREHOLDER`), demat account, and
-  broker, plus a monthly application-count trend.
+  account, plus a monthly application-count trend.
 - Shared IPO counts by status and a bounded list of issue details including price band, lot size,
   exchange, dates, and source. Missing source values are labeled as unpublished.
 - Recent application records and upcoming IPO closing dates from personal and shared IPO data.

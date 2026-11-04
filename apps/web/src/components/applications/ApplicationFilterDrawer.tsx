@@ -4,7 +4,6 @@ import { SearchableSelect, type SearchableSelectOption } from "../filters/Search
 
 export type ApplicationFilters = {
   dematAccountId: string;
-  broker: string;
   archiveStatus: "active" | "archived" | "all";
   reference: string;
   categoryId: string;
@@ -17,11 +16,9 @@ type ApplicationFilterDrawerProps = {
   filters: ApplicationFilters;
   activeCount: number;
   accountOptions: SearchableSelectOption[];
-  brokerOptions: SearchableSelectOption[];
   categoryOptions: SearchableSelectOption[];
   loading?: {
     accounts?: boolean;
-    brokers?: boolean;
     categories?: boolean;
   };
   onChange: <Key extends keyof ApplicationFilters>(
@@ -38,7 +35,6 @@ export function ApplicationFilterDrawer({
   filters,
   activeCount,
   accountOptions,
-  brokerOptions,
   categoryOptions,
   loading = {},
   onChange,
@@ -69,17 +65,6 @@ export function ApplicationFilterDrawer({
             value={filters.dematAccountId}
             onChange={(value) => onChange("dematAccountId", value as string)}
             loading={loading.accounts}
-          />
-        </FilterSection>
-        <FilterSection title="Broker">
-          <SearchableSelect
-            label="Broker"
-            placeholder="All brokers"
-            searchPlaceholder="Search brokers..."
-            options={brokerOptions}
-            value={filters.broker}
-            onChange={(value) => onChange("broker", value as string)}
-            loading={loading.brokers}
           />
         </FilterSection>
         <FilterSection title="Archive status">

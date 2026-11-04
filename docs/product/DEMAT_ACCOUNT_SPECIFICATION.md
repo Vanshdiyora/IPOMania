@@ -3,21 +3,19 @@
 ## Scope
 
 The module lets an authenticated user record and manage their own demat accounts. It does not
-store full demat identifiers, passwords, credentials, or broker login details. Account records
+store full demat identifiers, passwords, or credentials. Account records
 are not IPO applications and do not implement an IPO quota, allocation, or investment workflow.
 
 ## Account fields
 
-| Field                   | Rule                                                                       |
-| ----------------------- | -------------------------------------------------------------------------- |
-| Holder name             | Required, 1–160 trimmed characters                                         |
-| Broker name             | Required, 1–120 trimmed characters; free text to support the user's broker |
-| Broker code             | Optional, up to 40 characters                                              |
-| Depository              | Required; `NSDL` or `CDSL`                                                 |
-| Masked demat identifier | Required, 3–80 characters; masked value containing `X` or `*`              |
-| Masked client reference | Optional, 3–80 characters; if provided, containing `X` or `*`              |
-| Account status          | `active`, `inactive`, or `closed`                                          |
-| Notes                   | Optional, up to 2,000 characters                                           |
+| Field                   | Rule                                                          |
+| ----------------------- | ------------------------------------------------------------- |
+| Holder name             | Required, 1–160 trimmed characters                            |
+| Depository              | Required; `NSDL` or `CDSL`                                    |
+| Masked demat identifier | Required, 3–80 characters; masked value containing `X` or `*` |
+| Masked client reference | Optional, 3–80 characters; if provided, containing `X` or `*` |
+| Account status          | `active`, `inactive`, or `closed`                             |
+| Notes                   | Optional, up to 2,000 characters                              |
 
 The same user cannot register the same normalized masked demat identifier twice for the same
 depository, including while an earlier record is archived. Masked client references are not used
@@ -49,7 +47,7 @@ scrolling for ordinary account details.
 
 ## Search and pagination
 
-Holder and broker searches are case-insensitive prefix searches. Filters include depository,
+Holder searches are case-insensitive prefix searches. Filters include depository,
 account status, archived state, and creation-date bounds. The API returns at most 100 records per
 page; the UI requests 50 at a time. Sorting is newest first with a stable ID tie-breaker.
 

@@ -244,9 +244,6 @@ function createReportRows(analytics: DashboardAnalytics): ReportRow[] {
         item.count,
       ),
     ),
-    ...analytics.applications_by_broker.map((item) =>
-      reportRow("broker", "", item.broker_name, item.count),
-    ),
     ...analytics.monthly_application_trends.map((item) =>
       reportRow("monthly applications", item.month, "Applications", item.count),
     ),
@@ -331,7 +328,6 @@ function createWorkbookSheets(analytics: DashboardAnalytics): Array<[string, obj
     ["IPO", analytics.applications_by_ipo],
     ["Category", analytics.applications_by_category],
     ["Demat accounts", analytics.applications_by_account],
-    ["Brokers", analytics.applications_by_broker],
     ["Monthly applications", analytics.monthly_application_trends],
     ["Capital utilization", analytics.capital_utilization_trends],
     ["Capital totals", analytics.capital_event_totals],

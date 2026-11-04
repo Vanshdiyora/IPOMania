@@ -51,9 +51,9 @@ describe.skipIf(!databaseUrl)("application external-reference concurrency", () =
     categoryId = category.id;
     const [account] = await sql<{ id: string }[]>`
       insert into public.demat_accounts (
-        user_id, holder_name, broker_name, depository_type, masked_demat_identifier
+        user_id, holder_name, depository_type, masked_demat_identifier
       ) values (
-        ${userId}::uuid, 'Application Race', 'Race Test Broker', 'NSDL', ${`XXXX${suffix}`}
+        ${userId}::uuid, 'Application Race', 'NSDL', ${`XXXX${suffix}`}
       )
       returning id
     `;

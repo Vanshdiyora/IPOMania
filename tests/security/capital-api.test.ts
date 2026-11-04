@@ -53,7 +53,7 @@ describe("capital-management API", () => {
   it("keeps the mandate list owner-scoped and applies IPO/account/category/date filters", async () => {
     const requests = installSupabaseMock();
     const response = await createApp().request(
-      `/api/mandates?ipo_id=${applicationId}&account_id=${calculationId}&category=RETAIL&date_from=2026-10-01&broker=Demo`,
+      `/api/mandates?ipo_id=${applicationId}&account_id=${calculationId}&category=RETAIL&date_from=2026-10-01`,
       { headers: authHeaders() },
       bindings,
     );
@@ -64,7 +64,7 @@ describe("capital-management API", () => {
     expect(query.get("application.ipo_id")).toBe(`eq.${applicationId}`);
     expect(query.get("application.demat_account_id")).toBe(`eq.${calculationId}`);
     expect(query.get("application.category")).toBe("eq.RETAIL");
-    expect(query.get("application.demat_account.broker_name")).toBe("ilike.Demo%");
+    expect(query.get("application.demat_account.broker_name")).toBeNull();
     expect(query.get("created_at")).toBe("gte.2026-10-01T00:00:00.000Z");
     expect(query.get("user_id")).not.toContain(otherUserId);
   });
