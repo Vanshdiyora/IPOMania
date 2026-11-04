@@ -306,7 +306,7 @@ export function checkShareholderEligibility(
 }
 
 export function calculateMaximumEligibleLots(
-  ipo: IpoPricingInput,
+  ipo: Pick<IpoPricingInput, "lot_size">,
   rules: CategoryRules,
   price: string,
 ): number | null {
@@ -342,6 +342,42 @@ export function calculateMaximumEligibleLots(
   const eligibleMaximum =
     firstAllowedLots + Math.floor((maximum - firstAllowedLots) / increment) * increment;
   return eligibleMaximum < firstAllowedLots ? 0 : eligibleMaximum;
+}
+
+export function calculateMinimumEligibleLots(
+  ipo: Pick<IpoPricingInput, "lot_size">,
+  rules: CategoryRules,
+  price: string,
+): number | null {
+  if (
+    !Number.isSafeInteger(ipo.lot_size) ||
+    ipo.lot_size < 1 ||
+    !Number.isSafeInteger(rules.lot_increment) ||
+    rules.lot_increment < 1 ||
+    (rules.minimum_lots !== null && !Number.isSafeInteger(rules.minimum_lots))
+  ) {
+    return null;
+  }
+  if (
+    rules.lot_limit_status === "UNCONFIGURED" ||
+    rules.investment_limit_status === "UNCONFIGURED"
+  ) {
+    return null;
+  }
+  const firstAllowedLots = rules.minimum_lots ?? 1;
+  let minimum = firstAllowedLots;
+  if (rules.minimum_investment !== null) {
+    const amountPerLot = parsePositiveDecimal(price).mul(ipo.lot_size);
+    const investmentLots = parsePositiveDecimal(rules.minimum_investment)
+      .dividedBy(amountPerLot)
+      .ceil();
+    if (investmentLots.greaterThan(Number.MAX_SAFE_INTEGER)) return null;
+    minimum = Math.max(minimum, investmentLots.toNumber());
+  }
+  const eligibleMinimum =
+    firstAllowedLots +
+    Math.ceil((minimum - firstAllowedLots) / rules.lot_increment) * rules.lot_increment;
+  return Number.isSafeInteger(eligibleMinimum) ? eligibleMinimum : null;
 }
 
 export function validateApplicationConfiguration(input: CalculationInput): CalculationResult {

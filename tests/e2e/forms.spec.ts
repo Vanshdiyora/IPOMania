@@ -305,6 +305,82 @@ test("application form hides financial statuses and preserves them on edit", asy
   await expect(page).toHaveURL(/\/applications$/);
 });
 
+test("application lot ranges update from the selected IPO investor-category rules", async ({
+  page,
+}) => {
+  await prepare(page);
+  const categories = [
+    { category: "RETAIL", maximum_lots: 5, minimum_investment: null, maximum_investment: "400" },
+    { category: "SHNI", maximum_lots: null, minimum_investment: "600", maximum_investment: "2000" },
+    { category: "BHNI", maximum_lots: null, minimum_investment: "2200", maximum_investment: null },
+    {
+      category: "SHAREHOLDER",
+      maximum_lots: 4,
+      minimum_investment: null,
+      maximum_investment: null,
+    },
+  ].map((rule, index) => ({
+    id: `category-${index}`,
+    ipo_id: recordId,
+    source_catalog_rule_id: null,
+    ...rule,
+    rule_version: 1,
+    lot_limit_status: rule.maximum_lots === null ? "NO_PUBLISHED_LIMIT" : "CONFIGURED",
+    default_lots: 1,
+    minimum_lots: 1,
+    lot_increment: 1,
+    investment_limit_status: "CONFIGURED",
+    reserved_shares: null,
+    reserved_percentage: null,
+    shareholder_record_date: rule.category === "SHAREHOLDER" ? "2026-10-01" : null,
+    minimum_shareholding: rule.category === "SHAREHOLDER" ? 1 : null,
+    eligibility_conditions: [],
+    allowed_price_types: ["BID", "CUT_OFF"],
+    minimum_price_increment: "0.01",
+    source_reference: "IPO-specific test configuration",
+    rule_source: "PUBLISHED_SOURCE",
+    last_verified_at: "2026-11-01T00:00:00Z",
+    created_at: "2026-11-01T00:00:00Z",
+  }));
+  await page.route(`**/api/ipos/${recordId}/categories`, (route) =>
+    route.fulfill({ json: { data: { configurations: categories } } }),
+  );
+  await page.goto("/applications/new");
+  await page.getByRole("combobox", { name: "IPO" }).click();
+  await page.getByRole("option", { name: "Form test company" }).click();
+  await page.getByRole("combobox", { name: "Demat account" }).click();
+  await page.getByRole("option", { name: /Form test holder/ }).click();
+
+  const category = page.getByLabel("Investor category");
+  await category.click();
+  await expect(page.getByRole("option", { name: /Retail/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /sHNI/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /bHNI/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Shareholder/ })).toBeVisible();
+  const lots = page.getByLabel("Lots");
+
+  await page.getByRole("option", { name: /Retail/ }).click();
+  await expect(lots).toHaveAttribute("min", "1");
+  await expect(lots).toHaveAttribute("max", "2");
+  await expect(page.getByText("Total amount: ₹200")).toBeVisible();
+
+  await category.click();
+  await page.getByRole("option", { name: /sHNI/ }).click();
+  await expect(lots).toHaveValue("3");
+  await expect(lots).toHaveAttribute("max", "10");
+  await expect(page.getByText("Total amount: ₹600")).toBeVisible();
+
+  await category.click();
+  await page.getByRole("option", { name: /bHNI/ }).click();
+  await expect(lots).toHaveValue("11");
+  await expect(lots).not.toHaveAttribute("max", /.+/);
+
+  await category.click();
+  await page.getByRole("option", { name: /Shareholder/ }).click();
+  await expect(lots).toHaveValue("1");
+  await expect(lots).toHaveAttribute("max", "4");
+});
+
 test("opening the add-application drawer keeps the applications tab URL", async ({ page }) => {
   await prepare(page);
   await page.goto("/applications");
