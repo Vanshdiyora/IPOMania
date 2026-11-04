@@ -176,18 +176,12 @@ describe("IPO management API", () => {
     expect(new URL(requests[0]!.url).searchParams.get("ipo_status")).toBe("in.(upcoming,closed)");
   });
 
-  it("returns the caller's personal IPOs and shared catalog from the personal list endpoint", async () => {
-    const requests = installSupabaseMock((request) => {
-      const url = new URL(request.url);
-      if (url.pathname.endsWith("/ipo_catalog")) {
-        return new Response(JSON.stringify([catalogRow]), {
-          headers: { "Content-Type": "application/json", "Content-Range": "0-0/1" },
-        });
-      }
-      return new Response(JSON.stringify([ipoRow]), {
+  it("returns only the caller's paginated personal IPOs from the personal list endpoint", async () => {
+    const requests = installSupabaseMock(() =>
+      new Response(JSON.stringify([ipoRow]), {
         headers: { "Content-Type": "application/json", "Content-Range": "0-0/1" },
-      });
-    });
+      }),
+    );
 
     const response = await createApp().request(
       "/api/ipos?page=1&page_size=25",
@@ -201,22 +195,14 @@ describe("IPO management API", () => {
     expect(await response.json()).toMatchObject({
       data: {
         ipos: [{ id: ipoId, company_name: ipoInput.company_name }],
-        catalog: [{ id: ipoId, company_name: catalogRow.company_name, status: "UPCOMING" }],
         pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
-        catalog_pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
       },
     });
-    const personalRequest = requests.find((request) =>
-      new URL(request.url).pathname.endsWith("/ipos"),
-    )!;
-    const catalogRequest = requests.find((request) =>
-      new URL(request.url).pathname.endsWith("/ipo_catalog"),
-    )!;
+    expect(requests).toHaveLength(1);
+    const personalRequest = requests[0]!;
+    expect(new URL(personalRequest.url).pathname).toBe("/rest/v1/ipos");
     expect(new URL(personalRequest.url).searchParams.get("user_id")).toBe(`eq.${userId}`);
-    expect(new URL(catalogRequest.url).searchParams.get("user_id")).toBeNull();
-    expect(new URL(catalogRequest.url).searchParams.get("archived_at")).toBe("is.null");
     expect(personalRequest.headers.get("authorization")).toBe(authHeaders().Authorization);
-    expect(catalogRequest.headers.get("authorization")).toBe(authHeaders().Authorization);
   });
 
   it("quotes catalog search punctuation and escapes literal wildcards", async () => {

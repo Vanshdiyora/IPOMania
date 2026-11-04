@@ -6,7 +6,7 @@ Responses use `{ data }` or `{ error: { code, message } }`.
 
 | Method and path                                  | Behavior                                                                                                                        |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/ipos`                                  | Return the caller's personal IPOs and active shared catalog IPOs, separately paginated by `page` and `page_size` (maximum 100). |
+| `GET /api/ipos`                                  | Return only the caller's personal IPOs, paginated by `page` and `page_size` (maximum 100).                                      |
 | `GET /api/ipos/catalog`                          | Read active admin-managed IPOs shared with users; paginated, searchable by company or exact symbol, and filterable by status.   |
 | `GET /api/ipos/catalog/:ipoId`                   | Read one active shared IPO, including incomplete issue data.                                                                    |
 | `GET /api/ipos/catalog/:ipoId/categories`        | Read all published shared category-rule versions for an active catalog IPO.                                                     |
@@ -38,11 +38,11 @@ and archive inclusion. Category POST bodies are strict structured objects; unkno
 invalid limit states are rejected. Category rules require `default_lots`, which is checked against
 the configured minimum, maximum, and increment. The IPO's `lot_size` is its shares-per-lot value.
 
-`GET /api/ipos` keeps personal records in `data.ipos` with `data.pagination`, and also returns the
-shared catalog in `data.catalog` with `data.catalog_pagination`. Both collections use the caller's
-verified JWT, the same search/status/exchange/date filters, and the requested page size; the shared
-collection always excludes archived catalog records. The existing `/api/ipos/catalog` route remains
-available for callers that only need the shared catalog.
+`GET /api/ipos` returns only the caller's personal records in `data.ipos` with `data.pagination`.
+`GET /api/ipos/catalog` returns only active shared catalog records in `data.ipos` with its own
+`data.pagination`. Both endpoints use the caller's verified JWT; catalog list entries expose
+normalized summary fields needed for browsing (name, status, dates, prices, lot size, and source
+metadata), while the catalog detail endpoint provides the full available issue record.
 
 The shared catalog accepts `page`, `page_size` (maximum 100), `search`, and uppercase `status`
 (`UPCOMING`, `OPEN`, `CLOSED`, or `LISTED`). It always excludes archived entries, including when
