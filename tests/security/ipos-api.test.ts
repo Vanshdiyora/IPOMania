@@ -177,10 +177,11 @@ describe("IPO management API", () => {
   });
 
   it("returns only the caller's paginated personal IPOs from the personal list endpoint", async () => {
-    const requests = installSupabaseMock(() =>
-      new Response(JSON.stringify([ipoRow]), {
-        headers: { "Content-Type": "application/json", "Content-Range": "0-0/1" },
-      }),
+    const requests = installSupabaseMock(
+      () =>
+        new Response(JSON.stringify([ipoRow]), {
+          headers: { "Content-Type": "application/json", "Content-Range": "0-0/1" },
+        }),
     );
 
     const response = await createApp().request(
@@ -192,12 +193,15 @@ describe("IPO management API", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
+    const body = await response.json();
+    expect(body).toMatchObject({
       data: {
         ipos: [{ id: ipoId, company_name: ipoInput.company_name }],
         pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
       },
     });
+    expect(body.data).not.toHaveProperty("catalog");
+    expect(body.data).not.toHaveProperty("catalog_pagination");
     expect(requests).toHaveLength(1);
     const personalRequest = requests[0]!;
     expect(new URL(personalRequest.url).pathname).toBe("/rest/v1/ipos");
