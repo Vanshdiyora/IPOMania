@@ -134,7 +134,6 @@ function IpoListContent({ personal }: { personal: boolean }) {
   const { session } = useAuth();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [ownedPage, setOwnedPage] = useState(1);
   const search = searchParams.get("search") ?? "";
   const availableStatuses: readonly IpoStatus[] = personal ? statuses : catalogStatuses;
   const selectedStatuses = searchParams
@@ -146,7 +145,6 @@ function IpoListContent({ personal }: { personal: boolean }) {
   const requestedPage = Number(searchParams.get("page"));
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const updateListParams = (changes: Record<string, string | string[] | null>, replace = false) => {
-    setOwnedPage(1);
     setSearchParams(
       (previous) => {
         const next = new URLSearchParams(previous);
@@ -172,13 +170,6 @@ function IpoListContent({ personal }: { personal: boolean }) {
     ...(search ? { search } : {}),
   });
   selectedStatuses.forEach((selectedStatus) => params.append("status", selectedStatus));
-  const ownedParams = new URLSearchParams({
-    page: String(ownedPage),
-    page_size: "25",
-    sort,
-    ...(search ? { search } : {}),
-  });
-  selectedStatuses.forEach((selectedStatus) => ownedParams.append("status", selectedStatus));
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["ipos", personal ? "personal" : "catalog", params.toString()],
     enabled: Boolean(session),
@@ -188,14 +179,7 @@ function IpoListContent({ personal }: { personal: boolean }) {
         session!,
       ),
   });
-  const ownedQuery = useQuery({
-    queryKey: ["ipos", "catalog-owned", ownedParams.toString()],
-    enabled: Boolean(session && !personal),
-    queryFn: () => apiRequest<IpoListResponse>(`/api/ipos?${ownedParams}`, session!),
-  });
   const ipos = data?.data.ipos ?? [];
-  const ownedIpos = ownedQuery.data?.data.ipos ?? [];
-  const ownedPagination = ownedQuery.data?.data.pagination;
 
   return (
     <div className="space-y-6">
@@ -313,67 +297,6 @@ function IpoListContent({ personal }: { personal: boolean }) {
         </div>
       </Card>
       {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
-      {!personal ? (
-        <section className="space-y-3" aria-labelledby="your-ipos-heading">
-          <div>
-            <h2 id="your-ipos-heading" className="text-xl font-bold text-navy">
-              Your IPOs
-            </h2>
-            <p className="mt-1 text-sm text-muted">
-              These records are private to your account. Shared IPOs are listed below.
-            </p>
-          </div>
-          {ownedQuery.error ? (
-            <ErrorNotice error={ownedQuery.error} onRetry={() => void ownedQuery.refetch()} />
-          ) : null}
-          {ownedQuery.isLoading ? (
-            <SkeletonPage label="Loading your IPOs">
-              <div className="grid gap-4">
-                <SkeletonCard />
-              </div>
-            </SkeletonPage>
-          ) : null}
-          {!ownedQuery.isLoading && !ownedQuery.error && ownedIpos.length === 0 ? (
-            <Card>
-              <EmptyState
-                title="No personal IPO records found."
-                description="Add an IPO to see your private record here alongside the shared catalog."
-              />
-            </Card>
-          ) : null}
-          {!ownedQuery.isLoading && !ownedQuery.error && ownedIpos.length > 0 ? (
-            <>
-              <Card className="divide-y divide-border p-0">
-                {ownedIpos.map((ipo) => (
-                  <Link
-                    key={ipo.id}
-                    className="flex min-h-touch flex-wrap items-center justify-between gap-3 p-4 text-ink no-underline hover:bg-canvas/60"
-                    to={`/ipos/${ipo.id}`}
-                    state={{ from: `${location.pathname}${location.search}` }}
-                  >
-                    <span>
-                      <span className="block font-semibold text-action">{ipo.company_name}</span>
-                      <span className="mt-1 block text-xs text-muted">
-                        {ipo.symbol} · {ipo.exchange}
-                      </span>
-                    </span>
-                    <span className="text-sm font-medium">{label(ipo.status)}</span>
-                  </Link>
-                ))}
-              </Card>
-              {ownedPagination && ownedPagination.total_pages > 1 ? (
-                <Pagination
-                  page={ownedPagination.page}
-                  totalPages={ownedPagination.total_pages}
-                  total={ownedPagination.total}
-                  label="Your IPO pages"
-                  onPageChange={setOwnedPage}
-                />
-              ) : null}
-            </>
-          ) : null}
-        </section>
-      ) : null}
       {isLoading ? (
         <SkeletonPage label="Loading IPO records">
           <div className="grid gap-4">

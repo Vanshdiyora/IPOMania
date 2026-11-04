@@ -109,7 +109,7 @@ describe("user IPO catalog", () => {
     );
   });
 
-  it("shows the signed-in user's IPOs alongside the shared catalog without changing ownership", async () => {
+  it("shows personal IPOs only in My IPOs, separately from the shared catalog", async () => {
     const ownedIpo = {
       ...catalogIpo,
       id: "99999999-9999-4999-8999-999999999999",
@@ -125,21 +125,21 @@ describe("user IPO catalog", () => {
 
     renderPage();
 
-    expect(await screen.findByRole("heading", { name: "Your IPOs" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: catalogIpo.company_name })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "My Private IPO" })).not.toBeInTheDocument();
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",
+      expect.anything(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "My IPOs" }));
     expect(await screen.findByRole("link", { name: /My Private IPO/ })).toHaveAttribute(
       "href",
       `/ipos/${ownedIpo.id}`,
     );
-    expect(screen.getByRole("link", { name: catalogIpo.company_name })).toHaveAttribute(
-      "href",
-      `/ipos/catalog/${catalogIpo.id}`,
-    );
+    expect(screen.queryByRole("link", { name: catalogIpo.company_name })).not.toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/api/ipos?page=1&page_size=25&sort=date_desc",
-      expect.anything(),
-    );
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",
       expect.anything(),
     );
   });
@@ -347,7 +347,7 @@ describe("user IPO catalog", () => {
   it("shows a loading failure without incorrectly reporting an empty catalog", async () => {
     apiRequestMock.mockRejectedValue(new Error("Unavailable"));
     renderPage();
-    expect(await screen.findAllByRole("alert")).toHaveLength(2);
+    expect(await screen.findAllByRole("alert")).toHaveLength(1);
     expect(screen.queryByText("No IPO records match these filters.")).not.toBeInTheDocument();
   });
 });
