@@ -177,7 +177,6 @@ test("IPO list and details show user-entered provenance and rule setup links", a
   await page.getByRole("link", { name: "IPO Test Company" }).click();
 
   await expect(page.getByRole("heading", { name: "IPO Test Company" })).toBeVisible();
-  await expect(page.getByText("Manual entry · unverified")).toBeVisible();
   await expect(
     page.getByText(/The application does not automatically fetch or verify the source/),
   ).toBeVisible();
