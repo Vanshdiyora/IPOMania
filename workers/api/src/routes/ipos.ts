@@ -31,7 +31,7 @@ const categoryColumns =
 const catalogCategoryColumns =
   "id, ipo_catalog_id, category, rule_version, lot_limit_status, default_lots, minimum_lots, maximum_lots, lot_increment, investment_limit_status, minimum_investment, maximum_investment, reserved_shares, reserved_percentage, shareholder_record_date, minimum_shareholding, eligibility_conditions, allowed_price_types, minimum_price_increment, source_reference, rule_source, last_verified_at, created_at";
 const catalogColumns =
-  "id,provider_id,company_name,symbol,issue_type,exchange,price_band_min,price_band_max,issue_price,lot_size,issue_size,bidding_start_date,bidding_end_date,allotment_date,listing_date,ipo_status,data_source,last_synced_at,created_at,updated_at,archived_at";
+  "id,provider_id,company_name,symbol,issue_type,exchange,price_band_min,price_band_max,issue_price,lot_size,issue_size,bidding_start_date,bidding_end_date,allotment_date,listing_date,ipo_status,data_source,source_reference,last_synced_at,created_at,updated_at,archived_at";
 
 function queryWithStatuses(context: IpoRouteContext) {
   const query = context.req.query();
@@ -57,6 +57,7 @@ type IpoCatalogDatabaseRow = {
   listing_date: string | null;
   ipo_status: string;
   data_source: string;
+  source_reference: string | null;
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;
@@ -93,7 +94,7 @@ function catalogRecord(row: IpoCatalogDatabaseRow): IpoCatalogRecord {
     opening_date: row.bidding_start_date,
     closing_date: row.bidding_end_date,
     status,
-    source_reference: row.provider_id ?? null,
+    source_reference: row.source_reference ?? row.provider_id ?? null,
     last_verified_at: row.last_synced_at,
   };
 }
@@ -312,54 +313,66 @@ iposRoutes.get("/", async (context) => {
   const query = parsed.data;
   const userId = context.get("authenticatedUser").id;
   const supabase = context.get("rlsSupabase");
+  const offset = (query.page - 1) * query.page_size;
+  const pageEnd = offset + query.page_size - 1;
+  const combinedList = query.source === "all";
+  const rangeStart = combinedList ? 0 : offset;
+  const rangeEnd = pageEnd;
   const sortColumn = query.sort.startsWith("date_")
     ? "opening_date"
     : query.sort.startsWith("price_")
       ? "issue_price_min"
       : "company_name";
   const sortAscending = query.sort.endsWith("_asc");
-  let request = supabase
-    .from("ipos")
-    .select(ipoColumns, { count: "exact" })
-    .eq("user_id", userId)
-    .order(sortColumn, { ascending: sortAscending, nullsFirst: false });
-  if (sortColumn !== "company_name") request = request.order("company_name", { ascending: true });
-  request = request.order("id", { ascending: true });
-
-  if (query.include_archived === "false") request = request.is("archived_at", null);
-  if (query.include_archived === "true") request = request.not("archived_at", "is", null);
   const selectedStatuses = Array.isArray(query.status)
     ? query.status
     : query.status
       ? [query.status]
       : [];
-  if (selectedStatuses.length === 1) {
-    request = request.eq("status", selectedStatuses[0]!);
-  } else if (selectedStatuses.length > 1) {
-    request = request.in("status", selectedStatuses);
-  }
-  if (query.exchange) request = request.ilike("exchange", query.exchange);
-  if (query.opening_from) request = request.gte("opening_date", query.opening_from);
-  if (query.opening_to) request = request.lte("opening_date", query.opening_to);
-  if (query.search) {
-    const search = query.search.trim();
-    request = /^[A-Za-z0-9._-]+$/.test(search)
-      ? request.ilike("symbol", search)
-      : request.ilike("company_name", `%${escapeLike(search)}%`);
-  }
 
-  const { data, error, count } = await request.range(
-    (query.page - 1) * query.page_size,
-    query.page * query.page_size - 1,
-  );
-  if (error) throw error;
+  let ownedIpos: IpoRecord[] = [];
+  let ownedCount = 0;
+  if (query.source !== "catalog") {
+    let request = supabase
+      .from("ipos")
+      .select(ipoColumns, { count: "exact" })
+      .eq("user_id", userId)
+      .order(sortColumn, { ascending: sortAscending, nullsFirst: false });
+    if (sortColumn !== "company_name") request = request.order("company_name", { ascending: true });
+    request = request.order("id", { ascending: true });
+
+    if (query.include_archived === "false") request = request.is("archived_at", null);
+    if (query.include_archived === "true") request = request.not("archived_at", "is", null);
+    if (selectedStatuses.length === 1) {
+      request = request.eq("status", selectedStatuses[0]!);
+    } else if (selectedStatuses.length > 1) {
+      request = request.in("status", selectedStatuses);
+    }
+    if (query.exchange) request = request.ilike("exchange", query.exchange);
+    if (query.opening_from) request = request.gte("opening_date", query.opening_from);
+    if (query.opening_to) request = request.lte("opening_date", query.opening_to);
+    if (query.search) {
+      const search = query.search.trim();
+      request = /^[A-Za-z0-9._-]+$/.test(search)
+        ? request.ilike("symbol", search)
+        : request.ilike("company_name", `%${escapeLike(search)}%`);
+    }
+
+    const result = await request.range(rangeStart, rangeEnd);
+    if (result.error) throw result.error;
+    ownedIpos = (result.data ?? []) as IpoRecord[];
+    ownedCount = result.count ?? 0;
+  }
 
   const catalogStatuses = selectedStatuses.filter((status) =>
     ["UPCOMING", "OPEN", "CLOSED", "LISTED"].includes(status),
   );
   let catalog: IpoCatalogDatabaseRow[] = [];
   let catalogCount = 0;
-  if (selectedStatuses.length === 0 || catalogStatuses.length > 0) {
+  if (
+    query.source !== "personal" &&
+    (selectedStatuses.length === 0 || catalogStatuses.length > 0)
+  ) {
     let catalogRequest = supabase
       .from("ipo_catalog")
       .select(catalogColumns, { count: "exact" })
@@ -392,24 +405,63 @@ iposRoutes.get("/", async (context) => {
       const term = escapeLike(query.search).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
       catalogRequest = catalogRequest.or(`company_name.ilike."%${term}%",symbol.ilike."${term}"`);
     }
-    const catalogResult = await catalogRequest.range(
-      (query.page - 1) * query.page_size,
-      query.page * query.page_size - 1,
-    );
+    const catalogResult = await catalogRequest.range(rangeStart, rangeEnd);
     if (catalogResult.error) throw catalogResult.error;
     catalog = (catalogResult.data ?? []) as IpoCatalogDatabaseRow[];
     catalogCount = catalogResult.count ?? 0;
   }
 
+  const combinedIpos = [
+    ...ownedIpos.map((ipo) => ({ ...ipo, source: "PERSONAL" as const })),
+    ...catalog.map((ipo) => ({ ...catalogRecord(ipo), source: "CATALOG" as const })),
+  ];
+  if (combinedList) {
+    const compareNullable = (left: string | null, right: string | null) => {
+      if (left === null) return right === null ? 0 : 1;
+      if (right === null) return -1;
+      return left.localeCompare(right, undefined, { sensitivity: "base", numeric: true });
+    };
+    const compareValue = (left: string | null, right: string | null) => {
+      if (left === null || right === null) return compareNullable(left, right);
+      if (sortColumn === "issue_price_min") {
+        return Number(left) - Number(right);
+      }
+      return compareNullable(left, right);
+    };
+    combinedIpos.sort((left, right) => {
+      const leftValue =
+        sortColumn === "opening_date"
+          ? left.opening_date
+          : sortColumn === "issue_price_min"
+            ? left.issue_price_min
+            : left.company_name;
+      const rightValue =
+        sortColumn === "opening_date"
+          ? right.opening_date
+          : sortColumn === "issue_price_min"
+            ? right.issue_price_min
+            : right.company_name;
+      const primary = compareValue(leftValue, rightValue);
+      if (primary !== 0) return sortAscending ? primary : -primary;
+      if (sortColumn !== "company_name") {
+        const name = compareNullable(left.company_name, right.company_name);
+        if (name !== 0) return name;
+      }
+      const id = left.id.localeCompare(right.id);
+      return id !== 0 ? id : left.source.localeCompare(right.source);
+    });
+  }
+
+  const total = ownedCount + catalogCount;
   return context.json({
     data: {
-      ipos: (data ?? []) as IpoRecord[],
+      ipos: combinedList ? combinedIpos.slice(offset, pageEnd + 1) : combinedIpos,
       catalog: catalog.map(catalogRecord),
       pagination: {
         page: query.page,
         page_size: query.page_size,
-        total: count ?? 0,
-        total_pages: Math.ceil((count ?? 0) / query.page_size),
+        total,
+        total_pages: Math.ceil(total / query.page_size),
       },
       catalog_pagination: {
         page: query.page,
@@ -422,18 +474,58 @@ iposRoutes.get("/", async (context) => {
 });
 
 iposRoutes.post("/", validateJson(ipoSchema), async (context) => {
+  const submittedIpo = context.req.valid("json");
+  if (!(["UPCOMING", "OPEN", "CLOSED", "LISTED"] as string[]).includes(submittedIpo.status)) {
+    return context.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Shared catalog IPOs must use Upcoming, Open, Closed, or Listed status.",
+        },
+      },
+      400,
+    );
+  }
   const { data, error } = await context
     .get("rlsSupabase")
-    .from("ipos")
+    .from("ipo_catalog")
     .insert({
-      ...context.req.valid("json"),
-      user_id: context.get("authenticatedUser").id,
+      submitted_by: context.get("authenticatedUser").id,
+      company_name: submittedIpo.company_name,
+      symbol: submittedIpo.symbol,
+      issue_type: submittedIpo.ipo_type.toUpperCase() === "SME" ? "SME" : "mainboard",
+      exchange: submittedIpo.exchange,
+      price_band_min: submittedIpo.issue_price_min,
+      price_band_max: submittedIpo.issue_price_max,
+      issue_price: submittedIpo.cut_off_price,
+      lot_size: submittedIpo.lot_size,
+      issue_size: submittedIpo.issue_size,
+      bidding_start_date: submittedIpo.opening_date,
+      bidding_end_date: submittedIpo.closing_date,
+      allotment_date: submittedIpo.allotment_date,
+      listing_date: submittedIpo.listing_date,
+      ipo_status: submittedIpo.status.toLowerCase(),
+      data_source: "USER_SUBMITTED",
+      source_reference: submittedIpo.source_reference,
+      source_last_updated_at: submittedIpo.last_verified_at,
+      manual_override_fields: [],
     })
-    .select(ipoColumns)
+    .select(catalogColumns)
     .single();
 
+  if (error?.code === "23505") {
+    return context.json(
+      {
+        error: {
+          code: "DUPLICATE_IPO",
+          message: "An active shared catalog IPO already uses this symbol and exchange.",
+        },
+      },
+      409,
+    );
+  }
   if (error) return ipoDatabaseError(context, error);
-  return context.json({ data: data as IpoRecord }, 201);
+  return context.json({ data: catalogRecord(data as IpoCatalogDatabaseRow) }, 201);
 });
 
 iposRoutes.get("/:ipoId/categories", async (context) => {

@@ -6,9 +6,10 @@ Migrations: `supabase/migrations/20261031140000_ipo_manager_quota_engine.sql`,
 
 ## Ownership decision
 
-Personal IPO records are owner-scoped. The separately approved admin-managed catalog is shared and
-has append-only category rules that admins can create and signed-in users can read. User-owned IPO
-notes, shareholder inputs, and calculations remain private.
+Personal IPO records are owner-scoped snapshots. The shared catalog is the source of truth for new
+IPO issue data: signed-in users may submit a complete `USER_SUBMITTED` catalog entry under their
+verified identity, and administrators manage catalog data and category rules thereafter.
+User-owned IPO notes, shareholder inputs, calculations, and application snapshots remain private.
 
 ## `public.ipos`
 
@@ -42,6 +43,14 @@ Admins can insert rules, signed-in users can read rules for active catalog recor
 triggers assign versions. User imports copy the latest source rule per category into their own
 `ipo_categories` rows and retain the source rule ID for idempotent future imports. Imported rules
 remain private copies governed by the existing user-owned RLS and application foreign keys.
+
+## Shared catalog submissions
+
+`public.ipo_catalog.submitted_by` records the verified user who submitted a `USER_SUBMITTED`
+catalog entry, and `source_reference` preserves an optional source supplied with it. RLS allows a
+signed-in user to insert only a `USER_SUBMITTED` row tied to their own identity; users cannot edit
+or archive catalog rows. The active-symbol/exchange unique index prevents duplicate active issues.
+Administrators retain catalog-management access.
 
 ## `public.ipo_quota_calculations`
 
