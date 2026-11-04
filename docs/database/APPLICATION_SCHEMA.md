@@ -1,16 +1,17 @@
 # Application database schema
 
-Migration: `supabase/migrations/20261031150000_application_manager.sql`.
+Migrations: `supabase/migrations/20261031150000_application_manager.sql` and
+`supabase/migrations/20261104165000_manual_application_lots.sql`.
 
 ## `public.applications`
 
 Each row has a generated UUID and an immutable `user_id` linked to `auth.users`. Composite
-restrictive foreign keys require its IPO, demat account, and issue-specific category rule to belong
-to the same owner; the category must belong to that IPO. Deleting any referenced financial source
-record is restricted. Financial inputs are server-derived: lots, total shares, exact numeric amount,
-rule version, and JSON calculation snapshot. The snapshot captures the issue terms, category rule,
-calculation input/result, and time so later edits to an IPO or rules cannot rewrite earlier
-calculations.
+restrictive foreign keys require its IPO and demat account to belong to the same owner. A nullable
+category-rule reference, when present, must belong to that owner and IPO. `category_code` always
+stores the selected category. Financial inputs are server-derived: lots, total shares, exact numeric
+amount, optional rule version, and JSON calculation snapshot. The snapshot captures the issue terms,
+optional category rule, calculation input/result, and time so later edits to an IPO or rules cannot
+rewrite earlier calculations.
 
 Application, mandate, and allotment statuses are constrained independently. Applications can be
 soft archived. The client cannot update shares, amount, rule version, snapshot, or owner columns.

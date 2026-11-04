@@ -305,7 +305,7 @@ test("application form hides financial statuses and preserves them on edit", asy
   await expect(page).toHaveURL(/\/applications$/);
 });
 
-test("application lot ranges update from the selected IPO investor-category rules", async ({
+test("preselected IPO data enables application saving and applies category lot ranges", async ({
   page,
 }) => {
   await prepare(page);
@@ -345,9 +345,9 @@ test("application lot ranges update from the selected IPO investor-category rule
   await page.route(`**/api/ipos/${recordId}/categories`, (route) =>
     route.fulfill({ json: { data: { configurations: categories } } }),
   );
-  await page.goto("/applications/new");
-  await page.getByRole("combobox", { name: "IPO" }).click();
-  await page.getByRole("option", { name: "Form test company" }).click();
+  await page.goto(`/applications/new?ipo_id=${recordId}`);
+  await expect(page.getByRole("combobox", { name: "IPO" })).toHaveText("Form test company");
+  await expect(page.getByLabel("Price")).toHaveValue("20.00");
   await page.getByRole("combobox", { name: "Demat account" }).click();
   await page.getByRole("option", { name: /Form test holder/ }).click();
 
@@ -379,6 +379,7 @@ test("application lot ranges update from the selected IPO investor-category rule
   await page.getByRole("option", { name: /Shareholder/ }).click();
   await expect(lots).toHaveValue("1");
   await expect(lots).toHaveAttribute("max", "4");
+  await expect(page.getByRole("button", { name: "Save application" })).toBeEnabled();
 });
 
 test("opening the add-application drawer keeps the applications tab URL", async ({ page }) => {

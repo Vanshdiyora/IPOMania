@@ -271,7 +271,7 @@ describe("application API", () => {
       },
       bindings,
     );
-    expect(response.status).toBe(201);
+    expect(response.status, await response.clone().text()).toBe(201);
     const body = (await response.json()) as { data: Record<string, unknown> };
     expect(body.data).toMatchObject({
       user_id: userId,
@@ -294,6 +294,38 @@ describe("application API", () => {
       notes: null,
       submission_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
     });
+  });
+
+  it("creates applications with manually chosen lots and no category rule", async () => {
+    const requests = installMock();
+    const response = await createApp().request(
+      "/api/applications",
+      {
+        method: "POST",
+        headers: { Authorization: "Bearer test-access-token", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...applicationInput,
+          category_id: null,
+          category_code: "SHNI",
+          lots: 7,
+          price_type: "BID",
+        }),
+      },
+      bindings,
+    );
+    expect(response.status, await response.clone().text()).toBe(201);
+    const body = (await response.json()) as { data: Record<string, unknown> };
+    expect(body.data).toMatchObject({
+      category_id: null,
+      category_code: "SHNI",
+      lots: 7,
+      total_shares: 70,
+      application_amount: "1400",
+      rule_version: null,
+    });
+    expect(
+      requests.some((request) => new URL(request.url).pathname.endsWith("/ipo_categories")),
+    ).toBe(false);
   });
 
   it("rejects an inactive or unowned account before inserting", async () => {

@@ -746,12 +746,15 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     price,
   );
   const validLotSelection = Boolean(
-    lotBounds &&
-      lotBounds.minimum !== null &&
-      Number.isSafeInteger(enteredLots) &&
-      enteredLots >= lotBounds.minimum &&
-      (lotBounds.maximum === null || enteredLots <= lotBounds.maximum) &&
-      (enteredLots - lotBounds.minimum) % lotBounds.increment === 0,
+    Number.isSafeInteger(enteredLots) &&
+      enteredLots > 0 &&
+      enteredLots <= 1_000_000 &&
+      (!activeCategory ||
+        (lotBounds !== null &&
+          lotBounds.minimum !== null &&
+          enteredLots >= lotBounds.minimum &&
+          (lotBounds.maximum === null || enteredLots <= lotBounds.maximum) &&
+          (enteredLots - lotBounds.minimum) % lotBounds.increment === 0)),
   );
   const estimatedTotalShares =
     selectedIpo &&
@@ -764,6 +767,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   useEffect(() => {
     if (editing || dirty || ipoId || !preselectedIpo.data?.data.id) return;
     setIpoId(preselectedIpo.data.data.id);
+    setPrice(preselectedIpo.data.data.issue_price_max ?? "");
   }, [dirty, editing, ipoId, preselectedIpo.data]);
   useEffect(() => {
     if (editing || dirty || accountId || !preselectedAccountId) return;
@@ -772,11 +776,16 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       setAccountId(account.id);
     }
   }, [accountId, dirty, editing, lists.accounts, preselectedAccountId]);
-  const priceType = activeCategory?.allowed_price_types.includes("BID") ? "BID" : "CUT_OFF";
+  const priceType = activeCategory
+    ? activeCategory.allowed_price_types.includes("BID")
+      ? "BID"
+      : "CUT_OFF"
+    : "BID";
   const applicationPayload = {
     ipo_id: ipoId,
     demat_account_id: accountId,
-    category_id: categoryId,
+    category_id: categoryId || null,
+    category_code: categoryCode || undefined,
     lots: Number(lots),
     price_type: priceType,
     price,
@@ -827,20 +836,24 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
           session,
           { method: "POST" },
         );
-        const importedCategories = await apiRequest<{
-          data: { configurations: IpoCategoryConfiguration[] };
-        }>(`/api/ipos/${imported.data.id}/categories`, session);
-        const importedCategory = importedCategories.data.configurations.find(
-          (configuration) => configuration.source_catalog_rule_id === categoryId,
-        );
-        if (!importedCategory) {
-          throw new Error("The selected shared IPO category could not be prepared.");
+        if (categoryId) {
+          const importedCategories = await apiRequest<{
+            data: { configurations: IpoCategoryConfiguration[] };
+          }>(`/api/ipos/${imported.data.id}/categories`, session);
+          const importedCategory = importedCategories.data.configurations.find(
+            (configuration) => configuration.source_catalog_rule_id === categoryId,
+          );
+          if (!importedCategory) {
+            throw new Error("The selected shared IPO category could not be prepared.");
+          }
+          body = {
+            ...applicationPayload,
+            ipo_id: imported.data.id,
+            category_id: importedCategory.id,
+          };
+        } else {
+          body = { ...applicationPayload, ipo_id: imported.data.id };
         }
-        body = {
-          ...applicationPayload,
-          ipo_id: imported.data.id,
-          category_id: importedCategory.id,
-        };
       }
       return apiRequest(
         editing ? `/api/applications/${applicationId}` : "/api/applications",
@@ -876,7 +889,8 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     if (!editing || !application || ipoId) return;
     setIpoId(application.ipo_id);
     setAccountId(application.demat_account_id);
-    setCategoryId(application.category_id);
+    setCategoryId(application.category_id ?? "");
+    setCategoryCode(application.category_code);
     setLots(String(application.lots));
     setApplicationNumber(application.application_number ?? "");
     setExternalReference(application.external_reference ?? "");
@@ -885,7 +899,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   return (
     <RouteFormDrawer
       title={editing ? "Edit application" : "Add application"}
-      description="Choose an issue, an account, and a category with configured issue rules. This records an application for tracking; it does not submit an IPO application to a broker or exchange."
+      description="Choose an issue, account, category, and lot count. This records an application for tracking; it does not submit an IPO application to a broker or exchange."
       cancelTo={returnTo}
       formId="application-form"
       submitLabel="Save application"
@@ -897,7 +911,9 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
         (!editing &&
           (!ipoId ||
             !accountId ||
-            !categoryId ||
+            !categoryCode ||
+            categoriesQuery.isLoading ||
+            Boolean(categoriesQuery.error) ||
             !price ||
             !localCalculation ||
             !validLotSelection))
@@ -1007,7 +1023,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                       >
                         Add to catalog
                       </Link>{" "}
-                      and configure its category before recording an application.
+                      and record applications with manually selected lots.
                     </p>
                   ) : null}
                   {validation.errors.ipo_id ? (
@@ -1037,10 +1053,10 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                 />
                 <FormSelect
                   label="Investor category"
-                  error={validation.errors.category_id}
+                  error={validation.errors.category_code ?? validation.errors.category_id}
                   required
                   value={categoryId || categoryCode}
-                  disabled={categoriesQuery.isLoading || Boolean(categoriesQuery.error)}
+                  disabled={categoriesQuery.isLoading}
                   onChange={(event) => {
                     const nextCategory = categories.find((item) => item.id === event.target.value);
                     setCategoryId(nextCategory?.id ?? "");
@@ -1074,8 +1090,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                     const item = categories.find((category) => category.category === code);
                     return (
                       <option key={code} value={item?.id ?? code}>
-                        {formatCategory(code)} — {investorCategoryDescription(code)}
-                        {item ? ` (rules v${item.rule_version})` : " (not configured for this IPO)"}
+                        {formatCategory(code)}
                       </option>
                     );
                   })}
@@ -1083,105 +1098,36 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                     .filter((item) => item.category === "EMPLOYER")
                     .map((item) => (
                       <option key={item.id} value={item.id}>
-                        {formatCategory(item.category)} (rules v{item.rule_version})
+                        {formatCategory(item.category)}
                       </option>
                     ))}
                 </FormSelect>
-                {activeCategory ? (
-                  <p className="text-sm text-muted sm:col-span-2">
-                    {investorCategoryDescription(activeCategory.category)}
-                    {typeof activeCategory.minimum_shareholding === "number"
-                      ? ` Minimum eligible holding: ${activeCategory.minimum_shareholding.toLocaleString("en-IN")} shares.`
-                      : ""}
-                  </p>
-                ) : categoryCode ? (
-                  <p className="text-sm text-muted sm:col-span-2" role="status">
-                    {investorCategoryDescription(categoryCode)} Category selected for reference;
-                    configure issue-specific rules before saving an application.
-                  </p>
-                ) : null}
-                {ipoId &&
-                !categoriesQuery.isLoading &&
-                !categoriesQuery.error &&
-                categories.length === 0 ? (
-                  <p className="text-sm text-muted sm:col-span-2" role="status">
-                    No category rules are configured for this IPO.{" "}
-                    {selectedCatalogIpo ? (
-                      "An administrator must publish shared catalog rules before it can be used."
-                    ) : (
-                      <>
-                        <DrawerRouteLink
-                          className="font-semibold text-action underline underline-offset-2 hover:text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy"
-                          to={`/ipos/${ipoId}/categories`}
-                        >
-                          Configure categories
-                        </DrawerRouteLink>{" "}
-                        to make Retail, HNI, Shareholder, or Employer categories available.
-                      </>
-                    )}
-                  </p>
-                ) : null}
                 <div className="sm:col-span-2">
                   <FormInput
                     label="Lots"
                     error={validation.errors.lots}
                     required
                     type="number"
-                    min={lotBounds?.minimum ?? undefined}
-                    max={lotBounds?.maximum ?? undefined}
-                    step={lotBounds?.increment ?? 1}
+                    min={activeCategory ? (lotBounds?.minimum ?? undefined) : 1}
+                    max={activeCategory ? (lotBounds?.maximum ?? undefined) : 1_000_000}
+                    step={activeCategory ? (lotBounds?.increment ?? 1) : 1}
                     value={lots}
                     disabled={
-                      !activeCategory ||
-                      !lotBounds ||
-                      lotBounds?.minimum === null ||
-                      (lotBounds?.minimum !== undefined &&
-                        lotBounds.maximum !== null &&
-                        lotBounds.maximum < lotBounds.minimum)
+                      categoriesQuery.isLoading ||
+                      Boolean(categoriesQuery.error) ||
+                      (activeCategory &&
+                        (!lotBounds ||
+                          lotBounds.minimum === null ||
+                          (lotBounds.maximum !== null && lotBounds.maximum < lotBounds.minimum)))
                     }
                     onChange={(event) => setLots(event.target.value)}
                   />
-                  {activeCategory ? (
-                    <p className="mt-2 text-sm text-muted" role="status">
-                      {lotBounds?.minimum !== null && lotBounds?.minimum !== undefined ? (
-                        <>
-                          Permitted lots: {lotBounds.minimum.toLocaleString("en-IN")}–
-                          {lotBounds.maximum === null
-                            ? "no configured maximum"
-                            : lotBounds.maximum.toLocaleString("en-IN")}
-                          .{" "}
-                        </>
-                      ) : (
-                        "A lot range cannot be calculated from the current IPO configuration and price. "
-                      )}
-                      {lotBounds?.minimum !== null &&
-                      lotBounds?.minimum !== undefined &&
-                      lotBounds.maximum !== null &&
-                      lotBounds.maximum < lotBounds.minimum
-                        ? "No lot quantity satisfies this category's configured investment limits. "
-                        : ""}
-                      {activeCategory.minimum_investment !== null ||
-                      activeCategory.maximum_investment !== null ? (
-                        <>
-                          Investment range:{" "}
-                          {activeCategory.minimum_investment
-                            ? `₹${Number(activeCategory.minimum_investment).toLocaleString("en-IN")}`
-                            : "no configured minimum"}
-                          {" – "}
-                          {activeCategory.maximum_investment
-                            ? `₹${Number(activeCategory.maximum_investment).toLocaleString("en-IN")}`
-                            : "no configured maximum"}
-                          .
-                        </>
-                      ) : null}
-                    </p>
-                  ) : null}
                   {lotBounds?.minimum !== null &&
                   lotBounds?.minimum !== undefined &&
                   Number.isSafeInteger(enteredLots) &&
                   enteredLots < lotBounds.minimum ? (
                     <p role="alert" className="mt-1 text-sm font-medium text-red-700">
-                      Select at least {lotBounds.minimum} lot(s) for this category.
+                      Select at least {lotBounds.minimum} lot(s).
                     </p>
                   ) : null}
                   {lotBounds?.maximum !== null &&
@@ -1189,7 +1135,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                   Number.isSafeInteger(enteredLots) &&
                   enteredLots > lotBounds.maximum ? (
                     <p role="alert" className="mt-1 text-sm font-medium text-red-700">
-                      Select no more than {lotBounds.maximum} lot(s) for this category.
+                      Select no more than {lotBounds.maximum} lot(s).
                     </p>
                   ) : null}
                   {lotBounds?.minimum !== null &&
@@ -1198,7 +1144,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                   enteredLots >= lotBounds.minimum &&
                   (enteredLots - lotBounds.minimum) % lotBounds.increment !== 0 ? (
                     <p role="alert" className="mt-1 text-sm font-medium text-red-700">
-                      Select lots in increments of {lotBounds.increment} for this category.
+                      Select lots in increments of {lotBounds.increment}.
                     </p>
                   ) : null}
                 </div>
@@ -1244,12 +1190,6 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
               <span className="mt-1 block text-base font-normal">
                 Total shares: {localCalculation.totalShares.toLocaleString("en-IN")}
               </span>
-            </p>
-          ) : null}
-          {activeCategory ? (
-            <p className="mt-3 text-sm text-muted">
-              Rule version {activeCategory.rule_version}. This account/category combination will be
-              checked against the configured issue rules.
             </p>
           ) : null}
           {editing ? (
@@ -1342,7 +1282,7 @@ export function ApplicationDetailsPage() {
                 : item.demat_account_id,
             ],
             ["Broker", item.demat_accounts?.broker_name ?? "Not available"],
-            ["Category", item.ipo_categories?.category ?? item.category_id],
+            ["Category", item.ipo_categories?.category ?? formatCategory(item.category_code)],
             ["Lots", item.lots],
             ["Total shares", item.total_shares],
             ["Application amount", item.application_amount],
@@ -2058,18 +1998,6 @@ function adjustLotsToBounds(value: string, bounds: ApplicationLotBounds) {
     adjusted = bounds.maximum < bounds.minimum ? bounds.minimum : bounds.maximum;
   }
   return String(adjusted);
-}
-
-function investorCategoryDescription(category: string) {
-  return (
-    {
-      RETAIL: "Retail investor; limits follow the IPO configuration.",
-      SHNI: "Small HNI; limits follow the IPO configuration.",
-      BHNI: "Big HNI; limits follow the IPO configuration.",
-      SHAREHOLDER: "Shareholder reservation; eligibility follows the IPO configuration.",
-      EMPLOYER: "Employee reservation; eligibility follows the IPO configuration.",
-    }[category] ?? "Limits and eligibility follow the IPO configuration."
-  );
 }
 
 function formatCategory(value: string) {

@@ -22,24 +22,22 @@ application and its historical details remain available.
 ## Calculation and validation
 
 The add-application form keeps entry to an owned, unarchived IPO, an active owned demat account,
-an issue-specific category configuration, positive whole lots, and price. Shared IPO details offer
+a selected category, positive whole lots, and price. Shared IPO details offer
 **Use for application**, which copies complete shared issue data and the latest admin-managed
 category rules into the caller's **My IPOs** before opening the form. Unknown market values are not
 filled with defaults; incomplete shared records cannot be imported for application calculations.
-Personal IPO records and their independently configured rules are unchanged. If an IPO has no
-configured category rules, configure a sourced rule before recording an application. Selecting a
-category prefills its configured initial lots, which can be adjusted. The form states the shares in
-one lot and shows the corresponding total shares; the server preview calculates the total amount
-from price, lots, and IPO lot size without exposing a price-type field. The application service
-selects an allowed price mode from the configured issue rules. The server records the submission
-date and time when the form is saved, rather than accepting a user-entered timestamp. The same
-decimal financial engine checks the selected issue rules. Unknown or unconfigured lot, investment,
-and price rules remain errors. A saved application remains a tracking record, not issuer eligibility
-verification or investment advice.
+Personal IPO records and their independently configured rules are unchanged. When category rules
+exist, selecting a category prefills its configured lots and the existing rule checks remain in
+effect. Without a configured category rule, the category is saved as a label and users can enter
+lots manually (from 1 to 1,000,000); price must still match the IPO's issue-price range. The form
+states the shares in one lot and shows the corresponding total shares. The server calculates the
+amount from price, lots, and IPO lot size. The server records the submission date and time when the
+form is saved. A saved application remains a tracking record, not issuer eligibility verification
+or investment advice.
 
-The saved record includes exact application amount, total shares, rule version, a server-recorded
-submission timestamp, and a snapshot of the IPO pricing/lot-size inputs, category rule, applicant
-inputs, and result. This snapshot is historical evidence of the calculation, not issuer
+The saved record includes exact application amount, total shares, an optional rule version, a
+server-recorded submission timestamp, and a snapshot of the IPO pricing/lot-size inputs, optional
+category rule, applicant inputs, and result. This snapshot is historical evidence of the calculation, not issuer
 verification, investment advice, or an allotment prediction.
 
 ## Duplicate review
@@ -53,7 +51,7 @@ confirm import batches explicitly.
 
 ## Bulk entry
 
-Bulk entry requires one IPO, one configured category, lots, price type, and price, then validates
+Bulk entry requires one IPO, a selected category, lots, price type, and price, then validates
 each selected active demat account separately. The preview reports errors and exact calculated
 amounts per account. The application batch is created only after every selected row validates.
 SHAREHOLDER inputs and configured conditions are surfaced for explicit confirmation; selecting
