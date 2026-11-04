@@ -4,39 +4,45 @@ All routes require a verified Supabase bearer token and use the caller JWT with 
 key for database operations. User IDs are derived from Auth, never accepted from the request.
 Responses use `{ data }` or `{ error: { code, message } }`.
 
-| Method and path                                  | Behavior                                                                                                                      |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/ipos`                                  | Search/filter the caller's IPOs; paginated by `page` and `page_size` (maximum 100).                                           |
-| `GET /api/ipos/catalog`                          | Read active admin-managed IPOs shared with users; paginated, searchable by company or exact symbol, and filterable by status. |
-| `GET /api/ipos/catalog/:ipoId`                   | Read one active shared IPO, including incomplete issue data.                                                                  |
-| `GET /api/ipos/catalog/:ipoId/categories`        | Read all published shared category-rule versions for an active catalog IPO.                                                   |
-| `POST /api/ipos/catalog/:ipoId/import`           | Copy complete shared issue data and the latest shared category rules into the caller's My IPOs.                               |
-| `POST /api/ipos`                                 | Create a user-owned IPO.                                                                                                      |
-| `GET /api/ipos/:ipoId`                           | Read one owned IPO.                                                                                                           |
-| `PATCH /api/ipos/:ipoId`                         | Update a non-archived owned IPO.                                                                                              |
-| `POST /api/ipos/:ipoId/archive`                  | Soft-archive an owned IPO.                                                                                                    |
-| `GET /api/ipos/:ipoId/categories`                | Read all immutable category-rule versions for the owned IPO.                                                                  |
-| `POST /api/ipos/:ipoId/categories`               | Add a validated issue-specific rule version. The database assigns its version.                                                |
-| `GET /api/admin/ipos/catalog/:ipoId/categories`  | Read shared category-rule versions; administrators only.                                                                      |
-| `POST /api/admin/ipos/catalog/:ipoId/categories` | Add a source-backed shared rule version; administrators only.                                                                 |
-| `POST /api/quota/validate`                       | Validate a calculation without saving an audit record.                                                                        |
-| `POST /api/quota/calculate`                      | Calculate and save a reproducibility snapshot.                                                                                |
-| `POST /api/capital/applications`                 | Record an owned application from an eligible saved calculation; does not submit it.                                           |
-| `GET /api/capital/applications`                  | List capital-tracked applications with IPO/account/date filters.                                                              |
-| `GET /api/mandates`                              | List owned mandates with IPO/account/broker/category/date/status filters.                                                     |
-| `POST /api/mandates`                             | Record a pending UPI mandate; never initiates or approves a payment.                                                          |
-| `PATCH /api/mandates/:mandateId`                 | Manually update a mandate using validated state transitions.                                                                  |
-| `GET /api/allotments`                            | List owned allotments and refund state with issue/account/date filters.                                                       |
-| `POST /api/allotments`                           | Record a full, partial, or no-allotment result against an application.                                                        |
-| `PATCH /api/allotments/:id`                      | Update current allotment data; prior values are retained in audit history.                                                    |
-| `GET /api/capital/summary`                       | Read reconciled per-currency financial summaries.                                                                             |
-| `GET /api/capital/ledger`                        | List immutable financial events with filters and pagination.                                                                  |
-| `POST /api/capital/ledger`                       | Record a manual, idempotent financial event with an audit reference.                                                          |
+| Method and path                                  | Behavior                                                                                                                        |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/ipos`                                  | Return the caller's personal IPOs and active shared catalog IPOs, separately paginated by `page` and `page_size` (maximum 100). |
+| `GET /api/ipos/catalog`                          | Read active admin-managed IPOs shared with users; paginated, searchable by company or exact symbol, and filterable by status.   |
+| `GET /api/ipos/catalog/:ipoId`                   | Read one active shared IPO, including incomplete issue data.                                                                    |
+| `GET /api/ipos/catalog/:ipoId/categories`        | Read all published shared category-rule versions for an active catalog IPO.                                                     |
+| `POST /api/ipos/catalog/:ipoId/import`           | Copy complete shared issue data and the latest shared category rules into the caller's My IPOs.                                 |
+| `POST /api/ipos`                                 | Create a user-owned IPO.                                                                                                        |
+| `GET /api/ipos/:ipoId`                           | Read one owned IPO.                                                                                                             |
+| `PATCH /api/ipos/:ipoId`                         | Update a non-archived owned IPO.                                                                                                |
+| `POST /api/ipos/:ipoId/archive`                  | Soft-archive an owned IPO.                                                                                                      |
+| `GET /api/ipos/:ipoId/categories`                | Read all immutable category-rule versions for the owned IPO.                                                                    |
+| `POST /api/ipos/:ipoId/categories`               | Add a validated issue-specific rule version. The database assigns its version.                                                  |
+| `GET /api/admin/ipos/catalog/:ipoId/categories`  | Read shared category-rule versions; administrators only.                                                                        |
+| `POST /api/admin/ipos/catalog/:ipoId/categories` | Add a source-backed shared rule version; administrators only.                                                                   |
+| `POST /api/quota/validate`                       | Validate a calculation without saving an audit record.                                                                          |
+| `POST /api/quota/calculate`                      | Calculate and save a reproducibility snapshot.                                                                                  |
+| `POST /api/capital/applications`                 | Record an owned application from an eligible saved calculation; does not submit it.                                             |
+| `GET /api/capital/applications`                  | List capital-tracked applications with IPO/account/date filters.                                                                |
+| `GET /api/mandates`                              | List owned mandates with IPO/account/broker/category/date/status filters.                                                       |
+| `POST /api/mandates`                             | Record a pending UPI mandate; never initiates or approves a payment.                                                            |
+| `PATCH /api/mandates/:mandateId`                 | Manually update a mandate using validated state transitions.                                                                    |
+| `GET /api/allotments`                            | List owned allotments and refund state with issue/account/date filters.                                                         |
+| `POST /api/allotments`                           | Record a full, partial, or no-allotment result against an application.                                                          |
+| `PATCH /api/allotments/:id`                      | Update current allotment data; prior values are retained in audit history.                                                      |
+| `GET /api/capital/summary`                       | Read reconciled per-currency financial summaries.                                                                               |
+| `GET /api/capital/ledger`                        | List immutable financial events with filters and pagination.                                                                    |
+| `POST /api/capital/ledger`                       | Record a manual, idempotent financial event with an audit reference.                                                            |
 
 IPO list filters include company search (or exact symbol), status, exchange, opening-date bounds,
 and archive inclusion. Category POST bodies are strict structured objects; unknown fields and
 invalid limit states are rejected. Category rules require `default_lots`, which is checked against
 the configured minimum, maximum, and increment. The IPO's `lot_size` is its shares-per-lot value.
+
+`GET /api/ipos` keeps personal records in `data.ipos` with `data.pagination`, and also returns the
+shared catalog in `data.catalog` with `data.catalog_pagination`. Both collections use the caller's
+verified JWT, the same search/status/exchange/date filters, and the requested page size; the shared
+collection always excludes archived catalog records. The existing `/api/ipos/catalog` route remains
+available for callers that only need the shared catalog.
 
 The shared catalog accepts `page`, `page_size` (maximum 100), `search`, and uppercase `status`
 (`UPCOMING`, `OPEN`, `CLOSED`, or `LISTED`). It always excludes archived entries, including when
