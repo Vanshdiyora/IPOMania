@@ -1062,8 +1062,7 @@ async function previewImport(context: RouteContext) {
         (row) =>
           row.id.toLowerCase() === accountRef.toLowerCase() ||
           row.username?.toLowerCase() === accountRef.toLowerCase() ||
-          `${row.bank_name ?? ""}:${row.username ?? ""}`.toLowerCase() ===
-            accountRef.toLowerCase(),
+          `${row.bank_name ?? ""}:${row.username ?? ""}`.toLowerCase() === accountRef.toLowerCase(),
       );
       const account = accountMatches.length === 1 ? accountMatches[0] : null;
       if (!ipo) errors.push("IPO could not be matched by ID or symbol.");

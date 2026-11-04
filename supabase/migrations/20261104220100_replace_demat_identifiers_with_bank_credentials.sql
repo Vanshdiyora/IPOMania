@@ -33,9 +33,11 @@ alter table public.demat_accounts
     check (password_encrypted is null or password_encrypted ~ '^v1[.][A-Za-z0-9+/]+=*$');
 
 alter table public.demat_accounts
+  drop column masked_demat_identifier_normalized;
+
+alter table public.demat_accounts
   drop column depository_type,
   drop column masked_demat_identifier,
-  drop column masked_demat_identifier_normalized,
   drop column masked_client_reference;
 
 create index demat_accounts_owner_bank_idx

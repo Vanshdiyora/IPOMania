@@ -10,8 +10,8 @@ Responses use `{ data }` or `{ error: { code, message } }`.
 | `GET /api/ipos/catalog`                          | Read active admin-managed IPOs shared with users; paginated, searchable by company or exact symbol, and filterable by status. |
 | `GET /api/ipos/catalog/:ipoId`                   | Read one active shared IPO, including incomplete issue data.                                                                  |
 | `GET /api/ipos/catalog/:ipoId/categories`        | Read all published shared category-rule versions for an active catalog IPO.                                                   |
-| `POST /api/ipos/catalog/:ipoId/import`           | Copy complete shared issue data and the latest shared category rules into a private application snapshot.                      |
-| `POST /api/ipos`                                 | Reject user-submitted IPO creation with `403`; shared catalog creation is handled by the admin API.                          |
+| `POST /api/ipos/catalog/:ipoId/import`           | Copy complete shared issue data and the latest shared category rules into a private application snapshot.                     |
+| `POST /api/ipos`                                 | Reject user-submitted IPO creation with `403`; shared catalog creation is handled by the admin API.                           |
 | `GET /api/ipos/:ipoId`                           | Read one owned IPO.                                                                                                           |
 | `PATCH /api/ipos/:ipoId`                         | Update a non-archived owned IPO.                                                                                              |
 | `POST /api/ipos/:ipoId/archive`                  | Soft-archive an owned IPO.                                                                                                    |
