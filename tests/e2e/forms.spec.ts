@@ -222,16 +222,18 @@ test("account form preserves typed values, validates, saves, and loads existing 
   expect(errors).toEqual([]);
 });
 
-test("IPO validation and close confirmation work inside the drawer", async ({ page }) => {
+test("shared-catalog IPO validation and close confirmation work inside the drawer", async ({
+  page,
+}) => {
   await prepare(page);
   await page.goto("/ipos?source=personal");
-  await page.getByRole("link", { name: "Add IPO", exact: true }).click();
+  await page.getByRole("link", { name: "Add to catalog", exact: true }).click();
   await expect(page).toHaveURL(/\/ipos\?source=personal$/);
-  await page.getByRole("button", { name: "Add IPO", exact: true }).click();
+  await page.getByRole("button", { name: "Add to catalog", exact: true }).click();
   await expect(page.getByLabel("Company name")).toHaveAttribute("aria-invalid", "true");
   await page.getByLabel("Company name").fill("Unsaved company");
   await page
-    .getByRole("dialog", { name: "Add IPO" })
+    .getByRole("dialog", { name: "Add to shared catalog" })
     .getByRole("button", { name: "Close drawer" })
     .click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
@@ -239,7 +241,7 @@ test("IPO validation and close confirmation work inside the drawer", async ({ pa
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await expect(page.getByLabel("Company name")).toHaveValue("Unsaved company");
   await page
-    .getByRole("dialog", { name: "Add IPO" })
+    .getByRole("dialog", { name: "Add to shared catalog" })
     .getByRole("button", { name: "Cancel" })
     .click();
   await page.getByRole("button", { name: "Discard changes" }).click();
@@ -364,7 +366,7 @@ for (const width of [360, 390, 768, 1366, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     await prepare(page, true);
     for (const [path, action] of [
-      ["/ipos/new", "Add IPO"],
+      ["/ipos/new", "Add to catalog"],
       ["/accounts/new", "Save account"],
       ["/applications/new", "Save application"],
       ["/admin/ipos", "Create IPO"],
