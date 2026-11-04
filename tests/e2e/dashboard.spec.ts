@@ -285,6 +285,31 @@ test("financial pages are unavailable in the web app", async ({ page }) => {
   }
 });
 
+test("dashboard handles recent applications without an IPO symbol", async ({ page }) => {
+  await prepareDashboard(page);
+  await page.route(/\/api\/analytics(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          ...dashboardData,
+          recent_applications: dashboardData.recent_applications.map((application) => ({
+            ...application,
+            symbol: null,
+          })),
+        },
+      },
+    }),
+  );
+  const pageErrors: Error[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
+
+  await page.goto("/dashboard");
+
+  await expect(page.getByRole("heading", { name: "Dashboard & analytics" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Dashboard Test IPO", exact: true })).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
 test("dashboard remains usable across responsive viewports with accessible filters", async ({
   page,
 }, testInfo) => {

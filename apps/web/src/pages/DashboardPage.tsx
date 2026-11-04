@@ -797,45 +797,49 @@ export function DashboardPage() {
         <CardContent noPadding>
           {analytics?.recent_applications.length ? (
             <ul className="divide-y divide-border/60">
-              {analytics.recent_applications.map((application) => (
-                <li
-                  key={application.application_id}
-                  className="flex flex-wrap items-center justify-between gap-3 p-4 hover:bg-canvas/30 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-action/10 text-action font-bold text-xs">
-                      {application.symbol.slice(0, 3)}
-                    </span>
-                    <div>
-                      <Link
-                        className="font-semibold text-ink hover:text-action transition-colors"
-                        to={`/applications/${application.application_id}`}
-                        state={{ from: `${location.pathname}${location.search}` }}
-                      >
-                        {application.company_name} ({application.symbol})
-                      </Link>
-                      <p className="mt-0.5 text-xs text-muted">
-                        <span className="font-medium text-navy">
-                          {categoryLabel(application.category)}
-                        </span>
-                        {" • "}
-                        <span>{application.holder_name}</span>
-                        {" • "}
-                        <span className="font-mono">{application.masked_demat_identifier}</span>
-                      </p>
+              {analytics.recent_applications.map((application) => {
+                const symbol = application.symbol?.trim();
+                return (
+                  <li
+                    key={application.application_id}
+                    className="flex flex-wrap items-center justify-between gap-3 p-4 hover:bg-canvas/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-action/10 text-action font-bold text-xs">
+                        {symbol?.slice(0, 3) || application.company_name.slice(0, 3).toUpperCase()}
+                      </span>
+                      <div>
+                        <Link
+                          className="font-semibold text-ink hover:text-action transition-colors"
+                          to={`/applications/${application.application_id}`}
+                          state={{ from: `${location.pathname}${location.search}` }}
+                        >
+                          {application.company_name}
+                          {symbol ? ` (${symbol})` : ""}
+                        </Link>
+                        <p className="mt-0.5 text-xs text-muted">
+                          <span className="font-medium text-navy">
+                            {categoryLabel(application.category)}
+                          </span>
+                          {" • "}
+                          <span>{application.holder_name}</span>
+                          {" • "}
+                          <span className="font-mono">{application.masked_demat_identifier}</span>
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-4 text-right">
-                    <StatusBadge status={application.status} />
-                    <time
-                      className="text-xs text-muted tabular hidden sm:inline"
-                      dateTime={application.created_at}
-                    >
-                      {formatDateTime(application.created_at)}
-                    </time>
-                  </div>
-                </li>
-              ))}
+                    <div className="flex items-center gap-4 text-right">
+                      <StatusBadge status={application.status} />
+                      <time
+                        className="text-xs text-muted tabular hidden sm:inline"
+                        dateTime={application.created_at}
+                      >
+                        {formatDateTime(application.created_at)}
+                      </time>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <div className="p-6">

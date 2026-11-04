@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { CalendarDays, CircleDollarSign, Landmark, Layers3, ReceiptText } from "lucide-react";
 import type {
   DematAccount,
   IpoApplication,
@@ -56,9 +57,9 @@ type ApplicationListResponse = {
   data: {
     applications: Array<
       IpoApplication & {
-        ipos?: { symbol: string; company_name: string };
+        ipos?: { symbol: string | null; company_name: string };
         demat_accounts?: { holder_name: string };
-        ipo_categories?: { category: string };
+        ipo_categories?: { category: string } | null;
       }
     >;
     pagination: { page: number; page_size: number; total: number; total_pages: number };
@@ -89,8 +90,8 @@ type CategoryResponse = { data: { configurations: ApplicationCategoryConfigurati
 type ApplicationLotBounds = { minimum: number | null; maximum: number | null; increment: number };
 type ApplicationResponse = {
   data: IpoApplication & {
-    ipos?: { company_name: string; symbol: string };
-    demat_accounts?: { holder_name: string; masked_demat_identifier: string };
+    ipos?: { company_name: string | null; symbol: string | null };
+    demat_accounts?: { holder_name: string | null; masked_demat_identifier: string | null };
     ipo_categories?: { category: string };
   };
 };
@@ -193,6 +194,32 @@ function useOwnedLists() {
       return page && totalPages && page < totalPages ? page + 1 : undefined;
     },
   });
+  const applications = useQuery({
+    queryKey: ["applications", "applied-ipo-status"],
+    enabled: Boolean(session),
+    queryFn: async () => {
+      const loadPage = (page: number) =>
+        apiRequest<ApplicationListResponse>(
+          `/api/applications?page=${page}&page_size=100&include_archived=all`,
+          session!,
+        );
+      const first = await loadPage(1);
+      const totalPages = first.data.pagination?.total_pages ?? 1;
+      if (totalPages <= 1) return first;
+      const pages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) => loadPage(index + 2)),
+      );
+      return {
+        data: {
+          ...first.data,
+          applications: [
+            first.data.applications,
+            ...pages.map((page) => page.data.applications),
+          ].flat(),
+        },
+      };
+    },
+  });
   const accounts = useQuery({
     queryKey: ["accounts", "application-options"],
     enabled: Boolean(session),
@@ -213,16 +240,27 @@ function useOwnedLists() {
       };
     },
   });
+  const appliedIpoIds = new Set(
+    (applications.data?.data.applications ?? []).map((application) => application.ipo_id),
+  );
+  const appliedStatusByIpoId = new Map(
+    (applications.data?.data.applications ?? [])
+      .filter((application) => application.ipo_id)
+      .map((application) => [application.ipo_id, application.application_status]),
+  );
   return {
     ipos: ipos.data?.pages.flatMap((page) => page.data.ipos) ?? [],
     accounts: accounts.data?.data.accounts ?? [],
-    loading: ipos.isLoading || accounts.isLoading,
+    appliedIpoIds,
+    appliedStatusByIpoId,
+    loading: ipos.isLoading || accounts.isLoading || applications.isLoading,
     optionLoading: {
       ipos: ipos.isLoading,
       accounts: accounts.isLoading,
+      applications: applications.isLoading,
     },
-    error: ipos.error ?? accounts.error,
-    refetch: () => Promise.all([ipos.refetch(), accounts.refetch()]),
+    error: ipos.error ?? accounts.error ?? applications.error,
+    refetch: () => Promise.all([ipos.refetch(), accounts.refetch(), applications.refetch()]),
     iposInfinite: ipos,
   };
 }
@@ -609,10 +647,12 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
                         to={`/applications/${row.id}`}
                         state={{ from: `${location.pathname}${location.search}` }}
                       >
-                        {row.ipos?.symbol ?? "IPO"}
+                        {row.ipos?.company_name || row.ipos?.symbol || "IPO"}
                       </Link>
                     </td>
-                    <td className="p-3">{row.ipo_categories?.category ?? "Category"}</td>
+                    <td className="p-3">
+                      {formatCategory(row.ipo_categories?.category ?? row.category_code)}
+                    </td>
                     <td className="p-3">{row.demat_accounts?.holder_name ?? "Account"}</td>
                     <td className="p-3 text-right tabular-nums whitespace-nowrap">
                       {row.lots} lots · {row.application_amount}
@@ -724,6 +764,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     selectedCatalogIpo ??
     personalIpos.find((item) => item.id === ipoId) ??
     (preselectedIpo.data?.data.id === ipoId ? preselectedIpo.data.data : null);
+  const selectedIpoIsApplied = Boolean(ipoId && lists.appliedIpoIds.has(ipoId));
   const enteredLots = Number(lots);
   const lotBounds = getApplicationLotBounds(
     selectedIpo && typeof selectedIpo.lot_size === "number"
@@ -903,7 +944,8 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
             Boolean(categoriesQuery.error) ||
             !price ||
             !localCalculation ||
-            !validLotSelection))
+            !validLotSelection ||
+            selectedIpoIsApplied))
       }
     >
       <form
@@ -969,6 +1011,11 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                       ...personalIpos.map((item) => ({
                         value: item.id,
                         label: item.company_name,
+                        badge: lists.appliedIpoIds.has(item.id) ? "Applied" : undefined,
+                        description: lists.appliedIpoIds.has(item.id)
+                          ? "Already applied for this IPO"
+                          : undefined,
+                        disabled: lists.appliedIpoIds.has(item.id),
                       })),
                       ...sharedCatalogIpos.map((item) => ({
                         value: item.id,
@@ -1242,55 +1289,207 @@ export function ApplicationDetailsPage() {
   if (detail.error)
     return <ErrorMessage error={detail.error} onRetry={() => void detail.refetch()} />;
   if (!item) return <p>Application not found.</p>;
+  const snapshot = asRecord(item.calculation_snapshot);
+  const calculationInput = asRecord(snapshot.calculation_input);
+  const snapshotIpo = asRecord(calculationInput.ipo ?? snapshot.ipo);
+  const categoryRules = asRecord(calculationInput.rules ?? snapshot.category_configuration);
+  const ipoName = item.ipos?.company_name?.trim() || "IPO details unavailable";
+  const ipoSymbol = item.ipos?.symbol?.trim();
+  const accountName = item.demat_accounts?.holder_name?.trim() || "Demat account";
+  const maskedIdentifier = item.demat_accounts?.masked_demat_identifier?.trim();
+  const price = calculationInput.price;
+  const priceType = calculationInput.price_type;
+  const submittedDate = item.submission_date ?? item.created_at;
+  const historicalRuleDetails: Array<[string, unknown]> = [
+    ["Minimum lots", categoryRules.minimum_lots],
+    ["Maximum lots", categoryRules.maximum_lots],
+    ["Lot increment", categoryRules.lot_increment],
+    ["Minimum investment", categoryRules.minimum_investment],
+    ["Maximum investment", categoryRules.maximum_investment],
+  ];
+
   return (
-    <div className="w-full space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+    <div className="w-full space-y-6 pb-8">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
           <BackLink fallback="/applications" allowedPath={/^\/(applications|dashboard)?$/}>
             Back to applications
           </BackLink>
-          <h1 className="text-3xl font-bold text-navy">Application details</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-bold text-navy">Application details</h1>
+            <ApplicationStatusBadge status={item.application_status} />
+          </div>
           <p className="mt-2 text-base text-muted">
-            Historical calculation rules are retained with this record.
+            {ipoSymbol ? `${ipoSymbol} · ` : ""}
+            {ipoName}
           </p>
         </div>
         <DrawerRouteLink className={linkClass} to={`/applications/${item.id}/edit`}>
           Edit application details
         </DrawerRouteLink>
       </header>
-      <Card>
-        <dl className="grid gap-4 sm:grid-cols-2">
-          {[
-            ["IPO", item.ipos ? `${item.ipos.symbol} — ${item.ipos.company_name}` : item.ipo_id],
-            [
-              "Demat account",
-              item.demat_accounts
-                ? `${item.demat_accounts.holder_name} — ${item.demat_accounts.masked_demat_identifier}`
-                : item.demat_account_id,
-            ],
-            ["Category", item.ipo_categories?.category ?? formatCategory(item.category_code)],
-            ["Lots", item.lots],
-            ["Total shares", item.total_shares],
-            ["Application amount", item.application_amount],
-            ["Submitted", formatDateTime(item.submission_date ?? item.created_at)],
-            ["Rule version", item.rule_version],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <dt className="font-semibold text-muted">{label}</dt>
-              <dd className="mt-1 break-words text-ink">{value}</dd>
+      <section
+        aria-label="Application summary"
+        className="overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-br from-white via-white to-indigo-50 shadow-card"
+      >
+        <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="flex min-w-0 items-start gap-4">
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-action">
+              <CircleDollarSign aria-hidden="true" className="size-6" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-muted">Total application amount</p>
+              <p className="mt-1 break-words text-3xl font-bold tracking-tight text-navy">
+                {formatRupees(item.application_amount)}
+              </p>
+              <p className="mt-2 text-sm text-muted">
+                {formatCategory(item.ipo_categories?.category ?? item.category_code)} category
+              </p>
             </div>
-          ))}
-        </dl>
-        <details className="mt-6">
-          <summary className="min-h-touch cursor-pointer font-semibold">
-            View saved calculation snapshot
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <SummaryMetric
+              icon={<Layers3 aria-hidden="true" className="size-4" />}
+              label="Lots applied"
+              value={item.lots.toLocaleString("en-IN")}
+            />
+            <SummaryMetric
+              icon={<ReceiptText aria-hidden="true" className="size-4" />}
+              label="Total shares"
+              value={item.total_shares.toLocaleString("en-IN")}
+            />
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card>
+          <DetailSectionHeading
+            icon={<ReceiptText aria-hidden="true" className="size-5" />}
+            title="Application"
+          />
+          <dl className="mt-5 grid gap-x-6 gap-y-5 sm:grid-cols-2">
+            <ApplicationDetail label="IPO" value={ipoName} />
+            <ApplicationDetail
+              label="Category"
+              value={formatCategory(item.ipo_categories?.category ?? item.category_code)}
+            />
+            <ApplicationDetail
+              label="Application number"
+              value={item.application_number || "Not added"}
+            />
+            <ApplicationDetail
+              label="External reference"
+              value={item.external_reference || "Not added"}
+            />
+            <ApplicationDetail label="Rule version" value={item.rule_version ?? "Not recorded"} />
+          </dl>
+        </Card>
+
+        <Card>
+          <DetailSectionHeading
+            icon={<Landmark aria-hidden="true" className="size-5" />}
+            title="Account & timeline"
+          />
+          <dl className="mt-5 grid gap-x-6 gap-y-5 sm:grid-cols-2">
+            <ApplicationDetail
+              label="Demat account"
+              value={maskedIdentifier ? `${accountName} · ${maskedIdentifier}` : accountName}
+            />
+            <ApplicationDetail
+              label="Submitted"
+              value={formatDateTime(submittedDate)}
+              icon={<CalendarDays aria-hidden="true" className="size-4" />}
+            />
+            <ApplicationDetail
+              label="Last updated"
+              value={formatDateTime(item.updated_at)}
+              icon={<CalendarDays aria-hidden="true" className="size-4" />}
+            />
+            {item.notes ? (
+              <ApplicationDetail label="Notes" value={item.notes} className="sm:col-span-2" />
+            ) : null}
+          </dl>
+        </Card>
+      </div>
+
+      <Card>
+        <DetailSectionHeading
+          icon={<Layers3 aria-hidden="true" className="size-5" />}
+          title="Application progress"
+        />
+        <div className="mt-5 grid gap-4 sm:grid-cols-3">
+          <StatusDetail label="Application status" status={item.application_status} />
+          <StatusDetail label="Payment mandate" status={item.mandate_status} />
+          <StatusDetail label="Allotment status" status={item.allotment_status} />
+        </div>
+      </Card>
+
+      <Card>
+        <details className="group">
+          <summary className="flex min-h-touch cursor-pointer list-none items-center justify-between gap-4 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-action [&::-webkit-details-marker]:hidden">
+            <div>
+              <h2 className="text-lg font-semibold text-ink">Calculation details</h2>
+              <p className="mt-1 text-sm text-muted">
+                The saved inputs and issue rules used for this application.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-canvas px-3 py-1.5 text-sm font-semibold text-action group-open:bg-indigo-100">
+              <span className="group-open:hidden">Show details</span>
+              <span className="hidden group-open:inline">Hide details</span>
+            </span>
           </summary>
-          <pre className="mt-3 overflow-x-auto rounded-lg bg-canvas p-4 text-sm">
-            {JSON.stringify(item.calculation_snapshot, null, 2)}
-          </pre>
+          <div className="mt-5 border-t border-border pt-5">
+            <dl className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+              <ApplicationDetail label="Price type" value={formatPriceType(priceType)} />
+              <ApplicationDetail label="Price per share" value={formatOptionalRupees(price)} />
+              <ApplicationDetail
+                label="Price band"
+                value={formatPriceBand(snapshotIpo.issue_price_min, snapshotIpo.issue_price_max)}
+              />
+              <ApplicationDetail
+                label="Cut-off price"
+                value={formatOptionalRupees(snapshotIpo.cut_off_price)}
+              />
+              <ApplicationDetail
+                label="Shares per lot"
+                value={formatOptionalNumber(snapshotIpo.lot_size)}
+              />
+              <ApplicationDetail
+                label="Snapshot captured"
+                value={
+                  typeof snapshot.captured_at === "string"
+                    ? formatDateTime(snapshot.captured_at)
+                    : "Not recorded"
+                }
+              />
+              {historicalRuleDetails.map(([label, value]) =>
+                value === null || value === undefined ? null : (
+                  <ApplicationDetail
+                    key={label}
+                    label={label}
+                    value={
+                      label.includes("investment")
+                        ? formatOptionalRupees(value)
+                        : formatOptionalNumber(value)
+                    }
+                  />
+                ),
+              )}
+            </dl>
+            {item.rule_version !== null ? (
+              <p className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 text-sm text-indigo-950">
+                Rule version {item.rule_version} is retained with this record. These historical
+                details describe the original calculation and do not change if current IPO rules are
+                updated.
+              </p>
+            ) : null}
+          </div>
         </details>
+      </Card>
+
+      <div className="flex justify-end border-t border-border pt-5">
         <ConfirmButton
-          className="mt-5"
           variant="outline"
           disabled={archive.isPending}
           title="Archive this record?"
@@ -1300,7 +1499,7 @@ export function ApplicationDetailsPage() {
         >
           Archive application
         </ConfirmButton>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -1995,9 +2194,139 @@ function formatCategory(value: string) {
   );
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function formatRupees(value: string | number) {
+  const amount = Number(value);
+  return Number.isFinite(amount)
+    ? new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 2,
+      }).format(amount)
+    : "Not recorded";
+}
+
+function formatOptionalRupees(value: unknown) {
+  return typeof value === "string" || typeof value === "number"
+    ? formatRupees(value)
+    : "Not recorded";
+}
+
+function formatOptionalNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value.toLocaleString("en-IN")
+    : "Not recorded";
+}
+
+function formatPriceBand(minimum: unknown, maximum: unknown) {
+  const min = typeof minimum === "string" || typeof minimum === "number" ? minimum : null;
+  const max = typeof maximum === "string" || typeof maximum === "number" ? maximum : null;
+  if (min !== null && max !== null) return `${formatRupees(min)} – ${formatRupees(max)}`;
+  if (min !== null) return `From ${formatRupees(min)}`;
+  if (max !== null) return `Up to ${formatRupees(max)}`;
+  return "Not recorded";
+}
+
+function formatPriceType(value: unknown) {
+  if (value === "BID") return "Bid price";
+  if (value === "CUT_OFF") return "Cut-off price";
+  return "Not recorded";
+}
+
 function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Not recorded";
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
-    new Date(value),
+    date,
+  );
+}
+
+function formatStatus(value: string) {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function statusTone(value: string) {
+  if (["APPROVED", "COMPLETED", "ALLOTTED", "RELEASED", "NOT_REQUIRED"].includes(value)) {
+    return "border-success/20 bg-green-50 text-success";
+  }
+  if (["REJECTED", "FAILED", "NOT_ALLOTTED", "EXPIRED", "REVOKED"].includes(value)) {
+    return "border-danger/20 bg-red-50 text-danger";
+  }
+  if (["PENDING", "UNDER_PROCESSING", "PARTIALLY_ALLOTTED", "PARTIAL_ALLOTMENT"].includes(value)) {
+    return "border-warning/20 bg-amber-50 text-warning";
+  }
+  return "border-border bg-canvas text-muted";
+}
+
+function ApplicationStatusBadge({ status }: { status: string }) {
+  return (
+    <span
+      className={`inline-flex min-h-7 items-center rounded-full border px-3 py-1 text-xs font-semibold ${statusTone(status)}`}
+    >
+      {formatStatus(status)}
+    </span>
+  );
+}
+
+function DetailSectionHeading({ icon, title }: { icon: ReactNode; title: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex size-10 items-center justify-center rounded-xl bg-indigo-50 text-action">
+        {icon}
+      </span>
+      <h2 className="text-lg font-semibold text-ink">{title}</h2>
+    </div>
+  );
+}
+
+function ApplicationDetail({
+  label,
+  value,
+  icon,
+  className = "",
+}: {
+  label: string;
+  value: string | number;
+  icon?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`min-w-0 ${className}`}>
+      <dt className="flex items-center gap-2 text-sm font-medium text-muted">
+        {icon ? <span className="text-action">{icon}</span> : null}
+        {label}
+      </dt>
+      <dd className="mt-1 break-words font-semibold text-ink">{value}</dd>
+    </div>
+  );
+}
+
+function SummaryMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-border/80 bg-white/80 p-3 sm:min-w-32 sm:p-4">
+      <div className="flex items-center gap-2 text-action">
+        {icon}
+        <span className="text-xs font-semibold text-muted">{label}</span>
+      </div>
+      <p className="mt-2 break-words text-lg font-bold tabular-nums text-ink">{value}</p>
+    </div>
+  );
+}
+
+function StatusDetail({ label, status }: { label: string; status: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-canvas/70 p-4">
+      <span className="text-sm font-medium text-muted">{label}</span>
+      <ApplicationStatusBadge status={status} />
+    </div>
   );
 }
 

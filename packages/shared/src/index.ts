@@ -412,7 +412,7 @@ export interface DashboardAnalytics {
     application_id: string;
     ipo_id: string;
     company_name: string;
-    symbol: string;
+    symbol: string | null;
     account_id: string;
     holder_name: string;
     masked_demat_identifier: string;

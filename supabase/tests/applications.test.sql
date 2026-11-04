@@ -1,6 +1,6 @@
 begin;
 
-select plan(16);
+select plan(17);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -193,6 +193,30 @@ select throws_ok(
   '23505',
   'duplicate key value violates unique constraint "applications_external_reference_unique"',
   'Duplicate external references are rejected atomically'
+);
+select throws_ok(
+  $$insert into public.applications (
+      id, user_id, ipo_id, demat_account_id, category_id, lots, total_shares,
+      application_amount, external_reference, rule_version, calculation_snapshot
+    ) values (
+      '44444444-4444-4444-8444-444444444444',
+      '11111111-1111-4111-8111-111111111111',
+      '88888888-8888-4888-8888-888888888888',
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      1, 10, 200, 'stable-a-duplicate', 1, '{}'::jsonb
+    )$$,
+  '23505',
+  'duplicate key value violates unique constraint "applications_user_ipo_unique"',
+  'Duplicate active applications per user and IPO are rejected atomically'
+);
+select is(
+  (select count(*) from public.applications
+   where user_id = '11111111-1111-4111-8111-111111111111'
+     and ipo_id = '88888888-8888-4888-8888-888888888888'
+     and archived_at is null),
+  1::bigint,
+  'Only one active application is kept per user and IPO'
 );
 select is(
   public.confirm_application_import('55555555-5555-4555-8555-555555555555')->>'imported_rows',

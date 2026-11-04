@@ -643,6 +643,20 @@ async function prepareApplication(
   if (!account || account.account_status !== "active" || account.archived_at) {
     return failed("INVALID_DEMAT_ACCOUNT", "Select an active, unarchived demat account you own.");
   }
+  const { data: existingApplications, error: duplicateCheckError } = await supabase
+    .from("applications")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("ipo_id", input.ipo_id)
+    .is("archived_at", null)
+    .limit(1);
+  if (duplicateCheckError) throw duplicateCheckError;
+  if ((existingApplications ?? []).length > 0) {
+    return failed(
+      "DUPLICATE_IPO_APPLICATION",
+      "You have already applied for this IPO.",
+    );
+  }
   if (input.category_id && (!rule || rule.ipo_id !== input.ipo_id)) {
     return failed("CATEGORY_NOT_FOUND", "The category configuration does not belong to this IPO.");
   }
@@ -1206,12 +1220,22 @@ function importNotFound(context: RouteContext) {
 }
 
 function databaseError(context: RouteContext, error: { code?: string; message: string }) {
-  if (error.code === "23505" && error.message.includes("applications_external_reference_unique")) {
+  if (
+    error.code === "23505" &&
+    (error.message.includes("applications_external_reference_unique") ||
+      error.message.includes("applications_user_ipo_unique"))
+  ) {
+    const duplicateCode = error.message.includes("applications_user_ipo_unique")
+      ? "DUPLICATE_IPO_APPLICATION"
+      : "DUPLICATE_EXTERNAL_REFERENCE";
+    const duplicateMessage = error.message.includes("applications_user_ipo_unique")
+      ? "You have already applied for this IPO."
+      : "This external reference already exists.";
     return context.json(
       {
         error: {
-          code: "DUPLICATE_EXTERNAL_REFERENCE",
-          message: "This external reference already exists.",
+          code: duplicateCode,
+          message: duplicateMessage,
         },
       },
       409,

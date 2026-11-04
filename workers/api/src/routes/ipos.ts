@@ -100,6 +100,64 @@ function catalogRecord(row: IpoCatalogDatabaseRow): IpoCatalogRecord {
   };
 }
 
+type ApplicationAwareIpo<T extends IpoRecord | IpoCatalogRecord> = T & {
+  source: "PERSONAL" | "CATALOG";
+  alreadyApplied: boolean;
+  applicationStatus: string | null;
+};
+
+async function hydrateApplicationFlags(
+  supabase: SupabaseClient,
+  userId: string,
+  personalIpos: IpoRecord[],
+  catalogIpos: Array<IpoCatalogRecord & { source: "CATALOG" }>,
+) {
+  const ownedApplicationIds = personalIpos.map((ipo) => ipo.id);
+  if (ownedApplicationIds.length === 0) {
+    return {
+      personal: personalIpos.map((ipo) => ({ ...ipo, alreadyApplied: false, applicationStatus: null })),
+      catalog: catalogIpos.map((ipo) => ({ ...ipo, alreadyApplied: false, applicationStatus: null })),
+    };
+  }
+  const { data, error } = await supabase
+    .from("applications")
+    .select("ipo_id, application_status")
+    .eq("user_id", userId)
+    .in("ipo_id", ownedApplicationIds)
+    .is("archived_at", null);
+  if (error) throw error;
+  const statusByOwnedIpoId = new Map(
+    (data ?? []).map((application) => [application.ipo_id, application.application_status]),
+  );
+  const appliedCatalogIds = new Set(
+    personalIpos
+      .filter(
+        (ipo) =>
+          typeof ipo.source_catalog_id === "string" && statusByOwnedIpoId.has(ipo.id),
+      )
+      .map((ipo) => ipo.source_catalog_id as string),
+  );
+  const catalogStatusByCatalogId = new Map<string, string>();
+  for (const ipo of personalIpos) {
+    if (typeof ipo.source_catalog_id === "string" && statusByOwnedIpoId.has(ipo.id)) {
+      catalogStatusByCatalogId.set(ipo.source_catalog_id, statusByOwnedIpoId.get(ipo.id)!);
+    }
+  }
+  const hydratedPersonal: ApplicationAwareIpo<IpoRecord>[] = personalIpos.map((ipo) => ({
+    ...ipo,
+    source: "PERSONAL",
+    alreadyApplied: statusByOwnedIpoId.has(ipo.id),
+    applicationStatus: statusByOwnedIpoId.get(ipo.id) ?? null,
+  }));
+  const hydratedCatalog: ApplicationAwareIpo<IpoCatalogRecord>[] = catalogIpos.map((ipo) => ({
+    ...ipo,
+    source: "CATALOG",
+    alreadyApplied: appliedCatalogIds.has(ipo.id),
+    applicationStatus: catalogStatusByCatalogId.get(ipo.id) ?? null,
+  }));
+  return { personal: hydratedPersonal, catalog: hydratedCatalog };
+}
+
 export const iposRoutes = new Hono<IpoContext>();
 iposRoutes.use("*", authenticate);
 
@@ -145,9 +203,63 @@ iposRoutes.get("/catalog", async (context) => {
     query.page * query.page_size - 1,
   );
   if (error) throw error;
+  const catalogRows = (data ?? []).map(catalogRecord);
+  if (catalogRows.length === 0) {
+    return context.json({
+      data: {
+        ipos: [],
+        pagination: {
+          page: query.page,
+          page_size: query.page_size,
+          total: count ?? 0,
+          total_pages: Math.ceil((count ?? 0) / query.page_size),
+        },
+      },
+    });
+  }
+  const userOwnedRows = await context
+    .get("rlsSupabase")
+    .from("ipos")
+    .select(ipoColumns)
+    .eq("user_id", context.get("authenticatedUser").id)
+    .in(
+      "source_catalog_id",
+      catalogRows.map((ipo) => ipo.id),
+    )
+    .is("archived_at", null);
+  if (userOwnedRows.error) throw userOwnedRows.error;
+  const sourceCatalogIds = new Set(
+    (userOwnedRows.data ?? [])
+      .map((ipo) => ipo.source_catalog_id)
+      .filter((sourceCatalogId): sourceCatalogId is string => typeof sourceCatalogId === "string"),
+  );
+  const userApplications = await context
+    .get("rlsSupabase")
+    .from("applications")
+    .select("ipo_id, application_status")
+    .eq("user_id", context.get("authenticatedUser").id)
+    .in(
+      "ipo_id",
+      (userOwnedRows.data ?? []).map((ipo) => ipo.id),
+    )
+    .is("archived_at", null);
+  if (userApplications.error) throw userApplications.error;
+  const applicationStatusByOwnedIpoId = new Map(
+    (userApplications.data ?? []).map((application) => [application.ipo_id, application.application_status]),
+  );
+  const statusByCatalogId = new Map<string, string>();
+  for (const ipo of userOwnedRows.data ?? []) {
+    if (typeof ipo.source_catalog_id === "string" && applicationStatusByOwnedIpoId.has(ipo.id)) {
+      statusByCatalogId.set(ipo.source_catalog_id, applicationStatusByOwnedIpoId.get(ipo.id)!);
+    }
+  }
   return context.json({
     data: {
-      ipos: (data ?? []).map(catalogRecord),
+      ipos: catalogRows.map((ipo) => ({
+        ...ipo,
+        alreadyApplied: sourceCatalogIds.has(ipo.id),
+        applicationStatus: statusByCatalogId.get(ipo.id) ?? null,
+      })),
       pagination: {
         page: query.page,
         page_size: query.page_size,
@@ -397,7 +509,19 @@ iposRoutes.get("/", async (context) => {
 
   const personalIpos = ownedIpos.map((ipo) => ({ ...ipo, source: "PERSONAL" as const }));
   const catalogIpos = catalog.map((ipo) => ({ ...catalogRecord(ipo), source: "CATALOG" as const }));
-  const combinedIpos = [...personalIpos, ...catalogIpos];
+  const hydrated = await hydrateApplicationFlags(
+    supabase,
+    userId,
+    personalIpos,
+    catalogIpos,
+  );
+  const combinedIpos = [...hydrated.personal, ...hydrated.catalog] as unknown as Array<{
+    id: string;
+    company_name: string;
+    opening_date: string | null;
+    issue_price_min: string | null;
+    source: "PERSONAL" | "CATALOG";
+  }>;
   if (combinedList) {
     const compareNullable = (left: string | null, right: string | null) => {
       if (left === null) return right === null ? 0 : 1;
@@ -444,8 +568,8 @@ iposRoutes.get("/", async (context) => {
   const listedIpos = combinedList
     ? combinedIpos.slice(offset, pageEnd + 1)
     : query.source === "catalog"
-      ? catalogIpos
-      : personalIpos;
+      ? hydrated.catalog
+      : hydrated.personal;
   return context.json({
     data: {
       ipos: listedIpos,
