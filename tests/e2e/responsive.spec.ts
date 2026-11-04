@@ -149,9 +149,7 @@ for (const viewport of viewports) {
     ).toBeVisible();
     await expect(page.getByRole("combobox", { name: "Sort IPOs" })).toBeVisible();
     await page.getByRole("textbox", { name: "Search company or exact symbol" }).fill("IPO Test");
-    await expect(
-      page.getByRole("link", { name: "IPO Test Company", exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "IPO Test Company", exact: true })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await testInfo.attach(`ipo-list-${viewport.width}.png`, {
       body: await page.screenshot(),
