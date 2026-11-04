@@ -173,10 +173,11 @@ test("IPO list and details show user-entered provenance and rule setup links", a
   await page.getByRole("button", { name: "My IPOs", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "IPOs", exact: true })).toBeVisible();
-  await expect(page.getByText("Manual entry · unverified")).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Source" })).toHaveCount(0);
   await page.getByRole("link", { name: "IPO Test Company" }).click();
 
   await expect(page.getByRole("heading", { name: "IPO Test Company" })).toBeVisible();
+  await expect(page.getByText("Manual entry · unverified")).toBeVisible();
   await expect(
     page.getByText(/The application does not automatically fetch or verify the source/),
   ).toBeVisible();
@@ -196,7 +197,7 @@ test("regular users see admin-managed IPOs by default and can open shared detail
     "aria-pressed",
     "true",
   );
-  await expect(page.getByText("Admin-managed", { exact: true })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Source" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "IPO Test Company", exact: true })).toHaveCount(0);
   await page.getByRole("link", { name: catalogIpo.company_name }).click();
   await expect(page).toHaveURL(new RegExp(`/ipos/catalog/${ipoId}$`));
