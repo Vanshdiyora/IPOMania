@@ -332,7 +332,7 @@ function IpoListContent({ personal }: { personal: boolean }) {
         </Card>
       ) : null}
       {!isLoading && !error && ipos.length > 0 ? (
-        <DataTable minWidth="1200px">
+        <DataTable minWidth="1000px">
           <thead>
             <tr className="border-b border-border bg-canvas text-xs uppercase tracking-wide text-muted">
               <th className="p-4 text-left">IPO</th>
@@ -340,7 +340,6 @@ function IpoListContent({ personal }: { personal: boolean }) {
               <th className="p-4 text-left">Price band</th>
               <th className="p-4 text-right">Lot size</th>
               <th className="p-4 text-left">Bidding dates</th>
-              <th className="p-4 text-left">Source</th>
               <th className="p-4 text-center">Status</th>
             </tr>
           </thead>
@@ -369,19 +368,6 @@ function IpoListContent({ personal }: { personal: boolean }) {
                 </td>
                 <td className="p-4 text-sm text-ink whitespace-nowrap">
                   {formatDate(ipo.opening_date)} – {formatDate(ipo.closing_date)}
-                </td>
-                <td className="p-4 text-xs text-muted whitespace-nowrap">
-                  {!personal
-                    ? ipo.data_source === "USER_SUBMITTED"
-                      ? "User-submitted"
-                      : ipo.data_source === "IPO_GURU"
-                        ? "Admin-managed"
-                        : `Admin-managed · ${ipo.data_source === "MANUAL" ? "Manual entry" : ipo.data_source}`
-                    : ipo.data_source === "MANUAL"
-                      ? ipo.last_verified_at
-                        ? "Manual entry · user-marked verification date"
-                        : "Manual entry · unverified"
-                      : "Published source · user-entered"}
                 </td>
                 <td className="p-4 text-center">
                   <StatusBadge status={ipo.status} />

@@ -101,7 +101,8 @@ describe("user IPO catalog", () => {
       "aria-pressed",
       "true",
     );
-    expect(screen.getByText("Admin-managed", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Source" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Admin-managed", { exact: true })).not.toBeInTheDocument();
     expect(screen.getAllByText("Not published")).toHaveLength(2);
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",
