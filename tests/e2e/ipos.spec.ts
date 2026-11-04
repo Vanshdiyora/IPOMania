@@ -146,6 +146,25 @@ async function prepareAuthenticatedPage(page: Page) {
       },
     }),
   );
+  await page.route(/\/api\/accounts(?:\?|$)/, (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          accounts: [
+            {
+              id: application.demat_account_id,
+              user_id: userId,
+              holder_name: "Test Holder",
+              broker_name: "Test Broker",
+              account_status: "active",
+              archived_at: null,
+            },
+          ],
+          pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
+        },
+      },
+    }),
+  );
 }
 
 test("IPO list and details show user-entered provenance and rule setup links", async ({ page }) => {
@@ -163,8 +182,9 @@ test("IPO list and details show user-entered provenance and rule setup links", a
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Configure categories" })).toBeVisible();
   await expect(page.getByText("Rules not configured").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Applications for this IPO" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "APP-2026-001" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Demat account applications" })).toBeVisible();
+  await expect(page.getByText("Application APP-2026-001")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Edit", exact: true })).toBeVisible();
 });
 
 test("regular users see admin-managed IPOs by default and can open shared details", async ({
