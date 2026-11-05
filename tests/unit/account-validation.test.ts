@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  accountImportHistoryQuerySchema,
   accountListQuerySchema,
   dematAccountSchema,
   dematAccountUpdateSchema,
@@ -59,5 +60,14 @@ describe("demat account validation", () => {
         created_to: "2026-03-01T00:00:00.000Z",
       }).success,
     ).toBe(false);
+  });
+
+  it("uses the shared import-history page sizes and default", () => {
+    expect(accountImportHistoryQuerySchema.parse({})).toEqual({ page: 1, pageSize: 10 });
+    expect(accountImportHistoryQuerySchema.parse({ page: "2", pageSize: "100" })).toEqual({
+      page: 2,
+      pageSize: 100,
+    });
+    expect(accountImportHistoryQuerySchema.safeParse({ pageSize: "20" }).success).toBe(false);
   });
 });

@@ -137,7 +137,7 @@ export function SearchableSelect({
       document.removeEventListener("mousedown", closeOnOutside);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [open]);
+  }, [open, searchable]);
 
   const select = (optionValue: string) => {
     if (multiple) {

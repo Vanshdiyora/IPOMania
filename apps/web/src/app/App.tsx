@@ -7,6 +7,7 @@ import { ToastProvider } from "../components/ui/Toast";
 import { router } from "./router";
 import { queryClient } from "../lib/queryClient";
 import { store } from "../store";
+import { LoadingState } from "../components/LoadingState";
 
 const ReactQueryDevtools = import.meta.env.DEV
   ? lazy(() =>
@@ -22,7 +23,9 @@ export function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <ToastProvider>
-            <RouterProvider router={router} />
+            <Suspense fallback={<LoadingState label="Loading page" fullPage />}>
+              <RouterProvider router={router} />
+            </Suspense>
           </ToastProvider>
         </AuthProvider>
         {ReactQueryDevtools && (

@@ -100,18 +100,22 @@ describe("application manager overview", () => {
       expect(apiRequestMock).toHaveBeenCalledWith(
         `/api/applications/summary?ipo_id=${ipoId}`,
         expect.anything(),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
       ),
     );
     expect(screen.getByRole("combobox", { name: "View applications for IPO" })).toHaveTextContent(
       "Example Industries",
     );
-    expect(screen.getByLabelText("Application totals")).toHaveTextContent(
-      "Retail1sHNI1bHNI0Shareholder1",
+    await waitFor(() =>
+      expect(screen.getByLabelText("Application totals")).toHaveTextContent(
+        "Retail1sHNI1bHNI0Shareholder1",
+      ),
     );
     expect(screen.getByText("23 different IPOs applied")).toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
       expect.stringMatching(/^\/api\/applications\?.*ipo_id=88888888-8888-4888-8888-888888888888/),
       expect.anything(),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     overview.unmount();
   });

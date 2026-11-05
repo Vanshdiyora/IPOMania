@@ -3,8 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { useAppDispatch } from "../store";
-import { resetDashboardFilters } from "../store/slices/dashboardFiltersSlice";
-import { resetUi } from "../store/slices/uiSlice";
+import { clearSessionState } from "./clearSessionState";
 import { setAuthUiStatus, setSigningOut } from "../store/slices/authUiSlice";
 import { AuthContext } from "./AuthContext";
 
@@ -23,10 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const intentionalSignOut = useRef(false);
 
   const clearUserState = useCallback(() => {
-    void queryClient.cancelQueries();
-    queryClient.clear();
-    dispatch(resetDashboardFilters());
-    dispatch(resetUi());
+    clearSessionState(queryClient, dispatch);
   }, [dispatch, queryClient]);
 
   useEffect(() => {
@@ -65,23 +61,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [clearUserState, dispatch]);
 
-  const signOut = useCallback(async (scope: "global" | "local" = "global") => {
-    if (!supabase) return;
-    intentionalSignOut.current = true;
-    dispatch(setSigningOut(true));
-    try {
-      const { error } = await supabase.auth.signOut({ scope });
-      if (error) throw error;
-    } finally {
-      intentionalSignOut.current = false;
-      dispatch(setSigningOut(false));
-    }
-    clearUserState();
-    sessionRef.current = null;
-    setSession(null);
-    setSessionExpired(false);
-    dispatch(setAuthUiStatus("ready"));
-  }, [clearUserState, dispatch]);
+  const signOut = useCallback(
+    async (scope: "global" | "local" = "global") => {
+      if (!supabase) return;
+      intentionalSignOut.current = true;
+      dispatch(setSigningOut(true));
+      try {
+        const { error } = await supabase.auth.signOut({ scope });
+        if (error) throw error;
+      } finally {
+        intentionalSignOut.current = false;
+        dispatch(setSigningOut(false));
+      }
+      clearUserState();
+      sessionRef.current = null;
+      setSession(null);
+      setSessionExpired(false);
+      dispatch(setAuthUiStatus("ready"));
+    },
+    [clearUserState, dispatch],
+  );
 
   const markSessionExpired = useCallback(() => {
     clearUserState();

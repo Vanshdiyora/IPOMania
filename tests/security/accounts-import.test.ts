@@ -88,6 +88,35 @@ function xlsxFile() {
 }
 
 describe("account import API", () => {
+  it("paginates import history with the shared page-size options", async () => {
+    const requests = installImportMock();
+    const response = await createApp().request(
+      "/api/accounts/import/history?page=2&pageSize=50",
+      { headers: { Authorization: "Bearer test-token" } },
+      bindings,
+    );
+
+    expect(response.status, await response.clone().text()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        imports: [],
+        pagination: { page: 2, pageSize: 50, total: 0, totalPages: 1 },
+      },
+    });
+    const importRequest = requests.find((request) =>
+      new URL(request.url).pathname.endsWith("/account_imports"),
+    );
+    expect(new URL(importRequest!.url).searchParams.get("offset")).toBe("50");
+    expect(new URL(importRequest!.url).searchParams.get("limit")).toBe("50");
+
+    const invalid = await createApp().request(
+      "/api/accounts/import/history?pageSize=20",
+      { headers: { Authorization: "Bearer test-token" } },
+      bindings,
+    );
+    expect(invalid.status).toBe(400);
+  });
+
   it("reads CSV columns before requiring the user to map them", async () => {
     installImportMock();
     const csv = new Blob(["Holder,Bank,Username\r\nAsha Mehta,Example Bank,asha\r\n"], {

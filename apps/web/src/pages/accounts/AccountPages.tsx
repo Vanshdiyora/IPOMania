@@ -23,10 +23,12 @@ import { Card } from "../../components/ui/Card";
 import { StatusBadge } from "../../components/ui/Badge";
 import { BackLink } from "../../components/ui/BackLink";
 import { DataTable } from "../../components/ui/DataTable";
+import { Pagination } from "../../components/ui/Pagination";
 import { useModalLayer } from "../../components/ui/useModalLayer";
 import { ListToolbar } from "../../components/filters/ListToolbar";
 import { FilterDrawer, FilterSection } from "../../components/filters/FilterDrawer";
 import { ApiRequestError, apiRequest } from "../../lib/api";
+import { parsePageSize } from "../../lib/pagination";
 import { applicationDrawerPath } from "../../lib/applicationDrawer";
 import {
   SkeletonCard,
@@ -75,7 +77,7 @@ type ImportHistoryResponse = {
       confirmed_at: string | null;
       reversed_at: string | null;
     }>;
-    total: number;
+    pagination: { page: number; pageSize: number; total: number; totalPages: number };
   };
 };
 type ImportDetailResponse = {
@@ -148,14 +150,15 @@ const accountColumns: ColumnDef<DematAccount>[] = [
 function AccountPasswordText({ account }: { account: DematAccount }) {
   const { session, markSessionExpired } = useAuth();
   const { data, isLoading, isError } = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["accounts", account.id, "password"]),
+    queryKey: userQueryKey(session?.user?.id, ["accounts", account.id, "password"]),
     enabled: Boolean(session && account.password_saved),
     retry: false,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       try {
         return await apiRequest<AccountPasswordResponse>(
           `/api/accounts/${account.id}/password`,
           session!,
+          { signal },
         );
       } catch (error) {
         if (error instanceof ApiRequestError && error.status === 401) markSessionExpired();
@@ -227,10 +230,12 @@ function AccountDetailLink({
 export function AccountDashboardPage() {
   const { session, markSessionExpired } = useAuth();
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["accounts", "summary"]),
+    queryKey: userQueryKey(session?.user?.id, ["accounts", "summary"]),
     enabled: Boolean(session),
-    queryFn: () =>
-      apiRequest<AccountListResponse>("/api/accounts?page=1&pageSize=1&archived=all", session!),
+    queryFn: ({ signal }) =>
+      apiRequest<AccountListResponse>("/api/accounts?page=1&pageSize=1&archived=all", session!, {
+        signal,
+      }),
   });
   useEffect(() => {
     if (error instanceof ApiRequestError && error.status === 401) markSessionExpired();
@@ -312,6 +317,7 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const pageValue = Number(listParams.get("page"));
   const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const pageSize = parsePageSize(listParams.get("pageSize"));
   const holderName = listParams.get("holder_name") ?? "";
   const status = listParams.get("status") ?? "";
   const archived = listParams.get("archived") ?? "false";
@@ -345,7 +351,7 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
   };
   const queryString = new URLSearchParams({
     page: String(page),
-    pageSize: "50",
+    pageSize: String(pageSize),
     archived,
     ...(holderName ? { holder_name: holderName } : {}),
     ...(status ? { status } : {}),
@@ -353,10 +359,12 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
     ...(createdTo ? { created_to: `${createdTo}T23:59:59.999Z` } : {}),
   });
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["accounts", "list", queryString.toString()]),
+    queryKey: userQueryKey(session?.user?.id, ["accounts", "list", queryString.toString()]),
     enabled: Boolean(session),
-    queryFn: () =>
-      apiRequest<AccountListResponse>(`/api/accounts?${queryString.toString()}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<AccountListResponse>(`/api/accounts?${queryString.toString()}`, session!, {
+        signal,
+      }),
   });
   useEffect(() => {
     if (error instanceof ApiRequestError && error.status === 401) markSessionExpired();
@@ -369,9 +377,9 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     rowCount: data?.data.pagination.total ?? 0,
-    state: { pagination: { pageIndex: page - 1, pageSize: 50 } },
+    state: { pagination: { pageIndex: page - 1, pageSize } },
   });
-  const totalPages = data?.data.pagination.totalPages ?? 0;
+  const totalPages = data?.data.pagination.totalPages ?? 1;
 
   function resetFilters() {
     setListParams({}, { replace: true });
@@ -583,28 +591,26 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
         {!isLoading && accounts.length === 0 ? (
           <p className="py-8 text-center text-base text-muted">No accounts match these filters.</p>
         ) : null}
-        <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p aria-live="polite" className="text-base text-muted">
-            Page {page} of {totalPages || 1}
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:flex">
-            <Button
-              variant="outline"
-              className="w-full sm:w-auto"
-              disabled={page <= 1}
-              onClick={() => changePage(page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full sm:w-auto"
-              disabled={page >= totalPages}
-              onClick={() => changePage(page + 1)}
-            >
-              Next
-            </Button>
-          </div>
+        <div className="mt-5 border-t border-border pt-4">
+          <Pagination
+            label="Account list pages"
+            page={page}
+            totalPages={totalPages}
+            total={data?.data.pagination.total}
+            pageSize={pageSize}
+            onPageChange={changePage}
+            onPageSizeChange={(nextPageSize) => {
+              setListParams(
+                (previous) => {
+                  const next = new URLSearchParams(previous);
+                  next.set("pageSize", String(nextPageSize));
+                  next.delete("page");
+                  return next;
+                },
+                { replace: true },
+              );
+            }}
+          />
         </div>
       </Card>
     </div>
@@ -623,9 +629,10 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
     isLoading: loadingAccount,
     refetch: refetchAccount,
   } = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["accounts", accountId]),
+    queryKey: userQueryKey(session?.user?.id, ["accounts", accountId]),
     enabled: Boolean(session && editing && accountId),
-    queryFn: () => apiRequest<AccountResponse>(`/api/accounts/${accountId}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<AccountResponse>(`/api/accounts/${accountId}`, session!, { signal }),
   });
   const {
     control,
@@ -782,9 +789,10 @@ export function AccountDetailsPage() {
   const navigate = useNavigate();
   const { notify } = useToast();
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["accounts", accountId]),
+    queryKey: userQueryKey(session?.user?.id, ["accounts", accountId]),
     enabled: Boolean(session && accountId),
-    queryFn: () => apiRequest<AccountResponse>(`/api/accounts/${accountId}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<AccountResponse>(`/api/accounts/${accountId}`, session!, { signal }),
   });
   const action = useMutation({
     mutationFn: async (method: "archive" | "restore" | "delete") =>
@@ -1191,15 +1199,25 @@ export function AccountImportDialog({ onClose }: { onClose: () => void }) {
 export function ImportHistoryPage() {
   const { session, markSessionExpired } = useAuth();
   const { importId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pageValue = Number(searchParams.get("page"));
+  const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const pageSize = parsePageSize(searchParams.get("pageSize"));
   const client = useQueryClient();
   const { notify } = useToast();
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: userQueryKey(session?.user.id, importId ? ["account-imports", importId] : ["account-imports", "history"]),
+    queryKey: userQueryKey(
+      session?.user?.id,
+      importId ? ["account-imports", importId] : ["account-imports", "history", page, pageSize],
+    ),
     enabled: Boolean(session),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiRequest<ImportHistoryResponse>(
-        importId ? `/api/accounts/import/${importId}` : "/api/accounts/import/history",
+        importId
+          ? `/api/accounts/import/${importId}`
+          : `/api/accounts/import/history?page=${page}&pageSize=${pageSize}`,
         session!,
+        { signal },
       ),
   });
   useEffect(() => {
@@ -1207,6 +1225,9 @@ export function ImportHistoryPage() {
   }, [error, markSessionExpired]);
   const detail = importId ? (data as ImportDetailResponse | undefined)?.data : undefined;
   const imports = importId ? [] : ((data as ImportHistoryResponse | undefined)?.data.imports ?? []);
+  const importPagination = importId
+    ? undefined
+    : (data as ImportHistoryResponse | undefined)?.data.pagination;
   const reverse = useMutation({
     mutationFn: () =>
       apiRequest(`/api/accounts/import/${importId}/reverse`, session!, { method: "POST" }),
@@ -1363,6 +1384,37 @@ export function ImportHistoryPage() {
           </DataTable>
           {!imports.length ? (
             <p className="py-8 text-center text-base text-muted">No imports yet.</p>
+          ) : null}
+          {importPagination ? (
+            <Pagination
+              label="Account import history pages"
+              page={page}
+              totalPages={importPagination.totalPages}
+              total={importPagination.total}
+              pageSize={pageSize}
+              onPageChange={(nextPage) => {
+                setSearchParams(
+                  (previous) => {
+                    const next = new URLSearchParams(previous);
+                    if (nextPage > 1) next.set("page", String(nextPage));
+                    else next.delete("page");
+                    return next;
+                  },
+                  { replace: true },
+                );
+              }}
+              onPageSizeChange={(nextPageSize) => {
+                setSearchParams(
+                  (previous) => {
+                    const next = new URLSearchParams(previous);
+                    next.set("pageSize", String(nextPageSize));
+                    next.delete("page");
+                    return next;
+                  },
+                  { replace: true },
+                );
+              }}
+            />
           ) : null}
         </Card>
       ) : null}

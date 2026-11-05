@@ -1,8 +1,10 @@
 # Frontend architecture
 
 `apps/web` is a React 18 single-page app served by Vite. `src/main.tsx` installs the global error
-boundary and styles. `src/app/App.tsx` sets up TanStack Query, and `src/app/router.tsx` defines
-client-side routes. `AppLayout` composes the responsive sidebar, header, and route outlet. At `/`,
+boundary and styles. `src/app/App.tsx` sets up TanStack Query and Redux Toolkit, and `src/app/router.tsx` defines
+client-side routes. Route page modules and drawer forms load on demand, so the initial bundle does
+not include the whole account, application, IPO, admin, and chart UI. `AppLayout` composes the
+responsive sidebar, header, and route outlet. At `/`,
 signed-out visitors see the full-width public landing page without the header, sidebar, or app
 content padding; the signed-in home dashboard retains the application layout.
 
@@ -14,6 +16,28 @@ restoration and distinguish expired sessions. Reusable display elements live und
 `tailwind.config.ts` and global fixed-light tokens are declared in `src/styles.css`. `components.json`
 and `src/lib/utils.ts` configure the standard shadcn/ui utility conventions.
 
+## State and request ownership
+
+Supabase Auth owns the authenticated session. Redux Toolkit stores only shared client state:
+`authUi` tracks the authentication workflow, `ui` tracks mobile navigation, and
+`dashboardFilters` retains applied dashboard filters while navigating. Form drafts and route
+drawers remain local or URL state. API responses stay in TanStack Query. The fixed light palette
+has no theme setting.
+
+`src/lib/queryClient.ts` defines cache lifetimes by domain; `src/lib/queryKeys.ts` appends the
+authenticated user ID to every private query key. Domain-prefix invalidation still works after
+mutations. `AuthProvider` clears the query cache and user-specific Redux state on sign-out,
+expiration, or account switch. Supabase's initial auth event restores the session once; token
+refresh does not clear a same-user cache. Query functions can forward TanStack's abort signal to
+the central HTTP transport. Profile and administrator reads use query hooks instead of fetch
+effects. The admin role read is isolated in `src/services/admin.ts`; the API still enforces
+administrator access independently.
+
+`src/lib/api.ts` handles authenticated JSON and downloads, including structured errors. Set
+`VITE_LOG_API_REQUESTS=true` during local development to log a sequential request count, HTTP
+method, and normalized path. Query strings, tokens, and request bodies are omitted. Production
+builds do not emit these logs or include React Query Devtools.
+
 The protected demat-account routes include the dashboard, server-filtered account list, add/edit
 forms, details, bulk import, and import history. TanStack Query handles API state; TanStack Table
 and Virtual render the desktop account list, with readable mobile account cards. The forms and
@@ -22,6 +46,9 @@ touch-target styles apply throughout.
 Sidebar dashboard links match their exact routes, so a nested list page highlights only its own link.
 Account and application lists retain filter and page state in URL parameters. Their detail pages
 use the originating list URL when navigating back, with a safe parent fallback for direct links.
+All paginated user and administrator listings use the shared 10, 25, 50, and 100 row options,
+default to 10, and clamp stale page numbers when filters or data changes. Import-history lists use
+the same server-validated pagination contract.
 The application list has an IPO name search toolbar, active filter chips, and a mobile-friendly
 filter drawer with searchable IPO, account, category, status, and date controls. Applied
 filters drive both the paginated list and CSV export.
@@ -42,9 +69,14 @@ validation reasons, source/rule version, calculation inputs, and a clear notice 
 shareholder conditions are not independently verified.
 IPO list search, status and page state also live in URL parameters. Shared and personal detail
 views use the same issue and date presentation without inventing unavailable market statistics.
-The admin catalog also keeps search, status, and pagination in its URL. Its View action carries
+The admin catalog also keeps search, status, and pagination in its URL. Search requests are
+debounced, and the administrator API now filters and pages the catalog and sync history at the
+database boundary.
+Its View action carries
 that URL to the catalog detail page so Back returns to the filtered admin list.
 Dashboard detail links also carry their route context so Back returns to the signed-in home view.
+Application-summary and IPO-catalog status cards use database aggregates rather than calculating
+counts from paginated page contents.
 
 The authenticated home route shows the responsive dashboard and analytics page. TanStack Query
 loads bounded PostgreSQL aggregates, the canonical Phase 6 capital summary, and paginated IPO and

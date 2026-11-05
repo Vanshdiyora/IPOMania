@@ -1,4 +1,5 @@
 import { userQueryKey } from "../../lib/queryKeys";
+import { queryKeys } from "../../lib/queryKeys";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -60,6 +61,7 @@ import {
   SkeletonTable,
   SkeletonTableRows,
 } from "../../components/ui/Skeleton";
+import { parsePageSize } from "../../lib/pagination";
 
 type ApplicationListResponse = {
   data: {
@@ -146,7 +148,7 @@ type ImportHistoryResponse = {
       confirmed_at: string | null;
       reversed_at: string | null;
     }>;
-    total: number;
+    pagination: { page: number; page_size: number; total: number; total_pages: number };
   };
 };
 
@@ -196,24 +198,25 @@ function applicationReturnPath(value: string | null) {
 function useOwnedLists() {
   const { session } = useAuth();
   const ipos = useInfiniteQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipos", "application-options"]),
+    queryKey: userQueryKey(session?.user?.id, ["ipos", "application-options"]),
     enabled: Boolean(session),
     initialPageParam: 1,
-    queryFn: ({ pageParam }) =>
-      apiRequest<IpoListResponse>(`/api/ipos?page=${pageParam}&page_size=25`, session!),
+    queryFn: ({ pageParam, signal }) =>
+      apiRequest<IpoListResponse>(`/api/ipos?page=${pageParam}&page_size=25`, session!, { signal }),
     getNextPageParam: (lastPage) => {
       const { page, total_pages: totalPages } = lastPage.data.pagination ?? {};
       return page && totalPages && page < totalPages ? page + 1 : undefined;
     },
   });
   const applications = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["applications", "applied-ipo-status"]),
+    queryKey: userQueryKey(session?.user?.id, ["applications", "applied-ipo-status"]),
     enabled: Boolean(session),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const loadPage = (page: number) =>
         apiRequest<ApplicationListResponse>(
           `/api/applications?page=${page}&page_size=100&include_archived=all`,
           session!,
+          { signal },
         );
       const first = await loadPage(1);
       const totalPages = first.data.pagination?.total_pages ?? 1;
@@ -233,15 +236,21 @@ function useOwnedLists() {
     },
   });
   const accounts = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["accounts", "application-options"]),
+    queryKey: queryKeys.accounts.allOptions(session?.user?.id),
     enabled: Boolean(session),
-    queryFn: async () => {
-      const first = await apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!);
+    queryFn: async ({ signal }) => {
+      const first = await apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!, {
+        signal,
+      });
       const totalPages = first.data.pagination?.totalPages ?? 1;
       if (totalPages <= 1) return first;
       const pages = await Promise.all(
         Array.from({ length: totalPages - 1 }, (_, index) =>
-          apiRequest<AccountListResponse>(`/api/accounts?page=${index + 2}&pageSize=100`, session!),
+          apiRequest<AccountListResponse>(
+            `/api/accounts?page=${index + 2}&pageSize=100`,
+            session!,
+            { signal },
+          ),
         ),
       );
       return {
@@ -288,12 +297,17 @@ export function ApplicationDashboardPage() {
   const [listParams] = useSearchParams();
   const selectedIpoId = listParams.get("ipo_id") ?? "";
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["applications", "dashboard", selectedIpoId || "all"]),
+    queryKey: userQueryKey(session?.user?.id, [
+      "applications",
+      "dashboard",
+      selectedIpoId || "all",
+    ]),
     enabled: Boolean(session),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiRequest<ApplicationSummaryResponse>(
         `/api/applications/summary${selectedIpoId ? `?ipo_id=${selectedIpoId}` : ""}`,
         session!,
+        { signal },
       ),
   });
   const totals = [
@@ -357,6 +371,7 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
   const [listParams, setListParams] = useSearchParams();
   const pageValue = Number(listParams.get("page"));
   const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const pageSize = parsePageSize(listParams.get("page_size"));
   const appliedFilters = filtersFromParams(listParams);
   const ipoSearch = listParams.get("ipo_search") ?? "";
   const [searchInput, setSearchInput] = useState(ipoSearch);
@@ -409,12 +424,15 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
   };
   const lists = useOwnedLists();
   const categoriesQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["application-category-options", lists.ipos.map((item) => item.id).join(",")]),
+    queryKey: userQueryKey(session?.user?.id, [
+      "application-category-options",
+      lists.ipos.map((item) => item.id).join(","),
+    ]),
     enabled: Boolean(session && lists.ipos.length),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const results = await Promise.all(
         lists.ipos.map((ipo) =>
-          apiRequest<CategoryResponse>(`/api/ipos/${ipo.id}/categories`, session!),
+          apiRequest<CategoryResponse>(`/api/ipos/${ipo.id}/categories`, session!, { signal }),
         ),
       );
       return results.flatMap((result) => result.data.configurations);
@@ -422,7 +440,7 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
   });
   const params = new URLSearchParams({
     page: String(page),
-    page_size: "50",
+    page_size: String(pageSize),
     include_archived:
       appliedFilters.archiveStatus === "archived"
         ? "true"
@@ -438,16 +456,18 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
     ...(appliedFilters.submissionTo ? { submission_to: appliedFilters.submissionTo } : {}),
   });
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["applications", params.toString()]),
+    queryKey: userQueryKey(session?.user?.id, ["applications", params.toString()]),
     enabled: Boolean(session),
-    queryFn: () => apiRequest<ApplicationListResponse>(`/api/applications?${params}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<ApplicationListResponse>(`/api/applications?${params}`, session!, { signal }),
   });
   const rows = data?.data.applications ?? [];
   const activeFilterCount = filterCount(appliedFilters);
   const summary = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["applications", "summary", "all"]),
+    queryKey: userQueryKey(session?.user?.id, ["applications", "summary", "all"]),
     enabled: Boolean(session),
-    queryFn: () => apiRequest<ApplicationSummaryResponse>("/api/applications/summary", session!),
+    queryFn: ({ signal }) =>
+      apiRequest<ApplicationSummaryResponse>("/api/applications/summary", session!, { signal }),
   });
   const ipoOptions = lists.ipos.map((ipo) => ({
     value: ipo.id,
@@ -709,6 +729,10 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
           page={page}
           totalPages={data?.data.pagination.total_pages ?? 1}
           total={data?.data.pagination.total}
+          pageSize={pageSize}
+          onPageSizeChange={(nextPageSize) =>
+            updateListParams({ page_size: String(nextPageSize), page: null })
+          }
           onPageChange={changePage}
         />
       </Card>
@@ -737,18 +761,20 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const preselectedIpoId = searchParams.get("ipo_id");
   const returnTo = applicationReturnPath(searchParams.get("return_to"));
   const preselectedIpo = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipo", preselectedIpoId]),
+    queryKey: userQueryKey(session?.user?.id, ["ipo", preselectedIpoId]),
     enabled: Boolean(session && !editing && preselectedIpoId),
-    queryFn: () => apiRequest<IpoResponse>(`/api/ipos/${preselectedIpoId}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<IpoResponse>(`/api/ipos/${preselectedIpoId}`, session!, { signal }),
   });
   const catalogIpos = useInfiniteQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipo-catalog", "application-options"]),
+    queryKey: userQueryKey(session?.user?.id, ["ipo-catalog", "application-options"]),
     enabled: Boolean(session && !editing),
     initialPageParam: 1,
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam, signal }) =>
       apiRequest<IpoCatalogListResponse>(
         `/api/ipos/catalog?page=${pageParam}&page_size=25`,
         session!,
+        { signal },
       ),
     getNextPageParam: (lastPage) => {
       const { page, total_pages: totalPages } = lastPage.data.pagination ?? {};
@@ -756,14 +782,18 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     },
   });
   const categoriesQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, [selectedCatalogIpo ? "ipo-catalog-categories" : "ipo-categories", ipoId]),
+    queryKey: userQueryKey(session?.user?.id, [
+      selectedCatalogIpo ? "ipo-catalog-categories" : "ipo-categories",
+      ipoId,
+    ]),
     enabled: Boolean(session && ipoId),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiRequest<CategoryResponse>(
         selectedCatalogIpo
           ? `/api/ipos/catalog/${ipoId}/categories`
           : `/api/ipos/${ipoId}/categories`,
         session!,
+        { signal },
       ),
   });
   const categoryConfigurations = categoriesQuery.data?.data.configurations ?? [];
@@ -876,9 +906,10 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     }
   })();
   const detail = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["applications", applicationId]),
+    queryKey: userQueryKey(session?.user?.id, ["applications", applicationId]),
     enabled: Boolean(session && editing && applicationId),
-    queryFn: () => apiRequest<ApplicationResponse>(`/api/applications/${applicationId}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<ApplicationResponse>(`/api/applications/${applicationId}`, session!, { signal }),
   });
   const mutation = useMutation({
     mutationFn: async () => {
@@ -1286,9 +1317,10 @@ export function ApplicationDetailsPage() {
   const navigate = useNavigate();
   const { notify } = useToast();
   const detail = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["applications", applicationId]),
+    queryKey: userQueryKey(session?.user?.id, ["applications", applicationId]),
     enabled: Boolean(session && applicationId),
-    queryFn: () => apiRequest<ApplicationResponse>(`/api/applications/${applicationId}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<ApplicationResponse>(`/api/applications/${applicationId}`, session!, { signal }),
   });
   const archive = useMutation({
     mutationFn: () =>
@@ -1517,9 +1549,10 @@ export function BulkApplicationPage() {
   const lists = useOwnedLists();
   const ipo = lists.ipos.find((item) => item.id === ipoId);
   const categoriesQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipo-categories", ipoId]),
+    queryKey: userQueryKey(session?.user?.id, ["ipo-categories", ipoId]),
     enabled: Boolean(session && ipoId),
-    queryFn: () => apiRequest<CategoryResponse>(`/api/ipos/${ipoId}/categories`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<CategoryResponse>(`/api/ipos/${ipoId}/categories`, session!, { signal }),
   });
   const category = categoriesQuery.data?.data.configurations.find((item) => item.id === categoryId);
   const inputs = selectedAccounts.map((demat_account_id) => ({
@@ -1988,10 +2021,24 @@ export function ApplicationImportPage() {
 export function ApplicationImportHistoryPage() {
   const { session } = useAuth();
   const { importId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pageValue = Number(searchParams.get("page"));
+  const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const pageSize = parsePageSize(searchParams.get("page_size"));
   const { data, error, isLoading, refetch } = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["application-imports", importId ?? "history"]),
+    queryKey: userQueryKey(
+      session?.user?.id,
+      importId
+        ? ["application-imports", importId]
+        : ["application-imports", "history", page, pageSize],
+    ),
     enabled: Boolean(session && !importId),
-    queryFn: () => apiRequest<ImportHistoryResponse>(`/api/imports/history`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<ImportHistoryResponse>(
+        `/api/imports/history?page=${page}&page_size=${pageSize}`,
+        session!,
+        { signal },
+      ),
   });
   return (
     <div className="space-y-6">
@@ -2054,6 +2101,37 @@ export function ApplicationImportHistoryPage() {
               {data && data.data.imports.length === 0 ? (
                 <p className="p-3">No imports yet.</p>
               ) : null}
+              {data?.data.pagination ? (
+                <Pagination
+                  label="Application import history pages"
+                  page={page}
+                  totalPages={data.data.pagination.total_pages}
+                  total={data.data.pagination.total}
+                  pageSize={pageSize}
+                  onPageChange={(nextPage) => {
+                    setSearchParams(
+                      (previous) => {
+                        const next = new URLSearchParams(previous);
+                        if (nextPage > 1) next.set("page", String(nextPage));
+                        else next.delete("page");
+                        return next;
+                      },
+                      { replace: true },
+                    );
+                  }}
+                  onPageSizeChange={(nextPageSize) => {
+                    setSearchParams(
+                      (previous) => {
+                        const next = new URLSearchParams(previous);
+                        next.set("page_size", String(nextPageSize));
+                        next.delete("page");
+                        return next;
+                      },
+                      { replace: true },
+                    );
+                  }}
+                />
+              ) : null}
             </div>
           )}
         </Card>
@@ -2067,9 +2145,9 @@ function ImportReport({ importId }: { importId: string }) {
   const { notify } = useToast();
   const queryClient = useQueryClient();
   const report = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["application-import-report", importId]),
+    queryKey: userQueryKey(session?.user?.id, ["application-import-report", importId]),
     enabled: Boolean(session),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiRequest<{
         data: {
           import: { id: string; file_name: string; status: string };
@@ -2081,7 +2159,7 @@ function ImportReport({ importId }: { importId: string }) {
             warnings: string[];
           }>;
         };
-      }>(`/api/imports/${importId}/report`, session!),
+      }>(`/api/imports/${importId}/report`, session!, { signal }),
   });
   const reverse = useMutation({
     mutationFn: () => apiRequest(`/api/imports/${importId}/reverse`, session!, { method: "POST" }),

@@ -60,6 +60,8 @@ For hosted Supabase, use that project's URL and anon key. For local Supabase, us
 Database checks need explicit credentials and do not run as part of the default test suite. See
 [environment variables](./docs/deployment/ENVIRONMENT_VARIABLES.md) and
 [architecture documentation](./docs/architecture/SYSTEM_ARCHITECTURE.md).
+The browser state and request-cache migration is documented in
+[QUERY_REDUX_MIGRATION.md](./docs/architecture/QUERY_REDUX_MIGRATION.md).
 
 ## Repository map
 

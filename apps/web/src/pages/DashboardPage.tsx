@@ -97,46 +97,57 @@ export function DashboardPage() {
   }, [filters]);
 
   const analyticsQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["analytics", queryString]),
+    queryKey: userQueryKey(session?.user?.id, ["analytics", queryString]),
     enabled: Boolean(session),
     staleTime: 30_000,
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiRequest<AnalyticsResponse>(
         `/api/analytics${queryString ? `?${queryString}` : ""}`,
         session!,
+        { signal },
       ),
   });
   const ipoOptionsQuery = useInfiniteQuery({
-    queryKey: userQueryKey(session?.user.id, ["analytics", "personal-ipo-options"]),
+    queryKey: userQueryKey(session?.user?.id, ["analytics", "personal-ipo-options"]),
     enabled: Boolean(session),
     staleTime: 60_000,
     initialPageParam: 1,
-    queryFn: ({ pageParam }) =>
-      apiRequest<IpoOptionsResponse>(`/api/ipos?page=${pageParam}&page_size=100`, session!),
+    queryFn: ({ pageParam, signal }) =>
+      apiRequest<IpoOptionsResponse>(`/api/ipos?page=${pageParam}&page_size=100`, session!, {
+        signal,
+      }),
     getNextPageParam: (lastPage) => {
       const { page, total_pages: totalPages } = lastPage.data.pagination ?? {};
       return page && totalPages && page < totalPages ? page + 1 : undefined;
     },
   });
   const catalogOptionsQuery = useInfiniteQuery({
-    queryKey: userQueryKey(session?.user.id, ["analytics", "catalog-ipo-options"]),
+    queryKey: userQueryKey(session?.user?.id, ["analytics", "catalog-ipo-options"]),
     enabled: Boolean(session),
     staleTime: 60_000,
     initialPageParam: 1,
-    queryFn: ({ pageParam }) =>
-      apiRequest<IpoOptionsResponse>(`/api/ipos/catalog?page=${pageParam}&page_size=100`, session!),
+    queryFn: ({ pageParam, signal }) =>
+      apiRequest<IpoOptionsResponse>(
+        `/api/ipos/catalog?page=${pageParam}&page_size=100`,
+        session!,
+        {
+          signal,
+        },
+      ),
     getNextPageParam: (lastPage) => {
       const { page, total_pages: totalPages } = lastPage.data.pagination ?? {};
       return page && totalPages && page < totalPages ? page + 1 : undefined;
     },
   });
   const accountOptionsQuery = useInfiniteQuery({
-    queryKey: userQueryKey(session?.user.id, ["analytics", "account-options"]),
+    queryKey: userQueryKey(session?.user?.id, ["analytics", "account-options"]),
     enabled: Boolean(session),
     staleTime: 60_000,
     initialPageParam: 1,
-    queryFn: ({ pageParam }) =>
-      apiRequest<AccountOptionsResponse>(`/api/accounts?page=${pageParam}&pageSize=100`, session!),
+    queryFn: ({ pageParam, signal }) =>
+      apiRequest<AccountOptionsResponse>(`/api/accounts?page=${pageParam}&pageSize=100`, session!, {
+        signal,
+      }),
     getNextPageParam: (lastPage) => {
       const { page, totalPages } = lastPage.data.pagination ?? {};
       return page && totalPages && page < totalPages ? page + 1 : undefined;

@@ -5,13 +5,14 @@ export function userQueryKey<T extends readonly unknown[]>(userId: string | unde
 
 export const queryKeys = {
   profile: (userId: string | undefined) => userQueryKey(userId, ["profile"] as const),
+  accounts: {
+    allOptions: (userId: string | undefined) =>
+      userQueryKey(userId, ["accounts", "all-options"] as const),
+  },
   admin: {
-    overview: (userId: string | undefined) =>
-      userQueryKey(userId, ["admin", "overview"] as const),
-    status: (userId: string | undefined) =>
-      userQueryKey(userId, ["admin", "sync-status"] as const),
-    catalog: (userId: string | undefined) =>
-      userQueryKey(userId, ["admin", "catalog"] as const),
+    overview: (userId: string | undefined) => userQueryKey(userId, ["admin", "overview"] as const),
+    status: (userId: string | undefined) => userQueryKey(userId, ["admin", "sync-status"] as const),
+    catalog: (userId: string | undefined) => userQueryKey(userId, ["admin", "catalog"] as const),
   },
   ipo: {
     detail: (userId: string | undefined, ipoId: string) =>

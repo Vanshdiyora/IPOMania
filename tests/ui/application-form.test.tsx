@@ -399,6 +399,7 @@ describe("application form IPO selection", () => {
       expect(apiRequestMock).toHaveBeenCalledWith(
         `/api/ipos/catalog/${catalogIpoId}/categories`,
         expect.anything(),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
       ),
     );
     expect(screen.getByRole("textbox", { name: /Price/ })).toHaveValue("110");

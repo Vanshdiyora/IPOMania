@@ -1,4 +1,5 @@
 import { userQueryKey } from "../../lib/queryKeys";
+import { queryKeys } from "../../lib/queryKeys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -39,12 +40,14 @@ import {
 import { ApiRequestError, apiRequest } from "../../lib/api";
 import { applicationDrawerPath } from "../../lib/applicationDrawer";
 import { toIsoDateTime, toLocalDateTime } from "../../lib/formValues";
+import { defaultPageSize, parsePageSize } from "../../lib/pagination";
 import { DataTable } from "../../components/ui/DataTable";
 
 type IpoListResponse<T = IpoRecord> = {
   data: {
     ipos: T[];
     pagination: { page: number; page_size: number; total: number; total_pages: number };
+    status_counts?: { upcoming: number; open: number; closed: number; listed: number };
   };
 };
 type IpoResponse = { data: IpoRecord };
@@ -95,6 +98,16 @@ type CalculationResponse = {
     validation_errors: Array<{ code: string; message: string }>;
   };
 };
+type QuotaCalculationRequest = {
+  ipo_id: string;
+  demat_account_id: string;
+  category: IpoCategoryCode;
+  lots: number;
+  price_type: "BID" | "CUT_OFF";
+  price: string;
+  shareholder_shares: number | null;
+  eligibility_answers: Record<string, boolean | null>;
+};
 
 const categories: IpoCategoryCode[] = ["RETAIL", "SHNI", "BHNI", "SHAREHOLDER", "EMPLOYER"];
 const ipoSortOptions = [
@@ -127,6 +140,11 @@ function IpoListContent() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get("search") ?? "";
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   const availableStatuses: readonly IpoStatus[] = catalogStatuses;
   const selectedStatuses = searchParams
     .getAll("status")
@@ -136,6 +154,7 @@ function IpoListContent() {
   const sort: IpoSort = selectedSort ?? "date_desc";
   const requestedPage = Number(searchParams.get("page"));
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const pageSize = parsePageSize(searchParams.get("page_size"));
   const updateListParams = (changes: Record<string, string | string[] | null>, replace = false) => {
     setSearchParams(
       (previous) => {
@@ -157,18 +176,19 @@ function IpoListContent() {
   };
   const params = new URLSearchParams({
     page: String(page),
-    page_size: "25",
+    page_size: String(pageSize),
     sort,
-    ...(search ? { search } : {}),
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
   });
   selectedStatuses.forEach((selectedStatus) => params.append("status", selectedStatus));
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipos", "catalog", params.toString()]),
+    queryKey: userQueryKey(session?.user?.id, ["ipos", "catalog", params.toString()]),
     enabled: Boolean(session),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiRequest<IpoListResponse<IpoRecord | IpoCatalogRecord>>(
         `/api/ipos/catalog?${params}`,
         session!,
+        { signal },
       ),
   });
   const ipos = data?.data.ipos ?? [];
@@ -185,26 +205,28 @@ function IpoListContent() {
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="IPO totals">
         <Card className="px-4 py-3 sm:p-4">
           <p className="text-sm font-semibold text-muted">Total IPOs</p>
-          <p className="mt-1 text-2xl font-bold text-navy">{data?.data.pagination.total ?? 0}</p>
-        </Card>
-        <Card className="px-4 py-3 sm:p-4">
-          <p className="text-sm font-semibold text-muted">Open on this page</p>
           <p className="mt-1 text-2xl font-bold text-navy">
-            {ipos.filter((ipo) => ipo.status === "OPEN").length}
+            {isLoading ? "Loading…" : error ? "Unavailable" : (data?.data.pagination.total ?? 0)}
           </p>
         </Card>
-        <Card className="px-4 py-3 sm:p-4">
-          <p className="text-sm font-semibold text-muted">Upcoming on this page</p>
-          <p className="mt-1 text-2xl font-bold text-navy">
-            {ipos.filter((ipo) => ipo.status === "UPCOMING").length}
-          </p>
-        </Card>
-        <Card className="px-4 py-3 sm:p-4">
-          <p className="text-sm font-semibold text-muted">Listed on this page</p>
-          <p className="mt-1 text-2xl font-bold text-navy">
-            {ipos.filter((ipo) => ipo.status === "LISTED").length}
-          </p>
-        </Card>
+        {(
+          [
+            ["Open", "open"],
+            ["Upcoming", "upcoming"],
+            ["Listed", "listed"],
+          ] as const
+        ).map(([title, status]) => (
+          <Card key={status} className="px-4 py-3 sm:p-4">
+            <p className="text-sm font-semibold text-muted">{title} IPOs</p>
+            <p className="mt-1 text-2xl font-bold text-navy">
+              {isLoading
+                ? "Loading…"
+                : error || !data?.data.status_counts
+                  ? "Unavailable"
+                  : data.data.status_counts[status]}
+            </p>
+          </Card>
+        ))}
       </section>
       <Card className="overflow-hidden">
         <div className="flex flex-col gap-3">
@@ -339,12 +361,16 @@ function IpoListContent() {
           </tbody>
         </DataTable>
       ) : null}
-      {data && data.data.pagination.total_pages > 1 ? (
+      {data ? (
         <Pagination
           label="IPO list pages"
           page={page}
           totalPages={data.data.pagination.total_pages}
           total={data.data.pagination.total}
+          pageSize={pageSize}
+          onPageSizeChange={(nextPageSize) =>
+            updateListParams({ page_size: String(nextPageSize), page: null }, true)
+          }
           onPageChange={(next) => updateListParams({ page: String(next) })}
         />
       ) : null}
@@ -356,9 +382,10 @@ export function IpoCatalogDetailsPage() {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipo-catalog", ipoId]),
+    queryKey: userQueryKey(session?.user?.id, ["ipo-catalog", ipoId]),
     enabled: Boolean(session && ipoId),
-    queryFn: () => apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!, { signal }),
   });
   if (isLoading) return <SkeletonIpoDetails />;
   if (error) return <ErrorNotice error={error} onRetry={() => void refetch()} />;
@@ -396,37 +423,46 @@ export function IpoCatalogApplicationsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [accountPage, setAccountPage] = useState(1);
+  const [accountPageSize, setAccountPageSize] = useState<number>(defaultPageSize);
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
     return () => window.clearTimeout(timer);
   }, [search]);
   const ipoQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipo-catalog", ipoId]),
+    queryKey: userQueryKey(session?.user?.id, ["ipo-catalog", ipoId]),
     enabled: Boolean(session && ipoId),
-    queryFn: () => apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!, { signal }),
   });
   const ipo = ipoQuery.data?.data;
   const applicationReady = ipo ? isIpoReadyForApplication(ipo) : false;
   const accountsQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["accounts", "catalog-ipo-application-table", debouncedSearch, accountPage]),
+    queryKey: userQueryKey(session?.user?.id, [
+      "accounts",
+      "catalog-ipo-application-table",
+      debouncedSearch,
+      accountPage,
+      accountPageSize,
+    ]),
     enabled: Boolean(session && applicationReady),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const params = new URLSearchParams({
         page: String(accountPage),
-        pageSize: "25",
+        pageSize: String(accountPageSize),
         archived: "false",
       });
       if (debouncedSearch) params.set("holder_name", debouncedSearch);
-      return apiRequest<AccountListResponse>(`/api/accounts?${params}`, session!);
+      return apiRequest<AccountListResponse>(`/api/accounts?${params}`, session!, { signal });
     },
   });
   const ownedIpoQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipos", "catalog-application-status", ipoId]),
+    queryKey: userQueryKey(session?.user?.id, ["ipos", "catalog-application-status", ipoId]),
     enabled: Boolean(session && applicationReady),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const first = await apiRequest<IpoListResponse>(
         "/api/ipos?page=1&page_size=100&source=personal",
         session!,
+        { signal },
       );
       const totalPages = first.data.pagination.total_pages;
       if (totalPages <= 1) return first;
@@ -435,6 +471,7 @@ export function IpoCatalogApplicationsPage() {
           apiRequest<IpoListResponse>(
             `/api/ipos?page=${index + 2}&page_size=100&source=personal`,
             session!,
+            { signal },
           ),
         ),
       );
@@ -450,12 +487,13 @@ export function IpoCatalogApplicationsPage() {
     (item) => item.source_catalog_id === ipoId,
   );
   const applicationsQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["catalog-ipo-applications", ownedIpo?.id]),
+    queryKey: userQueryKey(session?.user?.id, ["catalog-ipo-applications", ownedIpo?.id]),
     enabled: Boolean(session && ownedIpo?.id),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const first = await apiRequest<IpoApplicationsResponse>(
         `/api/applications?ipo_id=${ownedIpo!.id}&page=1&page_size=100`,
         session!,
+        { signal },
       );
       const totalPages = first.data.pagination.total_pages;
       if (totalPages <= 1) return first;
@@ -464,6 +502,7 @@ export function IpoCatalogApplicationsPage() {
           apiRequest<IpoApplicationsResponse>(
             `/api/applications?ipo_id=${ownedIpo!.id}&page=${index + 2}&page_size=100`,
             session!,
+            { signal },
           ),
         ),
       );
@@ -634,16 +673,6 @@ export function IpoCatalogApplicationsPage() {
                 })}
               </tbody>
             </DataTable>
-            {accountsQuery.data?.data.pagination &&
-            accountsQuery.data.data.pagination.totalPages > 1 ? (
-              <Pagination
-                label="Demat account application pages"
-                page={accountPage}
-                totalPages={accountsQuery.data.data.pagination.totalPages}
-                total={accountsQuery.data.data.pagination.total}
-                onPageChange={setAccountPage}
-              />
-            ) : null}
           </>
         ) : (
           <p className="py-6 text-center font-semibold text-muted">
@@ -652,6 +681,20 @@ export function IpoCatalogApplicationsPage() {
               : "Add a demat account to apply for this IPO."}
           </p>
         )}
+        {accountsQuery.data?.data.pagination ? (
+          <Pagination
+            label="Demat account application pages"
+            page={accountPage}
+            totalPages={accountsQuery.data.data.pagination.totalPages}
+            total={accountsQuery.data.data.pagination.total}
+            pageSize={accountPageSize}
+            onPageChange={setAccountPage}
+            onPageSizeChange={(nextPageSize) => {
+              setAccountPageSize(nextPageSize);
+              setAccountPage(1);
+            }}
+          />
+        ) : null}
       </Card>
     </div>
   );
@@ -661,38 +704,52 @@ export function IpoDetailsPage() {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
   const [applicationPage, setApplicationPage] = useState(1);
+  const [applicationPageSize, setApplicationPageSize] = useState<number>(defaultPageSize);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { notify } = useToast();
   const ipoQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipo", ipoId]),
+    queryKey: userQueryKey(session?.user?.id, ["ipo", ipoId]),
     enabled: Boolean(session && ipoId),
-    queryFn: () => apiRequest<IpoResponse>(`/api/ipos/${ipoId}`, session!),
+    queryFn: ({ signal }) => apiRequest<IpoResponse>(`/api/ipos/${ipoId}`, session!, { signal }),
   });
   const categoriesQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipo-categories", ipoId]),
+    queryKey: userQueryKey(session?.user?.id, ["ipo-categories", ipoId]),
     enabled: Boolean(session && ipoId),
-    queryFn: () => apiRequest<IpoCategoryResponse>(`/api/ipos/${ipoId}/categories`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<IpoCategoryResponse>(`/api/ipos/${ipoId}/categories`, session!, { signal }),
   });
   const applicationsQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipo-applications", ipoId, applicationPage]),
+    queryKey: userQueryKey(session?.user?.id, [
+      "ipo-applications",
+      ipoId,
+      applicationPage,
+      applicationPageSize,
+    ]),
     enabled: Boolean(session && ipoId),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiRequest<IpoApplicationsResponse>(
-        `/api/applications?ipo_id=${ipoId}&page=${applicationPage}&page_size=25`,
+        `/api/applications?ipo_id=${ipoId}&page=${applicationPage}&page_size=${applicationPageSize}`,
         session!,
+        { signal },
       ),
   });
   const accountsQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["accounts", "ipo-application-table"]),
+    queryKey: queryKeys.accounts.allOptions(session?.user?.id),
     enabled: Boolean(session),
-    queryFn: async () => {
-      const first = await apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!);
+    queryFn: async ({ signal }) => {
+      const first = await apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!, {
+        signal,
+      });
       const totalPages = first.data.pagination?.totalPages ?? 1;
       if (totalPages <= 1) return first;
       const pages = await Promise.all(
         Array.from({ length: totalPages - 1 }, (_, index) =>
-          apiRequest<AccountListResponse>(`/api/accounts?page=${index + 2}&pageSize=100`, session!),
+          apiRequest<AccountListResponse>(
+            `/api/accounts?page=${index + 2}&pageSize=100`,
+            session!,
+            { signal },
+          ),
         ),
       );
       return {
@@ -945,14 +1002,19 @@ export function IpoDetailsPage() {
                 )}
               </tbody>
             </DataTable>
-            {applicationPagination && applicationPagination.total_pages > 1 ? (
+            {applicationPagination ? (
               <div className="mt-4">
                 <Pagination
                   label="IPO application pages"
                   page={applicationPage}
                   totalPages={applicationPagination.total_pages}
                   total={applicationPagination.total}
+                  pageSize={applicationPageSize}
                   onPageChange={setApplicationPage}
+                  onPageSizeChange={(nextPageSize) => {
+                    setApplicationPageSize(nextPageSize);
+                    setApplicationPage(1);
+                  }}
                 />
               </div>
             ) : null}
@@ -986,12 +1048,14 @@ export function IpoCategoryConfigurationPage({
   const [message, setMessage] = useState("");
   const [form, setForm] = useState<RuleForm>(emptyRuleForm);
   const ipoQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, [sharedCatalog ? "ipo-catalog" : "ipo", ipoId]),
+    queryKey: userQueryKey(session?.user?.id, [sharedCatalog ? "ipo-catalog" : "ipo", ipoId]),
     enabled: Boolean(session && ipoId),
-    queryFn: async (): Promise<IpoCategoryPageResponse> => {
+    queryFn: async ({ signal }): Promise<IpoCategoryPageResponse> => {
       const response = sharedCatalog
-        ? await apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!)
-        : await apiRequest<IpoResponse>(`/api/ipos/${ipoId}`, session!);
+        ? await apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!, {
+            signal,
+          })
+        : await apiRequest<IpoResponse>(`/api/ipos/${ipoId}`, session!, { signal });
       return {
         data: {
           id: response.data.id,
@@ -1003,15 +1067,21 @@ export function IpoCategoryConfigurationPage({
     },
   });
   const rulesQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, [sharedCatalog ? "ipo-catalog-categories" : "ipo-categories", ipoId]),
+    queryKey: userQueryKey(session?.user?.id, [
+      sharedCatalog ? "ipo-catalog-categories" : "ipo-categories",
+      ipoId,
+    ]),
     enabled: Boolean(session && ipoId),
-    queryFn: async (): Promise<IpoCategoryPageRulesResponse> => {
+    queryFn: async ({ signal }): Promise<IpoCategoryPageRulesResponse> => {
       const response = sharedCatalog
         ? await apiRequest<IpoCatalogCategoryResponse>(
             `/api/admin/ipos/catalog/${ipoId}/categories`,
             session!,
+            { signal },
           )
-        : await apiRequest<IpoCategoryResponse>(`/api/ipos/${ipoId}/categories`, session!);
+        : await apiRequest<IpoCategoryResponse>(`/api/ipos/${ipoId}/categories`, session!, {
+            signal,
+          });
       return { data: { configurations: response.data.configurations } };
     },
   });
@@ -1429,6 +1499,7 @@ export function IpoCategoryConfigurationPage({
 
 export function QuotaCalculatorPage() {
   const { session } = useAuth();
+  const queryClient = useQueryClient();
   const [searchParams] = useState(() => new URLSearchParams(window.location.search));
   const [ipoId, setIpoId] = useState(searchParams.get("ipo") ?? "");
   const [dematAccountId, setDematAccountId] = useState("");
@@ -1442,19 +1513,53 @@ export function QuotaCalculatorPage() {
   const [requestError, setRequestError] = useState("");
   const [applicationMessage, setApplicationMessage] = useState("");
   const iposQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipos", "calculator"]),
+    queryKey: userQueryKey(session?.user?.id, ["ipos", "calculator"]),
     enabled: Boolean(session),
-    queryFn: () => apiRequest<IpoListResponse>("/api/ipos?page_size=100", session!),
+    queryFn: ({ signal }) =>
+      apiRequest<IpoListResponse>("/api/ipos?page_size=100", session!, { signal }),
   });
   const accountsQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["accounts", "calculator"]),
+    queryKey: userQueryKey(session?.user?.id, ["accounts", "calculator"]),
     enabled: Boolean(session),
-    queryFn: () => apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!),
+    queryFn: ({ signal }) =>
+      apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!, { signal }),
   });
   const categoriesQuery = useQuery({
-    queryKey: userQueryKey(session?.user.id, ["ipo-categories", ipoId]),
+    queryKey: userQueryKey(session?.user?.id, ["ipo-categories", ipoId]),
     enabled: Boolean(session && ipoId),
-    queryFn: () => apiRequest<IpoCategoryResponse>(`/api/ipos/${ipoId}/categories`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<IpoCategoryResponse>(`/api/ipos/${ipoId}/categories`, session!, { signal }),
+  });
+  const calculationMutation = useMutation({
+    mutationFn: ({ persist, request }: { persist: boolean; request: QuotaCalculationRequest }) =>
+      apiRequest<CalculationResponse>(
+        persist ? "/api/quota/calculate" : "/api/quota/validate",
+        session!,
+        { method: "POST", body: JSON.stringify(request) },
+      ),
+    onSuccess: (response) => setResult(response.data),
+    onError: (error) =>
+      setRequestError(error instanceof Error ? error.message : "The calculation failed."),
+  });
+  const recordApplicationMutation = useMutation({
+    mutationFn: (calculationId: string) =>
+      apiRequest<{ data: { id: string } }>("/api/capital/applications", session!, {
+        method: "POST",
+        body: JSON.stringify({ calculation_id: calculationId }),
+      }),
+    onSuccess: async (response) => {
+      setApplicationMessage(
+        `Application ${response.data.id} recorded for tracking. No application was submitted.`,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["applications"] }),
+        queryClient.invalidateQueries({ queryKey: ["capital"] }),
+      ]);
+    },
+    onError: (error) =>
+      setRequestError(
+        error instanceof Error ? error.message : "The application record could not be saved.",
+      ),
   });
   const configurations = categoriesQuery.data?.data.configurations ?? [];
   const latestRules = latestByCategory(configurations);
@@ -1470,7 +1575,7 @@ export function QuotaCalculatorPage() {
     }
   }, [selectedRules]);
 
-  const submitCalculation = async (persist: boolean) => {
+  const submitCalculation = (persist: boolean) => {
     if (!session) return;
     setRequestError("");
     setApplicationMessage("");
@@ -1485,38 +1590,13 @@ export function QuotaCalculatorPage() {
       shareholder_shares: category === "SHAREHOLDER" ? Number(shareholderShares) : null,
       eligibility_answers: answers,
     };
-    try {
-      const response = await apiRequest<CalculationResponse>(
-        persist ? "/api/quota/calculate" : "/api/quota/validate",
-        session,
-        { method: "POST", body: JSON.stringify(request) },
-      );
-      setResult(response.data);
-    } catch (error) {
-      setRequestError(error instanceof Error ? error.message : "The calculation failed.");
-    }
+    calculationMutation.mutate({ persist, request });
   };
 
-  const recordApplication = async () => {
+  const recordApplication = () => {
     if (!session || !result?.eligible || !result.calculation_id) return;
     setRequestError("");
-    try {
-      const response = await apiRequest<{ data: { id: string } }>(
-        "/api/capital/applications",
-        session,
-        {
-          method: "POST",
-          body: JSON.stringify({ calculation_id: result.calculation_id }),
-        },
-      );
-      setApplicationMessage(
-        `Application ${response.data.id} recorded for tracking. No application was submitted.`,
-      );
-    } catch (error) {
-      setRequestError(
-        error instanceof Error ? error.message : "The application record could not be saved.",
-      );
-    }
+    recordApplicationMutation.mutate(result.calculation_id);
   };
 
   const accountOptions = accountsQuery.data?.data.accounts ?? [];
@@ -1712,17 +1792,29 @@ export function QuotaCalculatorPage() {
         ) : null}
         <div className="mt-5 flex flex-wrap gap-3">
           <Button
-            disabled={!ipoId || !dematAccountId || !selectedRules}
-            onClick={() => void submitCalculation(false)}
+            disabled={
+              !ipoId ||
+              !dematAccountId ||
+              !selectedRules ||
+              calculationMutation.isPending ||
+              recordApplicationMutation.isPending
+            }
+            onClick={() => submitCalculation(false)}
           >
-            Validate
+            {calculationMutation.isPending ? "Validating…" : "Validate"}
           </Button>
           <Button
             variant="secondary"
-            disabled={!ipoId || !dematAccountId || !selectedRules}
-            onClick={() => void submitCalculation(true)}
+            disabled={
+              !ipoId ||
+              !dematAccountId ||
+              !selectedRules ||
+              calculationMutation.isPending ||
+              recordApplicationMutation.isPending
+            }
+            onClick={() => submitCalculation(true)}
           >
-            Calculate and save audit
+            {calculationMutation.isPending ? "Calculating…" : "Calculate and save audit"}
           </Button>
         </div>
       </Card>
@@ -1760,8 +1852,15 @@ export function QuotaCalculatorPage() {
             </p>
           ) : null}
           {result.eligible && result.calculation_id ? (
-            <Button className="mt-4" variant="secondary" onClick={() => void recordApplication()}>
-              Record application for tracking
+            <Button
+              className="mt-4"
+              variant="secondary"
+              disabled={recordApplicationMutation.isPending}
+              onClick={recordApplication}
+            >
+              {recordApplicationMutation.isPending
+                ? "Recording…"
+                : "Record application for tracking"}
             </Button>
           ) : null}
           {applicationMessage ? (

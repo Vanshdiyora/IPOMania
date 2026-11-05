@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppLayout } from "../../apps/web/src/components/layout/AppLayout";
 import { WelcomePage } from "../../apps/web/src/pages/WelcomePage";
 import { ToastProvider } from "../../apps/web/src/components/ui/Toast";
+import { Provider } from "react-redux";
+import { createAppStore } from "../../apps/web/src/store";
 
 const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }));
 
@@ -14,16 +16,18 @@ vi.mock("../../apps/web/src/auth/useAuth", () => ({ useAuth: useAuthMock }));
 
 function renderLayout(path = "/") {
   return render(
-    <ToastProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<WelcomePage />} />
-            <Route path="/dashboard" element={<h1>Dashboard content</h1>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
-    </ToastProvider>,
+    <Provider store={createAppStore()}>
+      <ToastProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<WelcomePage />} />
+              <Route path="/dashboard" element={<h1>Dashboard content</h1>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    </Provider>,
   );
 }
 

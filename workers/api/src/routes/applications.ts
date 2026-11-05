@@ -5,6 +5,7 @@ import {
   applicationBulkCreateSchema,
   applicationBulkStatusSchema,
   applicationCreateSchema,
+  applicationImportHistoryQuerySchema,
   applicationListQuerySchema,
   applicationSummaryQuerySchema,
   applicationUpdateSchema,
@@ -102,53 +103,14 @@ applicationsRoutes.get("/summary", async (context) => {
   const parsed = applicationSummaryQuerySchema.safeParse(context.req.query());
   if (!parsed.success) return validationError(context, "Application summary filters are invalid.");
   const supabase = context.get("rlsSupabase");
-  const userId = context.get("authenticatedUser").id;
-  const applications: Array<{
-    ipo_id: string;
-    category_code: string;
-    ipo_categories: unknown;
-  }> = [];
-  const pageSize = 1000;
-  for (let from = 0; ; from += pageSize) {
-    let query = supabase
-      .from("applications")
-      .select(`ipo_id, category_code, ${applicationCategoryEmbed}`)
-      .eq("user_id", userId)
-      .is("archived_at", null);
-    if (parsed.data.ipo_id) query = query.eq("ipo_id", parsed.data.ipo_id);
-    const { data, error } = await query.range(from, from + pageSize - 1);
-    if (error) throw error;
-    const page = (data ?? []) as Array<{
-      ipo_id: string;
-      category_code: string;
-      ipo_categories: unknown;
-    }>;
-    applications.push(...page);
-    if (page.length < pageSize) break;
+  const { data, error } = await supabase.rpc("get_application_summary", {
+    p_ipo_id: parsed.data.ipo_id ?? null,
+  });
+  if (error) throw error;
+  if (!data || typeof data !== "object") {
+    throw new Error("The application summary query returned an invalid response.");
   }
-  const categoryCounts: Record<string, number> = {
-    RETAIL: 0,
-    SHNI: 0,
-    BHNI: 0,
-    SHAREHOLDER: 0,
-  };
-  applications.forEach((application) => {
-    const categoryRow = Array.isArray(application.ipo_categories)
-      ? application.ipo_categories[0]
-      : application.ipo_categories;
-    const category =
-      categoryRow && typeof categoryRow === "object" && "category" in categoryRow
-        ? categoryRow.category
-        : application.category_code;
-    if (typeof category === "string" && category in categoryCounts) categoryCounts[category] += 1;
-  });
-  return context.json({
-    data: {
-      total: applications.length,
-      distinct_ipo_count: new Set(applications.map((application) => application.ipo_id)).size,
-      category_counts: categoryCounts,
-    },
-  });
+  return context.json({ data });
 });
 
 export const applicationImportRoutes = new Hono<ApplicationContext>();
@@ -599,6 +561,14 @@ applicationsRoutes.get("/imports/:importId/report", getImportReport);
 applicationsRoutes.post("/imports/:importId/reverse", reverseImport);
 
 async function listImportHistory(context: RouteContext) {
+  const parsed = applicationImportHistoryQuerySchema.safeParse(context.req.query());
+  if (!parsed.success) {
+    return context.json(
+      { error: { code: "VALIDATION_ERROR", message: "Import history pagination is invalid." } },
+      400,
+    );
+  }
+  const { page, page_size: pageSize } = parsed.data;
   const { data, error, count } = await context
     .get("rlsSupabase")
     .from("application_imports")
@@ -610,9 +580,19 @@ async function listImportHistory(context: RouteContext) {
     )
     .eq("user_id", context.get("authenticatedUser").id)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .range((page - 1) * pageSize, page * pageSize - 1);
   if (error) throw error;
-  return context.json({ data: { imports: data, total: count ?? 0 } });
+  return context.json({
+    data: {
+      imports: data,
+      pagination: {
+        page,
+        page_size: pageSize,
+        total: count ?? 0,
+        total_pages: Math.max(1, Math.ceil((count ?? 0) / pageSize)),
+      },
+    },
+  });
 }
 
 async function getImportReport(context: RouteContext) {

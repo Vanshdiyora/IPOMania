@@ -2,12 +2,14 @@
 
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { AppLayout } from "../../apps/web/src/components/layout/AppLayout";
 import { ToastProvider } from "../../apps/web/src/components/ui/Toast";
 import { AccountImportDialog } from "../../apps/web/src/pages/accounts/AccountPages";
+import { Provider } from "react-redux";
+import { createAppStore } from "../../apps/web/src/store";
 
 vi.mock("../../apps/web/src/auth/useAuth", () => ({
   useAuth: () => ({
@@ -40,34 +42,36 @@ function LocationProbe() {
 function renderAccountLayout(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <ToastProvider>
-      <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={[path]}>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route
-                path="/accounts"
-                element={
-                  <>
-                    <h1>Account dashboard</h1>
-                    <LocationProbe />
-                  </>
-                }
-              />
-              <Route
-                path="/accounts/import-history"
-                element={
-                  <>
-                    <h1>Import history</h1>
-                    <LocationProbe />
-                  </>
-                }
-              />
-            </Route>
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    </ToastProvider>,
+    <Provider store={createAppStore()}>
+      <ToastProvider>
+        <QueryClientProvider client={client}>
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route
+                  path="/accounts"
+                  element={
+                    <>
+                      <h1>Account dashboard</h1>
+                      <LocationProbe />
+                    </>
+                  }
+                />
+                <Route
+                  path="/accounts/import-history"
+                  element={
+                    <>
+                      <h1>Import history</h1>
+                      <LocationProbe />
+                    </>
+                  }
+                />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </ToastProvider>
+    </Provider>,
   );
 }
 
@@ -94,15 +98,24 @@ describe("account import dialog", () => {
   it.each([
     ["/accounts?accountImport=true", "Account dashboard", "/accounts"],
     ["/accounts/import-history?accountImport=true", "Import history", "/accounts/import-history"],
-  ])("opens over %s and dismisses without leaving the current page", (path, heading, pathname) => {
-    renderAccountLayout(path);
+  ])(
+    "opens over %s and dismisses without leaving the current page",
+    async (path, heading, pathname) => {
+      renderAccountLayout(path);
 
-    expect(screen.getByRole("dialog", { name: "Bulk account import" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
+      expect(
+        await screen.findByRole("dialog", { name: "Bulk account import" }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
 
-    fireEvent.keyDown(document, { key: "Escape" });
+      fireEvent.keyDown(document, { key: "Escape" });
 
-    expect(screen.queryByRole("dialog", { name: "Bulk account import" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("location")).toHaveTextContent(pathname);
-  });
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("dialog", { name: "Bulk account import" }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.getByTestId("location")).toHaveTextContent(pathname);
+    },
+  );
 });

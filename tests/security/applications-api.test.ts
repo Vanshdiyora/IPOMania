@@ -207,6 +207,36 @@ function form(file: Blob, name: string, mapping?: Record<string, string>) {
 }
 
 describe("application API", () => {
+  it("paginates application import history with validated shared sizes", async () => {
+    const requests = installMock();
+    const response = await createApp().request(
+      "/api/imports/history?page=2&page_size=25",
+      { headers: { Authorization: "Bearer test-token" } },
+      bindings,
+    );
+
+    expect(response.status, await response.clone().text()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        imports: [],
+        pagination: { page: 2, page_size: 25, total: 0, total_pages: 1 },
+      },
+    });
+    const importRequest = requests.find(
+      (request) =>
+        request.method === "GET" && new URL(request.url).pathname.endsWith("/application_imports"),
+    );
+    expect(new URL(importRequest!.url).searchParams.get("offset")).toBe("25");
+    expect(new URL(importRequest!.url).searchParams.get("limit")).toBe("25");
+
+    const invalid = await createApp().request(
+      "/api/imports/history?page_size=20",
+      { headers: { Authorization: "Bearer test-token" } },
+      bindings,
+    );
+    expect(invalid.status).toBe(400);
+  });
+
   it("selects the owned category relationship for list, export, and detail reads", async () => {
     const requests = installMock({ exportRows: true });
     for (const path of [

@@ -4,13 +4,17 @@ import { authUiReducer } from "./slices/authUiSlice";
 import { dashboardFiltersReducer } from "./slices/dashboardFiltersSlice";
 import { uiReducer } from "./slices/uiSlice";
 
-export const store = configureStore({
-  reducer: {
-    authUi: authUiReducer,
-    dashboardFilters: dashboardFiltersReducer,
-    ui: uiReducer,
-  },
-});
+export function createAppStore() {
+  return configureStore({
+    reducer: {
+      authUi: authUiReducer,
+      dashboardFilters: dashboardFiltersReducer,
+      ui: uiReducer,
+    },
+  });
+}
+
+export const store = createAppStore();
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
