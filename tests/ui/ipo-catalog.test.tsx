@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ApiModule from "../../apps/web/src/lib/api";
 import { ToastProvider } from "../../apps/web/src/components/ui/Toast";
 import {
+  IpoCatalogApplicationsPage,
   IpoCatalogDetailsPage,
   IpoCategoryConfigurationPage,
   IpoDetailsPage,
@@ -74,6 +75,10 @@ function renderPage(path = "/ipos") {
             <Route path="/ipos" element={<IpoListPage />} />
             <Route path="/ipo-calendar" element={<Navigate to="/ipos" replace />} />
             <Route path="/ipos/:ipoId" element={<IpoDetailsPage />} />
+            <Route
+              path="/ipos/catalog/:ipoId/applications"
+              element={<IpoCatalogApplicationsPage />}
+            />
             <Route path="/ipos/catalog/:ipoId" element={<IpoCatalogDetailsPage />} />
             <Route
               path="/admin/ipos/:ipoId/categories"
@@ -249,18 +254,21 @@ describe("user IPO catalog", () => {
       await screen.findByRole("heading", { name: readyCatalogIpo.company_name }),
     ).toBeInTheDocument();
     expect(screen.getByText("Admin-managed", { exact: true })).toBeInTheDocument();
-    expect(await screen.findByText("Retail (rules v2)")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Application categories" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Demat account applications" })).toHaveAttribute(
+      "href",
+      `/ipos/catalog/${readyCatalogIpo.id}/applications`,
+    );
+    expect(screen.getByRole("link", { name: "Demat account applications" })).not.toHaveAttribute(
+      "target",
+    );
     expect(screen.queryByText("IPO Guru", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit IPO" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Configure categories" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
-    fireEvent.click(await screen.findByRole("button", { name: "Use for application" }));
-    expect(await screen.findByText("Application form")).toBeInTheDocument();
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      `/api/ipos/catalog/${readyCatalogIpo.id}/import`,
-      expect.anything(),
-      { method: "POST" },
-    );
+    expect(screen.queryByRole("button", { name: "Use for application" })).not.toBeInTheDocument();
   });
 
   it("lists catalog-IPO accounts with their category and applied state", async () => {
@@ -284,23 +292,44 @@ describe("user IPO catalog", () => {
         return { data: { configurations: [] } };
       }
       if (path.startsWith("/api/accounts?")) {
+        const allAccounts = [
+          {
+            id: accountId,
+            holder_name: "Applied Holder",
+            account_status: "active",
+            archived_at: null,
+          },
+          ...Array.from({ length: 24 }, (_, index) => ({
+            id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(index + 1).padStart(12, "0")}`,
+            holder_name: `Other Holder ${index + 1}`,
+            account_status: "active",
+            archived_at: null,
+          })),
+          {
+            id: otherAccountId,
+            holder_name: "Ready Holder",
+            account_status: "active",
+            archived_at: null,
+          },
+        ];
+        const accountSearch = new URLSearchParams(path.split("?")[1]).get("holder_name");
+        const matchedAccounts = accountSearch
+          ? allAccounts.filter((account) =>
+              account.holder_name.toLocaleLowerCase().includes(accountSearch.toLocaleLowerCase()),
+            )
+          : allAccounts;
+        const params = new URLSearchParams(path.split("?")[1]);
+        const page = Number(params.get("page") ?? 1);
+        const pageSize = Number(params.get("pageSize") ?? 25);
         return {
           data: {
-            accounts: [
-              {
-                id: accountId,
-                holder_name: "Applied Holder",
-                account_status: "active",
-                archived_at: null,
-              },
-              {
-                id: otherAccountId,
-                holder_name: "Ready Holder",
-                account_status: "active",
-                archived_at: null,
-              },
-            ],
-            pagination: { page: 1, pageSize: 100, total: 2, totalPages: 1 },
+            accounts: matchedAccounts.slice((page - 1) * pageSize, page * pageSize),
+            pagination: {
+              page,
+              pageSize,
+              total: matchedAccounts.length,
+              totalPages: Math.ceil(matchedAccounts.length / pageSize),
+            },
           },
         };
       }
@@ -323,6 +352,12 @@ describe("user IPO catalog", () => {
                 demat_account_id: accountId,
                 category_code: "RETAIL",
                 application_status: "DRAFT",
+                lots: 2,
+                total_shares: 20,
+                application_amount: "2100.00",
+                calculation_snapshot: {
+                  calculation_input: { price: "105.00", price_type: "BID" },
+                },
               },
             ],
             pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 },
@@ -335,14 +370,52 @@ describe("user IPO catalog", () => {
       throw new Error(`Unexpected request: ${path}`);
     });
 
-    renderPage(`/ipos/catalog/${readyCatalogIpo.id}`);
+    renderPage(`/ipos/catalog/${readyCatalogIpo.id}/applications`);
 
     expect(
       await screen.findByRole("heading", { name: "Demat account applications" }),
     ).toBeInTheDocument();
     expect(await screen.findByRole("row", { name: /Applied Holder/ })).toHaveTextContent("Retail");
     expect(screen.getByRole("row", { name: /Applied Holder/ })).toHaveTextContent("Applied");
-    expect(screen.getByRole("row", { name: /Ready Holder/ })).toHaveTextContent("Not Applied");
+    const appliedRow = screen.getByRole("row", { name: /Applied Holder/ });
+    expect(appliedRow).toHaveTextContent("2");
+    expect(appliedRow).toHaveTextContent("₹105.00");
+    expect(screen.queryByRole("row", { name: /Ready Holder/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: "Demat account application pages" }),
+    ).toHaveTextContent("Page 1 of 2");
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByRole("row", { name: /Ready Holder/ })).toHaveTextContent(
+      "Not Applied",
+    );
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search demat account applications" }), {
+      target: { value: "Applied" },
+    });
+    await waitFor(() =>
+      expect(apiRequestMock).toHaveBeenCalledWith(
+        expect.stringContaining("holder_name=Applied"),
+        expect.anything(),
+      ),
+    );
+    expect(await screen.findByRole("row", { name: /Applied Holder/ })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("row", { name: /Ready Holder/ })).not.toBeInTheDocument(),
+    );
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search demat account applications" }), {
+      target: { value: "Ready" },
+    });
+    await waitFor(() =>
+      expect(apiRequestMock).toHaveBeenCalledWith(
+        expect.stringContaining("holder_name=Ready"),
+        expect.anything(),
+      ),
+    );
+    expect(await screen.findByRole("row", { name: /Ready Holder/ })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("row", { name: /Applied Holder/ })).not.toBeInTheDocument(),
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
@@ -363,12 +436,12 @@ describe("user IPO catalog", () => {
       throw new Error(`Unexpected request: ${path}`);
     });
 
-    renderPage(`/ipos/catalog/${catalogIpo.id}`);
+    renderPage(`/ipos/catalog/${catalogIpo.id}/applications`);
 
-    expect(await screen.findByRole("button", { name: "Use for application" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Use for application" })).not.toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Application preparation is unavailable until this IPO has its exchange, price band, lot size, issue size, and bidding dates.",
+      await screen.findByText(
+        "Demat account applications are available after the issue and bidding details are published.",
       ),
     ).toBeInTheDocument();
   });

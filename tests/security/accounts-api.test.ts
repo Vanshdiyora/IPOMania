@@ -256,7 +256,7 @@ describe("demat account API", () => {
         expect(response.status).toBe(200);
         const listRequest = requests.find((request) => request.method === "GET");
         const query = new URL(listRequest!.url).searchParams;
-        expect(query.get("holder_name")).toBe("ilike.\\%\\_' OR 1=1 --%");
+        expect(query.get("holder_name")).toBe("ilike.%\\%\\_' OR 1=1 --%");
         expect(query.get("or")).toBeNull();
       });
     });
@@ -270,7 +270,7 @@ describe("demat account API", () => {
     const listRequest = requests.find((request) => request.method === "GET");
     expect(listRequest).toBeDefined();
     const query = new URL(listRequest!.url).searchParams;
-    expect(query.get("holder_name")).toBe("ilike.Ananya%");
+    expect(query.get("holder_name")).toBe("ilike.%Ananya%");
     expect(query.get("broker_name")).toBeNull();
     expect(query.get("bank_name")).toBeNull();
     expect(query.get("account_status")).toBe("eq.active");

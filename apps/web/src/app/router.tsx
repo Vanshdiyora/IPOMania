@@ -26,6 +26,7 @@ import {
   AdminSyncPage,
 } from "../pages/admin/AdminPages";
 import {
+  IpoCatalogApplicationsPage,
   IpoCatalogDetailsPage,
   IpoCategoryConfigurationPage,
   IpoDetailsPage,
@@ -97,6 +98,10 @@ export const router = createBrowserRouter([
         loader: ({ request }) => redirect(`/ipos${new URL(request.url).search}`),
       },
       { path: "ipos/new", element: <Navigate replace to="/ipos" /> },
+      {
+        path: "ipos/catalog/:ipoId/applications",
+        element: protectedPage(<IpoCatalogApplicationsPage />),
+      },
       { path: "ipos/catalog/:ipoId", element: protectedPage(<IpoCatalogDetailsPage />) },
       {
         path: "ipos/:ipoId/edit",

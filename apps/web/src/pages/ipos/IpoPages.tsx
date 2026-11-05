@@ -33,6 +33,7 @@ import {
   SkeletonIpoDetails,
   SkeletonPage,
   Skeleton,
+  SkeletonTable,
 } from "../../components/ui/Skeleton";
 import { ApiRequestError, apiRequest } from "../../lib/api";
 import { applicationDrawerPath } from "../../lib/applicationDrawer";
@@ -353,38 +354,69 @@ function IpoListContent() {
 export function IpoCatalogDetailsPage() {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
-  const navigate = useNavigate();
-  const { notify } = useToast();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["ipo-catalog", ipoId],
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!),
   });
-  const categoriesQuery = useQuery({
-    queryKey: ["ipo-catalog-categories", ipoId],
+  if (isLoading) return <SkeletonIpoDetails />;
+  if (error) return <ErrorNotice error={error} onRetry={() => void refetch()} />;
+  const ipo = data?.data;
+  if (!ipo) return <p role="alert">IPO record not found.</p>;
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <BackLink fallback="/ipos" allowedPath={/^\/(ipos|admin\/ipos|dashboard)?$/} />
+          <h1 className="mt-3 text-3xl font-bold text-navy">{ipo.company_name}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-muted">
+            <span>
+              {ipo.symbol ?? "Symbol not set"} · {ipo.exchange ?? "Exchange not set"}
+            </span>
+            <StatusBadge status={ipo.status} />
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Link className={secondaryLinkClass} to={`/ipos/catalog/${ipoId}/applications`}>
+            Demat account applications
+          </Link>
+        </div>
+      </header>
+      <IssueSummary ipo={ipo} personal={false} />
+    </div>
+  );
+}
+
+export function IpoCatalogApplicationsPage() {
+  const { ipoId = "" } = useParams();
+  const { session } = useAuth();
+  const navigate = useNavigate();
+  const { notify } = useToast();
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [accountPage, setAccountPage] = useState(1);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+  const ipoQuery = useQuery({
+    queryKey: ["ipo-catalog", ipoId],
     enabled: Boolean(session && ipoId),
-    queryFn: () =>
-      apiRequest<IpoCatalogCategoryResponse>(`/api/ipos/catalog/${ipoId}/categories`, session!),
+    queryFn: () => apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!),
   });
-  const applicationReady = data?.data ? isIpoReadyForApplication(data.data) : false;
+  const ipo = ipoQuery.data?.data;
+  const applicationReady = ipo ? isIpoReadyForApplication(ipo) : false;
   const accountsQuery = useQuery({
-    queryKey: ["accounts", "catalog-ipo-application-table"],
+    queryKey: ["accounts", "catalog-ipo-application-table", debouncedSearch, accountPage],
     enabled: Boolean(session && applicationReady),
     queryFn: async () => {
-      const first = await apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!);
-      const totalPages = first.data.pagination?.totalPages ?? 1;
-      if (totalPages <= 1) return first;
-      const pages = await Promise.all(
-        Array.from({ length: totalPages - 1 }, (_, index) =>
-          apiRequest<AccountListResponse>(`/api/accounts?page=${index + 2}&pageSize=100`, session!),
-        ),
-      );
-      return {
-        data: {
-          ...first.data,
-          accounts: [first.data.accounts, ...pages.map((page) => page.data.accounts)].flat(),
-        },
-      };
+      const params = new URLSearchParams({
+        page: String(accountPage),
+        pageSize: "25",
+        archived: "false",
+      });
+      if (debouncedSearch) params.set("holder_name", debouncedSearch);
+      return apiRequest<AccountListResponse>(`/api/accounts?${params}`, session!);
     },
   });
   const ownedIpoQuery = useQuery({
@@ -446,20 +478,11 @@ export function IpoCatalogDetailsPage() {
     },
   });
   const catalogReturnTo = `/ipos/catalog/${ipoId}`;
-  const importForApplication = useMutation<IpoResponse, Error, string | undefined>({
+  const importForApplication = useMutation<IpoResponse, Error, string>({
     mutationFn: () =>
       apiRequest<IpoResponse>(`/api/ipos/catalog/${ipoId}/import`, session!, { method: "POST" }),
     onSuccess: (result, accountId) => {
-      if (accountId) {
-        navigate(applicationDrawerPath(accountId, result.data.id, catalogReturnTo));
-        return;
-      }
-      navigate(
-        `/applications/new?${new URLSearchParams({
-          ipo_id: result.data.id,
-          return_to: catalogReturnTo,
-        }).toString()}`,
-      );
+      navigate(applicationDrawerPath(accountId, result.data.id, catalogReturnTo));
     },
     onError: (cause) =>
       notify({
@@ -468,97 +491,49 @@ export function IpoCatalogDetailsPage() {
         tone: "error",
       }),
   });
-  if (isLoading) return <SkeletonIpoDetails />;
-  if (error) return <ErrorNotice error={error} onRetry={() => void refetch()} />;
-  const ipo = data?.data;
+
+  if (ipoQuery.isLoading) return <SkeletonIpoDetails />;
+  if (ipoQuery.error)
+    return <ErrorNotice error={ipoQuery.error} onRetry={() => void ipoQuery.refetch()} />;
   if (!ipo) return <p role="alert">IPO record not found.</p>;
-  const accounts = (accountsQuery.data?.data.accounts ?? []).filter(
-    (account) => !account.archived_at,
-  );
+
+  const accounts = accountsQuery.data?.data.accounts ?? [];
   const applicationsByAccount = new Map(
     (applicationsQuery.data?.data.applications ?? []).map((application) => [
       application.demat_account_id,
       application,
     ]),
   );
-
   return (
     <div className="space-y-6">
-      <header>
-        <BackLink fallback="/ipos" allowedPath={/^\/(ipos|admin\/ipos|dashboard)?$/} />
-        <h1 className="mt-3 text-3xl font-bold text-navy">{ipo.company_name}</h1>
-        <div className="mt-2 flex flex-wrap items-center gap-3 text-muted">
-          <span>
-            {ipo.symbol ?? "Symbol not set"} · {ipo.exchange ?? "Exchange not set"}
-          </span>
-          <StatusBadge status={ipo.status} />
-        </div>
-      </header>
-      <IssueSummary ipo={ipo} personal={false} />
-      {categoriesQuery.error ? (
-        <ErrorNotice error={categoriesQuery.error} onRetry={() => void categoriesQuery.refetch()} />
-      ) : (
-        <Card>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-bold text-ink">Application categories</h2>
-              <p className="mt-1 text-sm text-muted">
-                Admin-managed, issue-specific rules. The latest saved version for each category is
-                copied into your IPO record when you continue.
-              </p>
-            </div>
-            <Button
-              disabled={
-                !applicationReady || importForApplication.isPending || categoriesQuery.isLoading
-              }
-              onClick={() => importForApplication.mutate(undefined)}
-            >
-              {importForApplication.isPending ? "Preparing IPO…" : "Use for application"}
-            </Button>
-          </div>
-          {!applicationReady ? (
-            <p className="mt-3 text-sm text-muted">
-              Application preparation is unavailable until this IPO has its exchange, price band,
-              lot size, issue size, and bidding dates.
-            </p>
-          ) : null}
-          {categoriesQuery.isLoading ? (
-            <p className="mt-4 text-sm text-muted" role="status" aria-busy="true">
-              Loading category rules…
-            </p>
-          ) : (
-            <ul className="mt-4 flex flex-wrap gap-2">
-              {Array.from(
-                latestByCategory(categoriesQuery.data?.data.configurations ?? []).values(),
-              ).map((rule) => (
-                <li
-                  key={rule.id}
-                  className="rounded-full border border-border px-3 py-1.5 text-sm font-medium"
-                >
-                  {formatCategory(rule.category)} (rules v{rule.rule_version})
-                </li>
-              ))}
-              {categoriesQuery.data?.data.configurations.length === 0 ? (
-                <li className="text-sm text-muted">
-                  No category rules are configured for this IPO yet.
-                </li>
-              ) : null}
-            </ul>
-          )}
-        </Card>
-      )}
+      <BackLink fallback={`/ipos/catalog/${ipoId}`} allowedPath={/^\/ipos\/catalog\/[^/]+$/} />
+      <PageHeader
+        eyebrow={ipo.symbol ?? "IPO"}
+        title="Demat account applications"
+        description={`Choose an account to prefill an application for ${ipo.company_name}.`}
+      />
       <Card>
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-ink">Demat account applications</h2>
-          <p className="mt-1 text-sm text-muted">
-            Choose an account to prefill an application with this IPO and its account details.
-          </p>
-        </div>
         {!applicationReady ? (
-          <p className="text-sm text-muted">
-            Account applications are available after the issue and bidding details are published.
+          <p className="mb-4 text-sm text-muted">
+            Demat account applications are available after the issue and bidding details are
+            published.
           </p>
-        ) : accountsQuery.error || ownedIpoQuery.error || applicationsQuery.error ? (
+        ) : null}
+        <div className="mb-4 max-w-md">
+          <Input
+            type="search"
+            aria-label="Search demat account applications"
+            placeholder="Search demat account holder..."
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setAccountPage(1);
+            }}
+          />
+        </div>
+        {!applicationReady ? null : accountsQuery.error ||
+          ownedIpoQuery.error ||
+          applicationsQuery.error ? (
           <ErrorNotice
             error={accountsQuery.error ?? ownedIpoQuery.error ?? applicationsQuery.error}
             onRetry={() =>
@@ -569,79 +544,109 @@ export function IpoCatalogDetailsPage() {
               ])
             }
           />
-        ) : accountsQuery.isLoading || ownedIpoQuery.isLoading || applicationsQuery.isLoading ? (
-          <p role="status">Loading accounts and applications…</p>
+        ) : accountsQuery.isLoading ||
+          accountsQuery.isFetching ||
+          ownedIpoQuery.isLoading ||
+          applicationsQuery.isLoading ? (
+          <div role="status" aria-label="Loading demat account applications" aria-busy="true">
+            <span className="sr-only">Loading accounts and applications…</span>
+            <SkeletonTable rows={5} cols={6} />
+          </div>
         ) : accounts.length ? (
-          <DataTable minWidth="860px">
-            <thead>
-              <tr className="border-b border-border text-sm text-muted">
-                <th scope="col" className="p-3 text-left">
-                  Demat account
-                </th>
-                <th scope="col" className="p-3 text-left">
-                  Category
-                </th>
-                <th scope="col" className="p-3 text-center">
-                  Applied
-                </th>
-                <th scope="col" className="p-3 text-right">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.map((account) => {
-                const application = applicationsByAccount.get(account.id);
-                const canApply = account.account_status === "active";
-                return (
-                  <tr
-                    key={account.id}
-                    className="border-b border-border transition-colors hover:bg-canvas/60"
-                  >
-                    <td className="p-3">
-                      <span className="font-semibold text-ink">{account.holder_name}</span>
-                    </td>
-                    <td className="p-3">
-                      {application
-                        ? formatCategory(
-                            application.ipo_categories?.category ?? application.category_code,
-                          )
-                        : "—"}
-                    </td>
-                    <td className="p-3 text-center">
-                      <StatusBadge status={application ? "APPLIED" : "NOT_APPLIED"} />
-                    </td>
-                    <td className="p-3 text-right">
-                      {application ? (
-                        <DrawerRouteLink
-                          className="font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
-                          to={`/applications/${application.id}/edit?${new URLSearchParams({ return_to: catalogReturnTo }).toString()}`}
-                        >
-                          Edit
-                        </DrawerRouteLink>
-                      ) : (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          disabled={!canApply || importForApplication.isPending}
-                          loading={
-                            importForApplication.isPending &&
-                            importForApplication.variables === account.id
-                          }
-                          onClick={() => importForApplication.mutate(account.id)}
-                        >
-                          Apply
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </DataTable>
+          <>
+            <DataTable minWidth="1120px">
+              <thead>
+                <tr className="border-b border-border text-sm text-muted">
+                  <th scope="col" className="p-3 text-left">
+                    Demat account
+                  </th>
+                  <th scope="col" className="p-3 text-left">
+                    Category
+                  </th>
+                  <th scope="col" className="p-3 text-right">
+                    Lots
+                  </th>
+                  <th scope="col" className="p-3 text-right">
+                    Price
+                  </th>
+                  <th scope="col" className="p-3 text-center">
+                    Applied
+                  </th>
+                  <th scope="col" className="p-3 text-right">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.map((account) => {
+                  const application = applicationsByAccount.get(account.id);
+                  const canApply = account.account_status === "active";
+                  return (
+                    <tr
+                      key={account.id}
+                      className="border-b border-border transition-colors hover:bg-canvas/60"
+                    >
+                      <td className="p-3">
+                        <span className="font-semibold text-ink">{account.holder_name}</span>
+                      </td>
+                      <td className="p-3">
+                        {application
+                          ? formatCategory(
+                              application.ipo_categories?.category ?? application.category_code,
+                            )
+                          : "—"}
+                      </td>
+                      <td className="p-3 text-right">{application?.lots ?? "—"}</td>
+                      <td className="p-3 text-right">
+                        {application ? formatApplicationPrice(application) : "—"}
+                      </td>
+                      <td className="p-3 text-center">
+                        <StatusBadge status={application ? "APPLIED" : "NOT_APPLIED"} />
+                      </td>
+                      <td className="p-3 text-right">
+                        {application ? (
+                          <DrawerRouteLink
+                            className="font-semibold text-action no-underline transition-colors hover:text-navy visited:text-action"
+                            to={`/applications/${application.id}/edit?${new URLSearchParams({ return_to: catalogReturnTo }).toString()}`}
+                          >
+                            Edit
+                          </DrawerRouteLink>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={!canApply || importForApplication.isPending}
+                            loading={
+                              importForApplication.isPending &&
+                              importForApplication.variables === account.id
+                            }
+                            onClick={() => importForApplication.mutate(account.id)}
+                          >
+                            Apply
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </DataTable>
+            {accountsQuery.data?.data.pagination &&
+            accountsQuery.data.data.pagination.totalPages > 1 ? (
+              <Pagination
+                label="Demat account application pages"
+                page={accountPage}
+                totalPages={accountsQuery.data.data.pagination.totalPages}
+                total={accountsQuery.data.data.pagination.total}
+                onPageChange={setAccountPage}
+              />
+            ) : null}
+          </>
         ) : (
           <p className="py-6 text-center font-semibold text-muted">
-            Add a demat account to apply for this IPO.
+            {debouncedSearch
+              ? "No demat account holders match your search."
+              : "Add a demat account to apply for this IPO."}
           </p>
         )}
       </Card>
