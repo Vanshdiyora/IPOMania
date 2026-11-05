@@ -106,7 +106,8 @@ describe("user IPO catalog", () => {
     expect(screen.queryByRole("link", { name: "Add to catalog" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Source" })).not.toBeInTheDocument();
     expect(screen.queryByText("Admin-managed", { exact: true })).not.toBeInTheDocument();
-    expect(screen.getAllByText("-")).toHaveLength(4);
+    expect(screen.getAllByText("-")).toHaveLength(3);
+    expect(screen.queryByText("-", { selector: "td p" })).not.toBeInTheDocument();
     expect(screen.getByText("- – -")).toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/api/ipos/catalog?page=1&page_size=10&sort=date_desc",

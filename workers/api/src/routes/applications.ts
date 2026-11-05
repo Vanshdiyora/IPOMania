@@ -106,12 +106,70 @@ applicationsRoutes.get("/summary", async (context) => {
   const { data, error } = await supabase.rpc("get_application_summary", {
     p_ipo_id: parsed.data.ipo_id ?? null,
   });
-  if (error) throw error;
+  if (error) {
+    if (!isMissingApplicationSummaryRpc(error)) throw error;
+    return context.json({
+      data: await queryApplicationSummary(
+        supabase,
+        context.get("authenticatedUser").id,
+        parsed.data.ipo_id,
+      ),
+    });
+  }
   if (!data || typeof data !== "object") {
     throw new Error("The application summary query returned an invalid response.");
   }
   return context.json({ data });
 });
+
+function isMissingApplicationSummaryRpc(error: { code?: string }) {
+  return error.code === "PGRST202" || error.code === "42883";
+}
+
+async function queryApplicationSummary(supabase: SupabaseClient, userId: string, ipoId?: string) {
+  const categoryCounts = { RETAIL: 0, SHNI: 0, BHNI: 0, SHAREHOLDER: 0, EMPLOYER: 0 };
+  const ipoIds = new Set<string>();
+  const pageSize = 1000;
+  let total = 0;
+
+  for (let offset = 0; ; offset += pageSize) {
+    let query = supabase
+      .from("applications")
+      .select(
+        "ipo_id, category_code, ipo_categories!applications_category_owner_issue_fk(category)",
+      )
+      .eq("user_id", userId)
+      .is("archived_at", null)
+      .range(offset, offset + pageSize - 1);
+    if (ipoId) query = query.eq("ipo_id", ipoId);
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const rows = data ?? [];
+    total += rows.length;
+    for (const row of rows) {
+      if (typeof row.ipo_id === "string") ipoIds.add(row.ipo_id);
+      const category = relationCategory(Reflect.get(row, "ipo_categories"));
+      const categoryCode = category ?? row.category_code;
+      if (typeof categoryCode === "string" && categoryCode in categoryCounts) {
+        categoryCounts[categoryCode as keyof typeof categoryCounts] += 1;
+      }
+    }
+
+    if (rows.length < pageSize) break;
+  }
+
+  return {
+    total,
+    distinct_ipo_count: ipoIds.size,
+    category_counts: categoryCounts,
+  };
+}
+
+function relationCategory(value: unknown): unknown {
+  const relation = Array.isArray(value) ? value[0] : value;
+  return relation && typeof relation === "object" ? Reflect.get(relation, "category") : undefined;
+}
 
 export const applicationImportRoutes = new Hono<ApplicationContext>();
 applicationImportRoutes.use("*", authenticate);

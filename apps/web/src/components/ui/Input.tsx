@@ -57,6 +57,7 @@ type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
   inputSize?: keyof typeof inputSizeClass;
   searchable?: boolean;
   clearable?: boolean;
+  showSelectedIndicator?: boolean;
 };
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
@@ -65,6 +66,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
     inputSize = "md",
     searchable = false,
     clearable = true,
+    showSelectedIndicator = true,
     children,
     value,
     defaultValue,
@@ -148,6 +150,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         multiple={multiple}
         searchable={searchable}
         clearable={clearable}
+        showSelectedIndicator={showSelectedIndicator}
         disabled={disabled}
         hideLabel
         triggerId={id}

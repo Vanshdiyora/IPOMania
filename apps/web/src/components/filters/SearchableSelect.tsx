@@ -18,6 +18,7 @@ type SearchableSelectProps = {
   onChange: (value: string | string[]) => void;
   multiple?: boolean;
   showSelectAll?: boolean;
+  showSelectedIndicator?: boolean;
   searchable?: boolean;
   clearable?: boolean;
   searchPlaceholder?: string;
@@ -44,6 +45,7 @@ export function SearchableSelect({
   onChange,
   multiple = false,
   showSelectAll = true,
+  showSelectedIndicator = true,
   searchable = true,
   clearable = true,
   searchPlaceholder = "Search options...",
@@ -148,7 +150,7 @@ export function SearchableSelect({
       );
       return;
     }
-    onChange(optionValue === selected[0] ? "" : optionValue);
+    onChange(optionValue);
     setOpen(false);
   };
   const selectedLabel =
@@ -249,7 +251,7 @@ export function SearchableSelect({
                 triggerRef.current?.focus();
               }
             }}
-            className="fixed z-[70] overflow-y-auto rounded-xl border border-border bg-white shadow-xl"
+            className="fixed z-[70] overflow-y-auto rounded-2xl border border-border bg-white shadow-xl shadow-slate-950/10"
             style={{
               top: position.top,
               bottom: position.bottom,
@@ -371,24 +373,29 @@ export function SearchableSelect({
                           ]?.focus();
                         }
                       }}
-                      className={`flex min-h-touch w-full items-center gap-3 rounded-lg px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 ${
+                      className={`flex min-h-touch w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 ${
                         isDisabled
                           ? "cursor-not-allowed bg-slate-100 text-muted opacity-80"
-                          : "hover:bg-canvas"
-                      } ${isSelected ? "bg-[#EAF0F6]" : ""}`}
+                          : isSelected
+                            ? "bg-indigo-50 text-action"
+                            : "hover:bg-canvas"
+                      }`}
                     >
-                      <span
-                        className={`flex size-5 shrink-0 items-center justify-center rounded border ${
-                          isSelected
-                            ? "border-action bg-action text-white"
-                            : isDisabled
-                              ? "border-slate-300 bg-slate-100 text-slate-400"
-                              : "border-slate-400 bg-white"
-                        }`}
-                        aria-hidden="true"
-                      >
-                        {isSelected ? <Check className="size-3.5" /> : null}
-                      </span>
+                      {multiple ? (
+                        <span
+                          data-select-checkbox
+                          className={`flex size-5 shrink-0 items-center justify-center rounded border ${
+                            isSelected
+                              ? "border-action bg-action text-white"
+                              : isDisabled
+                                ? "border-slate-300 bg-slate-100 text-slate-400"
+                                : "border-slate-400 bg-white"
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {isSelected ? <Check className="size-3.5" /> : null}
+                        </span>
+                      ) : null}
                       <span className="min-w-0 flex-1">
                         <span
                           className={`block truncate font-semibold ${
@@ -413,6 +420,9 @@ export function SearchableSelect({
                         >
                           {option.badge}
                         </span>
+                      ) : null}
+                      {!multiple && isSelected && showSelectedIndicator ? (
+                        <Check className="size-4 shrink-0 text-action" aria-hidden="true" />
                       ) : null}
                     </button>
                   );

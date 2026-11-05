@@ -78,6 +78,8 @@ function installMock(
     duplicate?: boolean;
     exportRows?: boolean;
     applicationRow?: Record<string, unknown>;
+    summaryRpcMissing?: boolean;
+    summaryRows?: Array<Record<string, unknown>>;
   } = {},
 ) {
   const requests: Request[] = [];
@@ -92,6 +94,15 @@ function installMock(
         });
       }
       requests.push(request.clone());
+      if (url.pathname.endsWith("/rpc/get_application_summary") && options.summaryRpcMissing) {
+        return json(
+          {
+            code: "PGRST202",
+            message: "Could not find the function in the schema cache",
+          },
+          404,
+        );
+      }
       const table = url.pathname.split("/").pop();
       if (table === "ipos") {
         return json(request.method === "GET" ? [ipo] : []);
@@ -105,6 +116,7 @@ function installMock(
           const record = await request.json();
           return json(record, 201);
         }
+        if (options.summaryRows) return json(options.summaryRows);
         if (options.applicationRow) return json([options.applicationRow]);
         if (options.exportRows) {
           return new Response(
@@ -207,6 +219,46 @@ function form(file: Blob, name: string, mapping?: Record<string, string>) {
 }
 
 describe("application API", () => {
+  it("falls back to owner-scoped application rows when the summary RPC is not installed", async () => {
+    const requests = installMock({
+      summaryRpcMissing: true,
+      summaryRows: [
+        {
+          ipo_id: ipoId,
+          category_code: "SHNI",
+          ipo_categories: { category: "RETAIL" },
+        },
+        { ipo_id: ipoId, category_code: "SHNI", ipo_categories: null },
+      ],
+    });
+
+    const response = await createApp().request(
+      `/api/applications/summary?ipo_id=${ipoId}`,
+      { headers: { Authorization: "Bearer ******" } },
+      bindings,
+    );
+
+    expect(response.status, await response.clone().text()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        total: 2,
+        distinct_ipo_count: 1,
+        category_counts: { RETAIL: 1, SHNI: 1, BHNI: 0, SHAREHOLDER: 0, EMPLOYER: 0 },
+      },
+    });
+    const applicationRequest = requests.find(
+      (request) =>
+        request.method === "GET" && new URL(request.url).pathname.endsWith("/applications"),
+    );
+    const query = new URL(applicationRequest!.url).searchParams;
+    expect(query.get("user_id")).toBe(`eq.${userId}`);
+    expect(query.get("archived_at")).toBe("is.null");
+    expect(query.get("ipo_id")).toBe(`eq.${ipoId}`);
+    expect(query.get("select")).toContain(
+      "ipo_categories!applications_category_owner_issue_fk(category)",
+    );
+  });
+
   it("paginates application import history with validated shared sizes", async () => {
     const requests = installMock();
     const response = await createApp().request(

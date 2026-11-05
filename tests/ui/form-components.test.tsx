@@ -8,6 +8,7 @@ import { FormInput, FormSelect, FormTextarea } from "../../apps/web/src/componen
 import { FormDrawer } from "../../apps/web/src/components/ui/FormDrawer";
 import { SideDrawer } from "../../apps/web/src/components/ui/SideDrawer";
 import { SearchableFormSelect } from "../../apps/web/src/components/ui/SearchableFormSelect";
+import { SearchableSelect } from "../../apps/web/src/components/filters/SearchableSelect";
 import { Input } from "../../apps/web/src/components/ui/Input";
 import { ConfirmButton } from "../../apps/web/src/components/ui/ConfirmButton";
 
@@ -48,6 +49,51 @@ describe("shared form controls", () => {
     await user.type(screen.getByRole("searchbox"), "Account 9");
     expect(screen.getByRole("combobox", { name: "Account" })).toHaveTextContent("Account 1");
     expect(screen.getByRole("option", { name: /Account 9/ })).toBeInTheDocument();
+  });
+
+  it("shows a checkmark instead of checkbox controls for single-select options", async () => {
+    const user = userEvent.setup();
+    render(
+      <SearchableSelect
+        label="Status"
+        placeholder="Choose a status"
+        options={[
+          { value: "open", label: "Open" },
+          { value: "closed", label: "Closed" },
+        ]}
+        value="open"
+        onChange={() => undefined}
+        searchable={false}
+      />,
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Status" }));
+    const option = screen.getByRole("option", { name: "Open" });
+    expect(option.querySelector("[data-select-checkbox]")).toBeNull();
+    expect(option.querySelector("svg")).not.toBeNull();
+  });
+
+  it("keeps checkbox controls for multi-select options", async () => {
+    const user = userEvent.setup();
+    render(
+      <SearchableSelect
+        label="Statuses"
+        placeholder="Choose statuses"
+        options={[
+          { value: "open", label: "Open" },
+          { value: "closed", label: "Closed" },
+        ]}
+        value={["open"]}
+        onChange={() => undefined}
+        multiple
+        searchable={false}
+      />,
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Statuses" }));
+    expect(
+      screen.getByRole("option", { name: /Open/ }).querySelector("[data-select-checkbox]"),
+    ).toBeInTheDocument();
   });
 
   it("anchors a dropdown above its trigger when the drawer has less space below", async () => {
