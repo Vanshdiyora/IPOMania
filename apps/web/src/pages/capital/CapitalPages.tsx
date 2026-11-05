@@ -1,3 +1,4 @@
+import { userQueryKey } from "../../lib/queryKeys";
 import { toIsoDateTime, toLocalDateTime } from "../../lib/formValues";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -110,7 +111,7 @@ export function MandateDetailsPage() {
   const [notes, setNotes] = useState("");
   const [loadedId, setLoadedId] = useState("");
   const detail = useQuery({
-    queryKey: ["mandate", mandateId],
+    queryKey: userQueryKey(session?.user.id, ["mandate", mandateId]),
     enabled: Boolean(session && mandateId),
     queryFn: () => apiRequest<MandateResponse>(`/api/mandates/${mandateId}`, session!),
   });
@@ -280,7 +281,7 @@ export function AllotmentDetailsPage() {
   const [date, setDate] = useState("");
   const [loadedId, setLoadedId] = useState("");
   const detail = useQuery({
-    queryKey: ["allotment", allotmentId],
+    queryKey: userQueryKey(session?.user.id, ["allotment", allotmentId]),
     enabled: Boolean(session && allotmentId),
     queryFn: () => apiRequest<AllotmentResponse>(`/api/allotments/${allotmentId}`, session!),
   });
@@ -710,7 +711,7 @@ export function CapitalTrackerPage() {
   const [filters, setFilters] = useState(blankFilters);
   const filterQuery = useMemo(() => capitalFilterString(filters), [filters]);
   const summaryQuery = useQuery({
-    queryKey: ["capital", "summary", filterQuery],
+    queryKey: userQueryKey(session?.user.id, ["capital", "summary", filterQuery]),
     enabled: Boolean(session),
     queryFn: () =>
       apiRequest<CapitalSummaryResponse>(`/api/capital/summary?${filterQuery}`, session!),
@@ -821,7 +822,7 @@ export function FinancialTransactionHistoryPage() {
   const [page, setPage] = useState(1);
   const query = useMemo(() => queryString(filters, page), [filters, page]);
   const ledgerQuery = useQuery({
-    queryKey: ["capital", "ledger", query],
+    queryKey: userQueryKey(session?.user.id, ["capital", "ledger", query]),
     enabled: Boolean(session),
     queryFn: () => apiRequest<LedgerResponse>(`/api/capital/ledger?${query}`, session!),
   });
@@ -899,7 +900,7 @@ export function RefundTrackerPage() {
     return search.toString();
   }, [filters, page]);
   const allotmentQuery = useQuery({
-    queryKey: ["allotments", "refunds", params],
+    queryKey: userQueryKey(session?.user.id, ["allotments", "refunds", params]),
     enabled: Boolean(session),
     queryFn: () => apiRequest<AllotmentsResponse>(`/api/allotments?${params}`, session!),
   });
@@ -995,7 +996,7 @@ function MandateList({ showAll }: { showAll: boolean }) {
   const [page, setPage] = useState(1);
   const query = useMemo(() => queryString(filters, page), [filters, page]);
   const mandatesQuery = useQuery({
-    queryKey: ["mandates", query],
+    queryKey: userQueryKey(session?.user.id, ["mandates", query]),
     enabled: Boolean(session),
     queryFn: () => apiRequest<MandatesResponse>(`/api/mandates?${query}`, session!),
   });
@@ -1079,7 +1080,7 @@ function AllotmentList({ showAll }: { showAll: boolean }) {
   const [page, setPage] = useState(1);
   const query = useMemo(() => queryString(filters, page), [filters, page]);
   const allotmentsQuery = useQuery({
-    queryKey: ["allotments", query],
+    queryKey: userQueryKey(session?.user.id, ["allotments", query]),
     enabled: Boolean(session),
     queryFn: () => apiRequest<AllotmentsResponse>(`/api/allotments?${query}`, session!),
   });
@@ -1358,12 +1359,12 @@ function FinancialFilters({
 }) {
   const { session } = useAuth();
   const ipos = useQuery({
-    queryKey: ["ipos", "capital-filters"],
+    queryKey: userQueryKey(session?.user.id, ["ipos", "capital-filters"]),
     enabled: Boolean(session),
     queryFn: () => apiRequest<IpoListResponse>("/api/ipos?page_size=100", session!),
   });
   const accounts = useQuery({
-    queryKey: ["accounts", "capital-filters"],
+    queryKey: userQueryKey(session?.user.id, ["accounts", "capital-filters"]),
     enabled: Boolean(session),
     queryFn: () => apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!),
   });
@@ -1467,7 +1468,7 @@ function FinancialFilters({
 
 function useApplications(session: ReturnType<typeof useAuth>["session"]) {
   return useQuery({
-    queryKey: ["applications"],
+    queryKey: userQueryKey(session?.user.id, ["applications"]),
     enabled: Boolean(session),
     queryFn: () =>
       apiRequest<ApplicationsResponse>("/api/capital/applications?page_size=100", session!),

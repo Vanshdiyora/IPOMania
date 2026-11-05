@@ -1,3 +1,4 @@
+import { userQueryKey } from "../lib/queryKeys";
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import {
   Bar,
@@ -45,6 +46,12 @@ import { ApiRequestError, apiRequest, downloadApiFile } from "../lib/api";
 import { WelcomePage } from "./WelcomePage";
 import { FilterDrawer, FilterSection } from "../components/filters/FilterDrawer";
 import { DateRangePicker } from "../components/filters/DateRangePicker";
+import { useAppDispatch, useAppSelector } from "../store";
+import {
+  emptyDashboardFilters,
+  setDashboardFilters,
+  type DashboardFilters,
+} from "../store/slices/dashboardFiltersSlice";
 
 type AnalyticsResponse = { data: DashboardAnalytics };
 type IpoOptionsResponse = {
@@ -59,23 +66,8 @@ type AccountOptionsResponse = {
     pagination?: { page: number; totalPages: number };
   };
 };
-type Filters = {
-  date_from: string;
-  date_to: string;
-  ipo_id: string;
-  catalog_ipo_id: string;
-  category: string;
-  account_id: string;
-};
-
-const emptyFilters: Filters = {
-  date_from: "",
-  date_to: "",
-  ipo_id: "",
-  catalog_ipo_id: "",
-  category: "",
-  account_id: "",
-};
+type Filters = DashboardFilters;
+const emptyFilters = emptyDashboardFilters;
 
 const selectClass =
   "min-h-touch w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/20 focus-visible:border-action";
@@ -88,11 +80,12 @@ export function DashboardHomePage() {
 }
 
 export function DashboardPage() {
+  const dispatch = useAppDispatch();
   const location = useLocation();
   const { notify } = useToast();
   const { session, markSessionExpired } = useAuth();
-  const [filters, setFilters] = useState<Filters>(emptyFilters);
-  const [draftFilters, setDraftFilters] = useState<Filters>(emptyFilters);
+  const filters = useAppSelector((state) => state.dashboardFilters);
+  const [draftFilters, setDraftFilters] = useState<Filters>(filters);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [exportError, setExportError] = useState("");
   const queryString = useMemo(() => {
@@ -104,7 +97,7 @@ export function DashboardPage() {
   }, [filters]);
 
   const analyticsQuery = useQuery({
-    queryKey: ["analytics", queryString],
+    queryKey: userQueryKey(session?.user.id, ["analytics", queryString]),
     enabled: Boolean(session),
     staleTime: 30_000,
     queryFn: () =>
@@ -114,7 +107,7 @@ export function DashboardPage() {
       ),
   });
   const ipoOptionsQuery = useInfiniteQuery({
-    queryKey: ["analytics", "personal-ipo-options"],
+    queryKey: userQueryKey(session?.user.id, ["analytics", "personal-ipo-options"]),
     enabled: Boolean(session),
     staleTime: 60_000,
     initialPageParam: 1,
@@ -126,7 +119,7 @@ export function DashboardPage() {
     },
   });
   const catalogOptionsQuery = useInfiniteQuery({
-    queryKey: ["analytics", "catalog-ipo-options"],
+    queryKey: userQueryKey(session?.user.id, ["analytics", "catalog-ipo-options"]),
     enabled: Boolean(session),
     staleTime: 60_000,
     initialPageParam: 1,
@@ -138,7 +131,7 @@ export function DashboardPage() {
     },
   });
   const accountOptionsQuery = useInfiniteQuery({
-    queryKey: ["analytics", "account-options"],
+    queryKey: userQueryKey(session?.user.id, ["analytics", "account-options"]),
     enabled: Boolean(session),
     staleTime: 60_000,
     initialPageParam: 1,
@@ -275,7 +268,7 @@ export function DashboardPage() {
         onClose={() => setFiltersOpen(false)}
         onReset={() => setDraftFilters(emptyFilters)}
         onApply={() => {
-          setFilters(draftFilters);
+          dispatch(setDashboardFilters(draftFilters));
           setFiltersOpen(false);
         }}
         applyDisabled={invalidDateRange}

@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { profileUpdateSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
@@ -12,6 +13,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { useToast } from "../components/ui/ToastContext";
 import { ApiRequestError, apiRequest } from "../lib/api";
 import { SkeletonFormFields } from "../components/ui/Skeleton";
+import { queryKeys } from "../lib/queryKeys";
 
 type Profile = {
   id: string;
@@ -25,10 +27,7 @@ type ProfileValues = z.infer<typeof profileUpdateSchema>;
 export function ProfilePage() {
   const { session, user, markSessionExpired, signOut } = useAuth();
   const { notify } = useToast();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [loadAttempt, setLoadAttempt] = useState(0);
+  const queryClient = useQueryClient();
   const [deleting, setDeleting] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
   const {
@@ -38,57 +37,35 @@ export function ProfilePage() {
     formState: { errors, isSubmitting },
   } = useForm<ProfileValues>({ resolver: zodResolver(profileUpdateSchema) });
 
+  const profileQuery = useQuery({
+    queryKey: queryKeys.profile(user?.id),
+    enabled: Boolean(session),
+    queryFn: ({ signal }) => apiRequest<ProfileResponse>("/api/me/profile", session!, { signal }),
+  });
+  const profile = profileQuery.data?.data;
   useEffect(() => {
-    if (!session) {
-      setProfileLoading(false);
-      return;
+    if (profileQuery.error instanceof ApiRequestError && profileQuery.error.status === 401) {
+      markSessionExpired();
     }
-    let active = true;
-    setProfileLoading(true);
-    setErrorMessage("");
-    void apiRequest<ProfileResponse>("/api/me/profile", session)
-      .then(({ data }) => {
-        if (!active) return;
-        setProfile(data);
-        reset({ full_name: data?.full_name ?? "" });
-      })
-      .catch((error: unknown) => {
-        if (!active) return;
-        if (error instanceof ApiRequestError && error.status === 401) {
-          markSessionExpired();
-        } else {
-          setErrorMessage("We could not load your profile. Please try again.");
-        }
-      })
-      .finally(() => {
-        if (active) setProfileLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [session, reset, markSessionExpired, loadAttempt]);
-
-  async function save(values: ProfileValues) {
-    if (!session) return;
-    try {
-      const { data } = await apiRequest<ProfileResponse>("/api/me/profile", session, {
+  }, [markSessionExpired, profileQuery.error]);
+  useEffect(() => {
+    if (profileQuery.isSuccess) reset({ full_name: profile?.full_name ?? "" });
+  }, [profileQuery.isSuccess, profile, reset]);
+  const saveMutation = useMutation({
+    mutationFn: (values: ProfileValues) =>
+      apiRequest<ProfileResponse>("/api/me/profile", session!, {
         method: "PATCH",
         body: JSON.stringify(values),
-      });
-      setProfile(data);
+      }),
+    onSuccess: (result) => {
+      queryClient.setQueryData(queryKeys.profile(user?.id), result);
       notify({ title: "Profile updated", tone: "success" });
-    } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 401) {
-        markSessionExpired();
-      } else {
-        notify({
-          title: "Profile could not be saved",
-          description: "Please try again.",
-          tone: "error",
-        });
-      }
-    }
-  }
+    },
+    onError: (error) => {
+      if (error instanceof ApiRequestError && error.status === 401) markSessionExpired();
+      else notify({ title: "Profile could not be saved", description: "Please try again.", tone: "error" });
+    },
+  });
 
   async function deleteAccount() {
     if (!session) return;
@@ -147,13 +124,13 @@ export function ProfilePage() {
             )}
           </div>
 
-          {profileLoading ? (
+          {profileQuery.isPending ? (
             <div role="status" aria-label="Loading profile" aria-busy="true">
               <span className="sr-only">Loading profile…</span>
               <SkeletonFormFields fields={1} />
             </div>
           ) : (
-            <form className="space-y-4" onSubmit={handleSubmit(save)} noValidate>
+            <form className="space-y-4" onSubmit={handleSubmit((values) => saveMutation.mutate(values))} noValidate>
               <FormField label="Full Name" htmlFor="full_name" error={errors.full_name?.message}>
                 <Input
                   id="full_name"
@@ -164,8 +141,8 @@ export function ProfilePage() {
                 />
               </FormField>
 
-              <Button type="submit" loading={isSubmitting} className="shadow-xs">
-                {isSubmitting ? "Saving changes…" : "Save changes"}
+              <Button type="submit" loading={isSubmitting || saveMutation.isPending} className="shadow-xs">
+                {isSubmitting || saveMutation.isPending ? "Saving changes…" : "Save changes"}
               </Button>
             </form>
           )}
@@ -215,16 +192,16 @@ export function ProfilePage() {
         </CardContent>
       </Card>
 
-      {errorMessage && (
+      {profileQuery.isError && (
         <div className="space-y-3">
           <div
             className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm font-medium text-danger"
             role="alert"
           >
             <AlertTriangle size={16} />
-            <span>{errorMessage}</span>
+            <span>We could not load your profile. Please try again.</span>
           </div>
-          <Button variant="outline" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
+          <Button variant="outline" onClick={() => void profileQuery.refetch()}>
             Retry profile
           </Button>
         </div>

@@ -1,3 +1,4 @@
+import { userQueryKey } from "../../lib/queryKeys";
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -929,7 +930,7 @@ export function AdminHistoryPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const history = useQuery({
-    queryKey: ["admin", "sync-history"],
+    queryKey: userQueryKey(session?.user.id, ["admin", "sync-history"]),
     enabled: Boolean(session),
     queryFn: () => apiRequest<{ data: SyncRun[] }>("/api/admin/ipos/sync/history", session!),
   });
@@ -1198,13 +1199,13 @@ export function AdminSyncPage() {
 export function AdminSettingsPage() {
   const { session } = useAuth();
   const settings = useQuery({
-    queryKey: ["admin", "settings"],
+    queryKey: userQueryKey(session?.user.id, ["admin", "settings"]),
     enabled: Boolean(session),
     queryFn: () =>
       apiRequest<{ data: { providerConfigured: boolean } }>("/api/admin/ipos/settings", session!),
   });
   const status = useQuery({
-    queryKey: ["admin", "sync-status"],
+    queryKey: userQueryKey(session?.user.id, ["admin", "sync-status"]),
     enabled: Boolean(session),
     queryFn: () =>
       apiRequest<{ data: { syncIntervalHours: number } }>("/api/admin/ipos/sync/status", session!),

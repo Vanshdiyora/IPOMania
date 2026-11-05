@@ -1,3 +1,4 @@
+import { userQueryKey } from "../../lib/queryKeys";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -147,7 +148,7 @@ const accountColumns: ColumnDef<DematAccount>[] = [
 function AccountPasswordText({ account }: { account: DematAccount }) {
   const { session, markSessionExpired } = useAuth();
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["accounts", account.id, "password"],
+    queryKey: userQueryKey(session?.user.id, ["accounts", account.id, "password"]),
     enabled: Boolean(session && account.password_saved),
     retry: false,
     queryFn: async () => {
@@ -226,7 +227,7 @@ function AccountDetailLink({
 export function AccountDashboardPage() {
   const { session, markSessionExpired } = useAuth();
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["accounts", "summary"],
+    queryKey: userQueryKey(session?.user.id, ["accounts", "summary"]),
     enabled: Boolean(session),
     queryFn: () =>
       apiRequest<AccountListResponse>("/api/accounts?page=1&pageSize=1&archived=all", session!),
@@ -352,7 +353,7 @@ export function AccountListPage({ embedded = false }: { embedded?: boolean } = {
     ...(createdTo ? { created_to: `${createdTo}T23:59:59.999Z` } : {}),
   });
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["accounts", "list", queryString.toString()],
+    queryKey: userQueryKey(session?.user.id, ["accounts", "list", queryString.toString()]),
     enabled: Boolean(session),
     queryFn: () =>
       apiRequest<AccountListResponse>(`/api/accounts?${queryString.toString()}`, session!),
@@ -622,7 +623,7 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
     isLoading: loadingAccount,
     refetch: refetchAccount,
   } = useQuery({
-    queryKey: ["accounts", accountId],
+    queryKey: userQueryKey(session?.user.id, ["accounts", accountId]),
     enabled: Boolean(session && editing && accountId),
     queryFn: () => apiRequest<AccountResponse>(`/api/accounts/${accountId}`, session!),
   });
@@ -781,7 +782,7 @@ export function AccountDetailsPage() {
   const navigate = useNavigate();
   const { notify } = useToast();
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["accounts", accountId],
+    queryKey: userQueryKey(session?.user.id, ["accounts", accountId]),
     enabled: Boolean(session && accountId),
     queryFn: () => apiRequest<AccountResponse>(`/api/accounts/${accountId}`, session!),
   });
@@ -1193,7 +1194,7 @@ export function ImportHistoryPage() {
   const client = useQueryClient();
   const { notify } = useToast();
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: importId ? ["account-imports", importId] : ["account-imports", "history"],
+    queryKey: userQueryKey(session?.user.id, importId ? ["account-imports", importId] : ["account-imports", "history"]),
     enabled: Boolean(session),
     queryFn: () =>
       apiRequest<ImportHistoryResponse>(

@@ -13,8 +13,9 @@
     "@ipo-mania/financial-engine": "0.1.0",
     "@ipo-mania/shared": "0.1.0",
     "@ipo-mania/validation": "0.1.0",
+    "@reduxjs/toolkit": "^2.14.0",
     "@supabase/supabase-js": "2.109.0",
-    "@tanstack/react-query": "5.62.7",
+    "@tanstack/react-query": "^5.106.0",
     "@tanstack/react-table": "8.20.6",
     "@tanstack/react-virtual": "3.11.2",
     "class-variance-authority": "0.7.1",
@@ -23,6 +24,7 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-hook-form": "7.91.0",
+    "react-redux": "^9.3.1",
     "react-router-dom": "7.18.5",
     "recharts": "2.14.1",
     "tailwind-merge": "2.5.5",
@@ -30,6 +32,7 @@
     "zustand": "5.0.2"
   },
   "devDependencies": {
+    "@tanstack/react-query-devtools": "^5.106.0",
     "vite": "7.3.7"
   }
 }

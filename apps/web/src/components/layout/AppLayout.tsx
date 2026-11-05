@@ -9,6 +9,8 @@ import { LoadingState } from "../LoadingState";
 import { DrawerRouteHost } from "./DrawerRouteHost";
 import { DrawerRouteProvider } from "../ui/FormDrawer";
 import { AccountImportDialog } from "../../pages/accounts/AccountPages";
+import { useAppDispatch, useAppSelector } from "../../store";
+import { setMobileNavigationOpen } from "../../store/slices/uiSlice";
 
 export function AppLayout() {
   const { loading, user } = useAuth();
@@ -27,7 +29,9 @@ export function AppLayout() {
   const backgroundRef = useRef(drawerRoute ? null : outlet);
   if (!drawerRoute) backgroundRef.current = outlet;
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuOpen = useAppSelector((state) => state.ui.mobileNavigationOpen);
+  const dispatch = useAppDispatch();
+  const setMobileMenuOpen = (open: boolean) => dispatch(setMobileNavigationOpen(open));
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuWasOpen = useRef(false);
   const pageContentRef = useRef<HTMLDivElement>(null);
@@ -137,7 +141,7 @@ export function AppLayout() {
               aria-expanded={mobileMenuOpen}
               aria-controls="main-navigation"
               tabIndex={mobileMenuOpen ? -1 : undefined}
-              onClick={() => setMobileMenuOpen((current) => !current)}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               <Menu aria-hidden="true" size={20} />
             </button>

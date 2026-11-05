@@ -1,3 +1,4 @@
+import { userQueryKey } from "../../lib/queryKeys";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -51,7 +52,7 @@ import {
   type ApplicationFilters,
 } from "../../components/applications/ApplicationFilterDrawer";
 import { ApplicationSearchToolbar } from "../../components/applications/ApplicationSearchToolbar";
-import { ApiRequestError, apiBaseUrl, apiRequest } from "../../lib/api";
+import { ApiRequestError, apiRequest, downloadApiFile } from "../../lib/api";
 import {
   SkeletonDetailsPage,
   SkeletonFormFields,
@@ -195,7 +196,7 @@ function applicationReturnPath(value: string | null) {
 function useOwnedLists() {
   const { session } = useAuth();
   const ipos = useInfiniteQuery({
-    queryKey: ["ipos", "application-options"],
+    queryKey: userQueryKey(session?.user.id, ["ipos", "application-options"]),
     enabled: Boolean(session),
     initialPageParam: 1,
     queryFn: ({ pageParam }) =>
@@ -206,7 +207,7 @@ function useOwnedLists() {
     },
   });
   const applications = useQuery({
-    queryKey: ["applications", "applied-ipo-status"],
+    queryKey: userQueryKey(session?.user.id, ["applications", "applied-ipo-status"]),
     enabled: Boolean(session),
     queryFn: async () => {
       const loadPage = (page: number) =>
@@ -232,7 +233,7 @@ function useOwnedLists() {
     },
   });
   const accounts = useQuery({
-    queryKey: ["accounts", "application-options"],
+    queryKey: userQueryKey(session?.user.id, ["accounts", "application-options"]),
     enabled: Boolean(session),
     queryFn: async () => {
       const first = await apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!);
@@ -287,7 +288,7 @@ export function ApplicationDashboardPage() {
   const [listParams] = useSearchParams();
   const selectedIpoId = listParams.get("ipo_id") ?? "";
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["applications", "dashboard", selectedIpoId || "all"],
+    queryKey: userQueryKey(session?.user.id, ["applications", "dashboard", selectedIpoId || "all"]),
     enabled: Boolean(session),
     queryFn: () =>
       apiRequest<ApplicationSummaryResponse>(
@@ -408,7 +409,7 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
   };
   const lists = useOwnedLists();
   const categoriesQuery = useQuery({
-    queryKey: ["application-category-options", lists.ipos.map((item) => item.id).join(",")],
+    queryKey: userQueryKey(session?.user.id, ["application-category-options", lists.ipos.map((item) => item.id).join(",")]),
     enabled: Boolean(session && lists.ipos.length),
     queryFn: async () => {
       const results = await Promise.all(
@@ -437,14 +438,14 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
     ...(appliedFilters.submissionTo ? { submission_to: appliedFilters.submissionTo } : {}),
   });
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["applications", params.toString()],
+    queryKey: userQueryKey(session?.user.id, ["applications", params.toString()]),
     enabled: Boolean(session),
     queryFn: () => apiRequest<ApplicationListResponse>(`/api/applications?${params}`, session!),
   });
   const rows = data?.data.applications ?? [];
   const activeFilterCount = filterCount(appliedFilters);
   const summary = useQuery({
-    queryKey: ["applications", "summary", "all"],
+    queryKey: userQueryKey(session?.user.id, ["applications", "summary", "all"]),
     enabled: Boolean(session),
     queryFn: () => apiRequest<ApplicationSummaryResponse>("/api/applications/summary", session!),
   });
@@ -504,16 +505,8 @@ export function ApplicationListPage({ embedded = false }: { embedded?: boolean }
       : []),
   ];
   async function exportCsv() {
-    const response = await fetch(`${apiBaseUrl}/api/applications/export?${params}`, {
-      headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
-    });
-    if (!response.ok) throw new Error("Export failed. Please try again.");
-    const url = URL.createObjectURL(await response.blob());
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "ipo-applications.csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
+    if (!session) return;
+    await downloadApiFile(`/api/applications/export?${params}`, session);
   }
   return (
     <div className="space-y-6">
@@ -744,12 +737,12 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const preselectedIpoId = searchParams.get("ipo_id");
   const returnTo = applicationReturnPath(searchParams.get("return_to"));
   const preselectedIpo = useQuery({
-    queryKey: ["ipo", preselectedIpoId],
+    queryKey: userQueryKey(session?.user.id, ["ipo", preselectedIpoId]),
     enabled: Boolean(session && !editing && preselectedIpoId),
     queryFn: () => apiRequest<IpoResponse>(`/api/ipos/${preselectedIpoId}`, session!),
   });
   const catalogIpos = useInfiniteQuery({
-    queryKey: ["ipo-catalog", "application-options"],
+    queryKey: userQueryKey(session?.user.id, ["ipo-catalog", "application-options"]),
     enabled: Boolean(session && !editing),
     initialPageParam: 1,
     queryFn: ({ pageParam }) =>
@@ -763,7 +756,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     },
   });
   const categoriesQuery = useQuery({
-    queryKey: [selectedCatalogIpo ? "ipo-catalog-categories" : "ipo-categories", ipoId],
+    queryKey: userQueryKey(session?.user.id, [selectedCatalogIpo ? "ipo-catalog-categories" : "ipo-categories", ipoId]),
     enabled: Boolean(session && ipoId),
     queryFn: () =>
       apiRequest<CategoryResponse>(
@@ -883,7 +876,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     }
   })();
   const detail = useQuery({
-    queryKey: ["applications", applicationId],
+    queryKey: userQueryKey(session?.user.id, ["applications", applicationId]),
     enabled: Boolean(session && editing && applicationId),
     queryFn: () => apiRequest<ApplicationResponse>(`/api/applications/${applicationId}`, session!),
   });
@@ -1293,7 +1286,7 @@ export function ApplicationDetailsPage() {
   const navigate = useNavigate();
   const { notify } = useToast();
   const detail = useQuery({
-    queryKey: ["applications", applicationId],
+    queryKey: userQueryKey(session?.user.id, ["applications", applicationId]),
     enabled: Boolean(session && applicationId),
     queryFn: () => apiRequest<ApplicationResponse>(`/api/applications/${applicationId}`, session!),
   });
@@ -1524,7 +1517,7 @@ export function BulkApplicationPage() {
   const lists = useOwnedLists();
   const ipo = lists.ipos.find((item) => item.id === ipoId);
   const categoriesQuery = useQuery({
-    queryKey: ["ipo-categories", ipoId],
+    queryKey: userQueryKey(session?.user.id, ["ipo-categories", ipoId]),
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<CategoryResponse>(`/api/ipos/${ipoId}/categories`, session!),
   });
@@ -1996,7 +1989,7 @@ export function ApplicationImportHistoryPage() {
   const { session } = useAuth();
   const { importId } = useParams();
   const { data, error, isLoading, refetch } = useQuery({
-    queryKey: ["application-imports", importId ?? "history"],
+    queryKey: userQueryKey(session?.user.id, ["application-imports", importId ?? "history"]),
     enabled: Boolean(session && !importId),
     queryFn: () => apiRequest<ImportHistoryResponse>(`/api/imports/history`, session!),
   });
@@ -2074,7 +2067,7 @@ function ImportReport({ importId }: { importId: string }) {
   const { notify } = useToast();
   const queryClient = useQueryClient();
   const report = useQuery({
-    queryKey: ["application-import-report", importId],
+    queryKey: userQueryKey(session?.user.id, ["application-import-report", importId]),
     enabled: Boolean(session),
     queryFn: () =>
       apiRequest<{

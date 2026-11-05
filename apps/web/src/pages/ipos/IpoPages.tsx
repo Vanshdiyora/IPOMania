@@ -1,3 +1,4 @@
+import { userQueryKey } from "../../lib/queryKeys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -162,7 +163,7 @@ function IpoListContent() {
   });
   selectedStatuses.forEach((selectedStatus) => params.append("status", selectedStatus));
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["ipos", "catalog", params.toString()],
+    queryKey: userQueryKey(session?.user.id, ["ipos", "catalog", params.toString()]),
     enabled: Boolean(session),
     queryFn: () =>
       apiRequest<IpoListResponse<IpoRecord | IpoCatalogRecord>>(
@@ -355,7 +356,7 @@ export function IpoCatalogDetailsPage() {
   const { ipoId = "" } = useParams();
   const { session } = useAuth();
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["ipo-catalog", ipoId],
+    queryKey: userQueryKey(session?.user.id, ["ipo-catalog", ipoId]),
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!),
   });
@@ -400,14 +401,14 @@ export function IpoCatalogApplicationsPage() {
     return () => window.clearTimeout(timer);
   }, [search]);
   const ipoQuery = useQuery({
-    queryKey: ["ipo-catalog", ipoId],
+    queryKey: userQueryKey(session?.user.id, ["ipo-catalog", ipoId]),
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<{ data: IpoCatalogRecord }>(`/api/ipos/catalog/${ipoId}`, session!),
   });
   const ipo = ipoQuery.data?.data;
   const applicationReady = ipo ? isIpoReadyForApplication(ipo) : false;
   const accountsQuery = useQuery({
-    queryKey: ["accounts", "catalog-ipo-application-table", debouncedSearch, accountPage],
+    queryKey: userQueryKey(session?.user.id, ["accounts", "catalog-ipo-application-table", debouncedSearch, accountPage]),
     enabled: Boolean(session && applicationReady),
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -420,7 +421,7 @@ export function IpoCatalogApplicationsPage() {
     },
   });
   const ownedIpoQuery = useQuery({
-    queryKey: ["ipos", "catalog-application-status", ipoId],
+    queryKey: userQueryKey(session?.user.id, ["ipos", "catalog-application-status", ipoId]),
     enabled: Boolean(session && applicationReady),
     queryFn: async () => {
       const first = await apiRequest<IpoListResponse>(
@@ -449,7 +450,7 @@ export function IpoCatalogApplicationsPage() {
     (item) => item.source_catalog_id === ipoId,
   );
   const applicationsQuery = useQuery({
-    queryKey: ["catalog-ipo-applications", ownedIpo?.id],
+    queryKey: userQueryKey(session?.user.id, ["catalog-ipo-applications", ownedIpo?.id]),
     enabled: Boolean(session && ownedIpo?.id),
     queryFn: async () => {
       const first = await apiRequest<IpoApplicationsResponse>(
@@ -664,17 +665,17 @@ export function IpoDetailsPage() {
   const navigate = useNavigate();
   const { notify } = useToast();
   const ipoQuery = useQuery({
-    queryKey: ["ipo", ipoId],
+    queryKey: userQueryKey(session?.user.id, ["ipo", ipoId]),
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<IpoResponse>(`/api/ipos/${ipoId}`, session!),
   });
   const categoriesQuery = useQuery({
-    queryKey: ["ipo-categories", ipoId],
+    queryKey: userQueryKey(session?.user.id, ["ipo-categories", ipoId]),
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<IpoCategoryResponse>(`/api/ipos/${ipoId}/categories`, session!),
   });
   const applicationsQuery = useQuery({
-    queryKey: ["ipo-applications", ipoId, applicationPage],
+    queryKey: userQueryKey(session?.user.id, ["ipo-applications", ipoId, applicationPage]),
     enabled: Boolean(session && ipoId),
     queryFn: () =>
       apiRequest<IpoApplicationsResponse>(
@@ -683,7 +684,7 @@ export function IpoDetailsPage() {
       ),
   });
   const accountsQuery = useQuery({
-    queryKey: ["accounts", "ipo-application-table"],
+    queryKey: userQueryKey(session?.user.id, ["accounts", "ipo-application-table"]),
     enabled: Boolean(session),
     queryFn: async () => {
       const first = await apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!);
@@ -985,7 +986,7 @@ export function IpoCategoryConfigurationPage({
   const [message, setMessage] = useState("");
   const [form, setForm] = useState<RuleForm>(emptyRuleForm);
   const ipoQuery = useQuery({
-    queryKey: [sharedCatalog ? "ipo-catalog" : "ipo", ipoId],
+    queryKey: userQueryKey(session?.user.id, [sharedCatalog ? "ipo-catalog" : "ipo", ipoId]),
     enabled: Boolean(session && ipoId),
     queryFn: async (): Promise<IpoCategoryPageResponse> => {
       const response = sharedCatalog
@@ -1002,7 +1003,7 @@ export function IpoCategoryConfigurationPage({
     },
   });
   const rulesQuery = useQuery({
-    queryKey: [sharedCatalog ? "ipo-catalog-categories" : "ipo-categories", ipoId],
+    queryKey: userQueryKey(session?.user.id, [sharedCatalog ? "ipo-catalog-categories" : "ipo-categories", ipoId]),
     enabled: Boolean(session && ipoId),
     queryFn: async (): Promise<IpoCategoryPageRulesResponse> => {
       const response = sharedCatalog
@@ -1441,17 +1442,17 @@ export function QuotaCalculatorPage() {
   const [requestError, setRequestError] = useState("");
   const [applicationMessage, setApplicationMessage] = useState("");
   const iposQuery = useQuery({
-    queryKey: ["ipos", "calculator"],
+    queryKey: userQueryKey(session?.user.id, ["ipos", "calculator"]),
     enabled: Boolean(session),
     queryFn: () => apiRequest<IpoListResponse>("/api/ipos?page_size=100", session!),
   });
   const accountsQuery = useQuery({
-    queryKey: ["accounts", "calculator"],
+    queryKey: userQueryKey(session?.user.id, ["accounts", "calculator"]),
     enabled: Boolean(session),
     queryFn: () => apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!),
   });
   const categoriesQuery = useQuery({
-    queryKey: ["ipo-categories", ipoId],
+    queryKey: userQueryKey(session?.user.id, ["ipo-categories", ipoId]),
     enabled: Boolean(session && ipoId),
     queryFn: () => apiRequest<IpoCategoryResponse>(`/api/ipos/${ipoId}/categories`, session!),
   });

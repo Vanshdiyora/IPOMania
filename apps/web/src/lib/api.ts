@@ -67,7 +67,8 @@ export async function apiRequest<T>(
         ...init.headers,
       },
     });
-  } catch {
+  } catch (error) {
+    if (init.signal?.aborted) throw error;
     throw new ApiRequestError(fallbackMessage(0), 0);
   }
 
