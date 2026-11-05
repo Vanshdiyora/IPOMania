@@ -32,7 +32,7 @@ npm run dev:api
 Local development uses the conventional root `.env.local` file; production builds continue to use root
 `.env`. Keep hosted Supabase values in both `VITE_*` and API variables in `.env.local`, and keep API-only secrets such as `SUPABASE_SERVICE_ROLE_KEY` out of every `VITE_*`
 variable. The production defaults remain in root `.env`. The web app is served at
-`http://127.0.0.1:4175`. The API listens at `http://127.0.0.1:8787`; check `GET /api/health`.
+`http://127.0.0.1:4179`. The API listens at `http://127.0.0.1:8787`; check `GET /api/health`.
 For hosted Supabase, use that project's URL and anon key. For local Supabase, use the values from
 `supabase status` instead.
 

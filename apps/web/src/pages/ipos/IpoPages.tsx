@@ -318,17 +318,17 @@ function IpoListContent() {
                   >
                     {ipo.company_name}
                   </Link>
-                  <p className="mt-1 text-xs text-muted">{ipo.symbol || "Symbol not published"}</p>
+                  <p className="mt-1 text-xs text-muted">{ipo.symbol || "-"}</p>
                 </td>
-                <td className="p-4 text-sm text-ink">{ipo.exchange || "Not published"}</td>
+                <td className="p-4 text-sm text-ink">{ipo.exchange || "-"}</td>
                 <td className="p-4 text-sm font-medium text-ink">
                   {formatPriceBand(ipo.issue_price_min, ipo.issue_price_max)}
                 </td>
                 <td className="p-4 text-right text-sm font-medium text-ink tabular-nums">
-                  {ipo.lot_size ? ipo.lot_size.toLocaleString("en-IN") : "—"}
+                  {ipo.lot_size ? ipo.lot_size.toLocaleString("en-IN") : "-"}
                 </td>
                 <td className="p-4 text-sm text-ink whitespace-nowrap">
-                  {formatDate(ipo.opening_date)} – {formatDate(ipo.closing_date)}
+                  {formatTableDate(ipo.opening_date)} – {formatTableDate(ipo.closing_date)}
                 </td>
                 <td className="p-4 text-center">
                   <StatusBadge status={ipo.status} />
@@ -1989,7 +1989,7 @@ function formatApplicationPrice(application: IpoApplication) {
 }
 
 function formatPriceBand(minimum: string | null, maximum: string | null) {
-  if (!minimum && !maximum) return "Not published";
+  if (!minimum && !maximum) return "-";
   if (!maximum || minimum === maximum) return formatRupees(minimum || maximum || "");
   if (!minimum) return formatRupees(maximum);
   return `${formatRupees(minimum)} – ${formatRupees(maximum)}`;
@@ -2055,6 +2055,10 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" }).format(
     new Date(`${value.slice(0, 10)}T00:00:00.000Z`),
   );
+}
+
+function formatTableDate(value: string | null) {
+  return value ? formatDate(value) : "-";
 }
 
 function formatDateTime(value: string) {

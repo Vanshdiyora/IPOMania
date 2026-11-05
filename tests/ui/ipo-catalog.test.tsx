@@ -97,7 +97,7 @@ describe("user IPO catalog", () => {
     apiRequestMock.mockReset();
   });
 
-  it("loads shared IPOs by default and shows incomplete provider data without hiding the name", async () => {
+  it("loads shared IPOs by default and displays missing table values as dashes", async () => {
     apiRequestMock.mockResolvedValue(listResponse());
     renderPage();
     const link = await screen.findByRole("link", { name: catalogIpo.company_name });
@@ -106,7 +106,8 @@ describe("user IPO catalog", () => {
     expect(screen.queryByRole("link", { name: "Add to catalog" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Source" })).not.toBeInTheDocument();
     expect(screen.queryByText("Admin-managed", { exact: true })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Not published")).toHaveLength(2);
+    expect(screen.getAllByText("-")).toHaveLength(4);
+    expect(screen.getByText("- – -")).toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",
       expect.anything(),
