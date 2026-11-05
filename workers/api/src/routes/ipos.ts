@@ -170,9 +170,7 @@ iposRoutes.get("/catalog", async (context) => {
     );
   }
   if (query.search) {
-    // Quote PostgREST values so punctuation cannot introduce extra filter expressions.
-    const term = escapeLike(query.search).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    request = request.or(`company_name.ilike."%${term}%",symbol.ilike."${term}"`);
+    request = request.or(catalogSearchFilter(query.search));
   }
   const [listResult, countsResult] = await Promise.all([
     request.range((query.page - 1) * query.page_size, query.page * query.page_size - 1),
@@ -185,8 +183,13 @@ iposRoutes.get("/catalog", async (context) => {
   ]);
   const { data, error, count } = listResult;
   if (error) throw error;
-  if (countsResult.error) throw countsResult.error;
-  const statusCounts = parseCatalogStatusCounts(countsResult.data);
+  let statusCounts: CatalogStatusCounts;
+  if (countsResult.error) {
+    if (!isMissingCatalogStatusCountsRpc(countsResult.error)) throw countsResult.error;
+    statusCounts = await queryCatalogStatusCounts(supabase, query.search, selectedStatuses);
+  } else {
+    statusCounts = parseCatalogStatusCounts(countsResult.data);
+  }
   const catalogRows = (data ?? []).map(catalogRecord);
   if (catalogRows.length === 0) {
     return context.json({
@@ -276,6 +279,40 @@ function parseCatalogStatusCounts(value: unknown): CatalogStatusCounts {
     closed: Number(counts.closed),
     listed: Number(counts.listed),
   };
+}
+
+function isMissingCatalogStatusCountsRpc(error: { code?: string }) {
+  return error.code === "PGRST202" || error.code === "42883";
+}
+
+async function queryCatalogStatusCounts(
+  supabase: SupabaseClient,
+  search: string | undefined,
+  selectedStatuses: string[],
+): Promise<CatalogStatusCounts> {
+  const statuses = ["upcoming", "open", "closed", "listed"] as const;
+  const counts: CatalogStatusCounts = { upcoming: 0, open: 0, closed: 0, listed: 0 };
+  await Promise.all(
+    statuses.map(async (status) => {
+      if (selectedStatuses.length > 0 && !selectedStatuses.includes(status.toUpperCase())) return;
+      let request = supabase
+        .from("ipo_catalog")
+        .select("id", { count: "exact", head: true })
+        .is("archived_at", null)
+        .eq("ipo_status", status);
+      if (search) request = request.or(catalogSearchFilter(search));
+      const { count, error } = await request;
+      if (error) throw error;
+      counts[status] = count ?? 0;
+    }),
+  );
+  return counts;
+}
+
+function catalogSearchFilter(search: string) {
+  // Quote PostgREST values so punctuation cannot introduce extra filter expressions.
+  const term = escapeLike(search).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `company_name.ilike."%${term}%",symbol.ilike."${term}"`;
 }
 
 iposRoutes.get("/catalog/:ipoId", async (context) => {

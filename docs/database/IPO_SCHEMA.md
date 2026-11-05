@@ -4,6 +4,8 @@ Migrations: `supabase/migrations/20261031140000_ipo_manager_quota_engine.sql`,
 `supabase/migrations/20261031160000_capital_management.sql`,
 `supabase/migrations/20261103130000_shared_ipo_category_rules.sql`, and
 `supabase/migrations/20261104230000_admin_only_ipo_catalog_inserts.sql`.
+`supabase/migrations/20261105120000_global_metrics_pagination.sql` adds the authenticated
+catalog status-count aggregation used by the catalog API.
 
 ## Ownership decision
 
@@ -49,6 +51,9 @@ remain private copies governed by the existing user-owned RLS and application fo
 The RLS insert policy permits catalog creation only through the administrator policy; regular users
 cannot insert, edit, or archive catalog rows. Legacy `submitted_by` values are retained for audit
 history. The active-symbol/exchange unique index prevents duplicate active issues.
+The catalog API falls back to filtered, per-status table counts if the aggregation function has not
+yet been installed; apply the migration through the normal database deployment procedure to use
+the single-query aggregation.
 
 ## `public.ipo_quota_calculations`
 
