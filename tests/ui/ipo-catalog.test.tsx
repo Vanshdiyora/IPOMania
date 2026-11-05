@@ -379,8 +379,10 @@ describe("user IPO catalog", () => {
     expect(await screen.findByRole("row", { name: /Applied Holder/ })).toHaveTextContent("Retail");
     expect(screen.getByRole("row", { name: /Applied Holder/ })).toHaveTextContent("Applied");
     const appliedRow = screen.getByRole("row", { name: /Applied Holder/ });
-    expect(appliedRow).toHaveTextContent("2");
-    expect(appliedRow).toHaveTextContent("₹105.00");
+    expect(appliedRow).toHaveTextContent("2 × ₹105.00");
+    expect(appliedRow).toHaveTextContent("₹2,100.00");
+    expect(screen.getByRole("columnheader", { name: "Lots / price" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Total amount" })).toBeInTheDocument();
     expect(screen.queryByRole("row", { name: /Ready Holder/ })).not.toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "Demat account application pages" }),

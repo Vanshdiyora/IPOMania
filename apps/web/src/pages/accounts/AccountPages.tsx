@@ -6,17 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import {
-  Archive,
-  Building2,
-  CheckCircle2,
-  Eye,
-  EyeOff,
-  Plus,
-  Upload,
-  WalletCards,
-  X,
-} from "lucide-react";
+import { Archive, Building2, CheckCircle2, Plus, Upload, WalletCards, X } from "lucide-react";
 import type { z } from "@ipo-mania/validation";
 import { dematAccountFormSchema } from "@ipo-mania/validation";
 import type { AccountImportPreviewRow, DematAccount } from "@ipo-mania/shared";
@@ -120,12 +110,20 @@ const accountColumns: ColumnDef<DematAccount>[] = [
       <AccountDetailLink account={row.original}>{row.original.holder_name}</AccountDetailLink>
     ),
   },
-  { accessorKey: "bank_name", header: "Bank" },
-  { accessorKey: "username", header: "Username" },
+  {
+    accessorKey: "bank_name",
+    header: "Bank",
+    cell: ({ row }) => row.original.bank_name || "-",
+  },
+  {
+    accessorKey: "username",
+    header: "Username",
+    cell: ({ row }) => row.original.username || "-",
+  },
   {
     accessorKey: "password_saved",
     header: "Password",
-    cell: ({ row }) => (row.original.password_saved ? "••••••••" : "Not set"),
+    cell: ({ row }) => <AccountPasswordText account={row.original} />,
   },
   {
     accessorKey: "account_status",
@@ -145,6 +143,32 @@ const accountColumns: ColumnDef<DematAccount>[] = [
     cell: ({ row }) => <AccountApplicationAction account={row.original} />,
   },
 ];
+
+function AccountPasswordText({ account }: { account: DematAccount }) {
+  const { session, markSessionExpired } = useAuth();
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["accounts", account.id, "password"],
+    enabled: Boolean(session && account.password_saved),
+    retry: false,
+    queryFn: async () => {
+      try {
+        return await apiRequest<AccountPasswordResponse>(
+          `/api/accounts/${account.id}/password`,
+          session!,
+        );
+      } catch (error) {
+        if (error instanceof ApiRequestError && error.status === 401) markSessionExpired();
+        throw error;
+      }
+    },
+  });
+
+  if (!account.password_saved) return <>-</>;
+  if (isLoading) return <>Loading…</>;
+  if (isError) return <>Unavailable</>;
+
+  return <span className="break-all font-mono">{data?.data.password ?? "Unavailable"}</span>;
+}
 
 function AccountApplicationAction({
   account,
@@ -756,39 +780,11 @@ export function AccountDetailsPage() {
   const client = useQueryClient();
   const navigate = useNavigate();
   const { notify } = useToast();
-  const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
-  const [isRevealingPassword, setIsRevealingPassword] = useState(false);
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["accounts", accountId],
     enabled: Boolean(session && accountId),
     queryFn: () => apiRequest<AccountResponse>(`/api/accounts/${accountId}`, session!),
   });
-  useEffect(() => setRevealedPassword(null), [accountId]);
-
-  async function togglePasswordVisibility() {
-    if (revealedPassword !== null) {
-      setRevealedPassword(null);
-      return;
-    }
-    if (!session || !accountId) return;
-    setIsRevealingPassword(true);
-    try {
-      const response = await apiRequest<AccountPasswordResponse>(
-        `/api/accounts/${accountId}/password`,
-        session,
-      );
-      setRevealedPassword(response.data.password);
-    } catch (reason) {
-      if (reason instanceof ApiRequestError && reason.status === 401) markSessionExpired();
-      notify({
-        title: "Password could not be revealed",
-        description: reason instanceof Error ? reason.message : "The password could not be loaded.",
-        tone: "error",
-      });
-    } finally {
-      setIsRevealingPassword(false);
-    }
-  }
   const action = useMutation({
     mutationFn: async (method: "archive" | "restore" | "delete") =>
       apiRequest(`/api/accounts/${accountId}${method === "delete" ? "" : `/${method}`}`, session!, {
@@ -827,9 +823,7 @@ export function AccountDetailsPage() {
             Back to accounts
           </BackLink>
           <h1 className="text-2xl font-bold text-navy">Account details</h1>
-          <p className="mt-2 text-base text-muted">
-            Passwords are hidden until you choose to reveal them.
-          </p>
+          <p className="mt-2 text-base text-muted">Saved credentials are displayed as entered.</p>
         </div>
         {account && !account.archived_at ? (
           <DrawerRouteLink
@@ -850,29 +844,7 @@ export function AccountDetailsPage() {
             <div>
               <dt className="text-sm font-semibold text-muted">Password</dt>
               <dd className="mt-1 flex flex-wrap items-center gap-3 text-base text-ink">
-                <span className="break-all font-mono">
-                  {!account.password_saved ? "Not set" : (revealedPassword ?? "••••••••")}
-                </span>
-                {account.password_saved ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={isRevealingPassword}
-                    aria-expanded={revealedPassword !== null}
-                    onClick={() => void togglePasswordVisibility()}
-                  >
-                    {revealedPassword !== null ? (
-                      <EyeOff className="mr-2 size-4" aria-hidden="true" />
-                    ) : (
-                      <Eye className="mr-2 size-4" aria-hidden="true" />
-                    )}
-                    {isRevealingPassword
-                      ? "Loading…"
-                      : revealedPassword !== null
-                        ? "Hide password"
-                        : "Reveal password"}
-                  </Button>
-                ) : null}
+                <AccountPasswordText account={account} />
               </dd>
             </div>
             <DetailItem label="Account status" value={account.account_status} />
@@ -1454,10 +1426,7 @@ function MobileAccountCard({ account }: { account: DematAccount }) {
           label="Username"
           value={account.username ?? "Not provided"}
         />
-        <AccountCardDetail
-          label="Password"
-          value={account.password_saved ? "••••••••" : "Not set"}
-        />
+        <AccountCardDetail label="Password" value={<AccountPasswordText account={account} />} />
       </dl>
       <AccountApplicationAction account={account} className="mt-4 w-full" />
     </article>
@@ -1470,7 +1439,7 @@ function AccountCardDetail({
   className,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   className?: string;
 }) {
   return (

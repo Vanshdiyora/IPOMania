@@ -79,8 +79,14 @@ select is(
 
 select lives_ok(
   $$insert into public.demat_accounts
-    (user_id, holder_name, bank_name, username)
-    values ('33333333-3333-4333-8333-333333333333', 'Account 500', 'Test Bank', 'user-a-500')$$,
+    (id, user_id, holder_name, bank_name, username)
+    values (
+      '55555555-5555-4555-8555-555555555555',
+      '33333333-3333-4333-8333-333333333333',
+      'Account 500',
+      'Test Bank',
+      'user-a-500'
+    )$$,
   'User A can create a 500th active account'
 );
 select is(

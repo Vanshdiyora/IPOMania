@@ -564,10 +564,10 @@ export function IpoCatalogApplicationsPage() {
                     Category
                   </th>
                   <th scope="col" className="p-3 text-right">
-                    Lots
+                    Lots / price
                   </th>
                   <th scope="col" className="p-3 text-right">
-                    Price
+                    Total amount
                   </th>
                   <th scope="col" className="p-3 text-center">
                     Applied
@@ -596,9 +596,11 @@ export function IpoCatalogApplicationsPage() {
                             )
                           : "—"}
                       </td>
-                      <td className="p-3 text-right">{application?.lots ?? "—"}</td>
-                      <td className="p-3 text-right">
-                        {application ? formatApplicationPrice(application) : "—"}
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">
+                        {application ? formatApplicationLotsAndPrice(application) : "—"}
+                      </td>
+                      <td className="p-3 text-right tabular-nums whitespace-nowrap">
+                        {application ? formatApplicationTotalAmount(application) : "—"}
                       </td>
                       <td className="p-3 text-center">
                         <StatusBadge status={application ? "APPLIED" : "NOT_APPLIED"} />
@@ -868,10 +870,10 @@ export function IpoDetailsPage() {
                     Category
                   </th>
                   <th scope="col" className="p-3 text-right">
-                    Price
+                    Lots / price
                   </th>
                   <th scope="col" className="p-3 text-right">
-                    Lots / amount
+                    Total amount
                   </th>
                   <th scope="col" className="p-3 text-center">
                     Status
@@ -903,12 +905,10 @@ export function IpoDetailsPage() {
                           {application?.ipo_categories?.category ?? "Not applied"}
                         </td>
                         <td className="p-3 text-right tabular-nums whitespace-nowrap">
-                          {application ? formatApplicationPrice(application) : "—"}
+                          {application ? formatApplicationLotsAndPrice(application) : "—"}
                         </td>
                         <td className="p-3 text-right tabular-nums whitespace-nowrap">
-                          {application
-                            ? `${application.lots} lots · ${formatRupees(application.application_amount)}`
-                            : "—"}
+                          {application ? formatApplicationTotalAmount(application) : "—"}
                         </td>
                         <td className="p-3 text-center">
                           {application ? (
@@ -1986,6 +1986,30 @@ function formatApplicationPrice(application: IpoApplication) {
   const priceType = "price_type" in input ? input.price_type : null;
   if (typeof price !== "string") return "Not recorded";
   return `${formatRupees(price)}${priceType === "CUT_OFF" ? " (cut-off)" : ""}`;
+}
+
+function formatApplicationLotsAndPrice(application: IpoApplication) {
+  const lots = Number(application.lots ?? 0);
+  const price = formatApplicationPrice(application);
+  if (!Number.isFinite(lots) || lots <= 0 || price === "Not recorded") return price;
+  return `${lots} × ${price}`;
+}
+
+function formatApplicationTotalAmount(application: IpoApplication) {
+  const amount = application.application_amount ?? "";
+  if (amount) return formatRupees(amount);
+  const price = application.calculation_snapshot?.calculation_input;
+  if (
+    !price ||
+    typeof price !== "object" ||
+    !("price" in price) ||
+    typeof price.price !== "string"
+  ) {
+    return "—";
+  }
+  const lots = Number(application.lots ?? 0);
+  if (!Number.isFinite(lots) || lots <= 0) return "—";
+  return formatRupees(String(lots * Number(price.price)));
 }
 
 function formatPriceBand(minimum: string | null, maximum: string | null) {

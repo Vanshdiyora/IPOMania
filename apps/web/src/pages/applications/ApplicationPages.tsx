@@ -251,18 +251,24 @@ function useOwnedLists() {
       };
     },
   });
-  const appliedIpoIds = new Set(
-    (applications.data?.data.applications ?? []).map((application) => application.ipo_id),
+  const activeApplications = (applications.data?.data.applications ?? []).filter(
+    (application) => !application.archived_at,
   );
+  const activeAccountIdsByIpoId = new Map<string, Set<string>>();
+  activeApplications.forEach((application) => {
+    const accountIds = activeAccountIdsByIpoId.get(application.ipo_id) ?? new Set<string>();
+    accountIds.add(application.demat_account_id);
+    activeAccountIdsByIpoId.set(application.ipo_id, accountIds);
+  });
   const appliedStatusByIpoId = new Map(
-    (applications.data?.data.applications ?? [])
+    activeApplications
       .filter((application) => application.ipo_id)
       .map((application) => [application.ipo_id, application.application_status]),
   );
   return {
     ipos: ipos.data?.pages.flatMap((page) => page.data.ipos) ?? [],
     accounts: accounts.data?.data.accounts ?? [],
-    appliedIpoIds,
+    activeAccountIdsByIpoId,
     appliedStatusByIpoId,
     loading: ipos.isLoading || accounts.isLoading || applications.isLoading,
     optionLoading: {
@@ -780,13 +786,24 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   ).map(([, configuration]) => configuration);
   const activeCategory = categories.find((category) => category.id === categoryId);
   const personalIpos = lists.ipos.filter((item) => !item.source_catalog_id);
-  const selectableIpos = editing ? lists.ipos : personalIpos;
+  const preselectedOwnedIpo =
+    preselectedIpo.data?.data.id === preselectedIpoId ? preselectedIpo.data.data : null;
+  const selectableIpos = editing
+    ? lists.ipos
+    : [
+        ...personalIpos,
+        ...(preselectedOwnedIpo && !personalIpos.some((item) => item.id === preselectedOwnedIpo.id)
+          ? [preselectedOwnedIpo]
+          : []),
+      ];
   const sharedCatalogIpos = catalogIpos.data?.pages.flatMap((page) => page.data.ipos) ?? [];
   const selectedIpo =
     selectedCatalogIpo ??
     lists.ipos.find((item) => item.id === ipoId) ??
     (preselectedIpo.data?.data.id === ipoId ? preselectedIpo.data.data : null);
-  const selectedIpoIsApplied = Boolean(ipoId && lists.appliedIpoIds.has(ipoId));
+  const selectedAccountAlreadyApplied = Boolean(
+    ipoId && accountId && lists.activeAccountIdsByIpoId.get(ipoId)?.has(accountId),
+  );
   const enteredLots = Number(lots);
   const lotBounds = getApplicationLotBounds(
     selectedIpo && typeof selectedIpo.lot_size === "number"
@@ -978,7 +995,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
         !price ||
         !localCalculation ||
         !validLotSelection ||
-        (!editing && selectedIpoIsApplied)
+        (!editing && selectedAccountAlreadyApplied)
       }
     >
       <form
@@ -1043,12 +1060,23 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                     ...selectableIpos.map((item) => ({
                       value: item.id,
                       label: item.company_name,
-                      badge: !editing && lists.appliedIpoIds.has(item.id) ? "Applied" : undefined,
-                      description:
-                        !editing && lists.appliedIpoIds.has(item.id)
-                          ? "Already applied for this IPO"
+                      badge:
+                        !editing &&
+                        accountId &&
+                        lists.activeAccountIdsByIpoId.get(item.id)?.has(accountId)
+                          ? "Applied"
                           : undefined,
-                      disabled: !editing && lists.appliedIpoIds.has(item.id),
+                      description:
+                        !editing &&
+                        accountId &&
+                        lists.activeAccountIdsByIpoId.get(item.id)?.has(accountId)
+                          ? "Already applied for this IPO and account"
+                          : undefined,
+                      disabled:
+                        !editing &&
+                        Boolean(
+                          accountId && lists.activeAccountIdsByIpoId.get(item.id)?.has(accountId),
+                        ),
                     })),
                     ...sharedCatalogIpos.map((item) => ({
                       value: item.id,
@@ -1110,6 +1138,12 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                   }))}
                 onChange={setAccountId}
               />
+              {selectedAccountAlreadyApplied ? (
+                <p className="text-sm font-medium text-red-700 sm:col-span-2" role="alert">
+                  An active application already exists for this IPO and demat account. Edit that
+                  application instead.
+                </p>
+              ) : null}
               <FormSelect
                 label="Investor category"
                 error={validation.errors.category_code ?? validation.errors.category_id}

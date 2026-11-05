@@ -761,7 +761,19 @@ function databaseError(context: AccountRouteContext, error: { code?: string; mes
       409,
     );
   }
-  throw error;
+  console.error("Account database operation failed", {
+    code: error.code ?? "UNKNOWN",
+    message: error.message,
+  });
+  return context.json(
+    {
+      error: {
+        code: "ACCOUNT_DATABASE_ERROR",
+        message: "The account could not be saved. Please try again later.",
+      },
+    },
+    500,
+  );
 }
 
 function parsePositiveInteger(value: string | undefined, defaultValue: number) {

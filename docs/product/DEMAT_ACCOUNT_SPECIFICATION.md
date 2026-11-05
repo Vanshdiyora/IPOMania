@@ -17,10 +17,10 @@ applications and do not implement an IPO quota, allocation, or investment workfl
 | Account status | `active`, `inactive`, or `closed`                                          |
 | Notes          | Optional, up to 2,000 characters                                           |
 
-Existing records may have missing bank credentials until edited. Passwords are never imported,
-included in ordinary account responses, or shown in account tables. The account detail view reveals
-the password only after an explicit user action. A blank password during edit preserves the saved
-password.
+Existing records may have missing bank credentials until edited. Passwords are never imported or
+included in ordinary account responses. The signed-in owner sees the saved password as text in the
+account list, mobile card, and details view; each display retrieves it through the owner-scoped
+password endpoint. A blank password during edit preserves the saved password.
 
 ## Archive behavior
 
@@ -38,7 +38,7 @@ and still unarchived; reversal archives those accounts rather than deleting them
 - **Account list:** server-side search, filters, pagination, a virtualized desktop table, and
   readable mobile cards.
 - **Add, edit, and details:** validated account fields, lifecycle actions, and owner-protected
-  password reveal.
+  password display.
 - **Bulk import and import history:** column mapping, row-by-row preview, confirmation, reports,
   and safe reversal where possible.
 
@@ -60,6 +60,6 @@ PostgreSQL RLS is the final ownership boundary. Clients cannot supply or update 
 
 The API encrypts passwords with AES-256-GCM using a deployment-managed 32-byte secret before
 writing to the database. The password-reveal route verifies the caller and account owner, and
-returns `Cache-Control: no-store`. The account page masks passwords by default. Configure and
-protect `ACCOUNT_CREDENTIAL_ENCRYPTION_KEY`; losing it makes saved passwords unrecoverable. Do not
-put passwords in notes or uploaded files.
+returns `Cache-Control: no-store`. The account page retrieves and displays passwords as text for
+the signed-in owner. Configure and protect `ACCOUNT_CREDENTIAL_ENCRYPTION_KEY`; losing it makes
+saved passwords unrecoverable. Do not put passwords in notes or uploaded files.

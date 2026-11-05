@@ -1281,13 +1281,13 @@ function databaseError(context: RouteContext, error: { code?: string; message: s
   if (
     error.code === "23505" &&
     (error.message.includes("applications_external_reference_unique") ||
-      error.message.includes("applications_user_ipo_unique"))
+      error.message.includes("applications_user_ipo_account_unique"))
   ) {
-    const duplicateCode = error.message.includes("applications_user_ipo_unique")
+    const duplicateCode = error.message.includes("applications_user_ipo_account_unique")
       ? "DUPLICATE_IPO_APPLICATION"
       : "DUPLICATE_EXTERNAL_REFERENCE";
-    const duplicateMessage = error.message.includes("applications_user_ipo_unique")
-      ? "You have already applied for this IPO."
+    const duplicateMessage = error.message.includes("applications_user_ipo_account_unique")
+      ? "An active application already exists for this IPO and demat account."
       : "This external reference already exists.";
     return context.json(
       {

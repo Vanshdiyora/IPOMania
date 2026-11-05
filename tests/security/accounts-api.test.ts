@@ -175,6 +175,42 @@ describe("demat account API", () => {
     });
   });
 
+  it("returns a structured safe error when account storage rejects a write", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    installSupabaseMock(
+      async () =>
+        new Response(
+          JSON.stringify({ code: "42501", message: "new row violates row-level security policy" }),
+          {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+    );
+
+    const response = await createApp().request(
+      "/api/accounts",
+      {
+        method: "POST",
+        headers: { ...bearerHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(accountInput),
+      },
+      bindings,
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "ACCOUNT_DATABASE_ERROR",
+        message: "The account could not be saved. Please try again later.",
+      },
+    });
+    expect(errorLog).toHaveBeenCalledWith("Account database operation failed", {
+      code: "42501",
+      message: "new row violates row-level security policy",
+    });
+  });
+
   it("reports account totals without a remaining capacity", async () => {
     installSupabaseMock(async (request) => {
       const count =
