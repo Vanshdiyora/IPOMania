@@ -12,6 +12,7 @@ import {
   PieChart,
   ResponsiveContainer,
   Tooltip,
+  type TooltipProps,
   XAxis,
   YAxis,
 } from "recharts";
@@ -528,15 +529,7 @@ export function DashboardPage() {
                         />
                       ))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--color-surface)",
-                      borderRadius: "10px",
-                      borderColor: "var(--color-border)",
-                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                    }}
-                    formatter={(value) => [value, "Applications"]}
-                  />
+                  <Tooltip content={<DashboardChartTooltip kind="status" />} />
                   <Legend formatter={(value) => humanize(String(value))} />
                 </PieChart>
               </ResponsiveContainer>
@@ -565,14 +558,7 @@ export function DashboardPage() {
                     tick={{ fontSize: 11 }}
                   />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--color-surface)",
-                      borderRadius: "10px",
-                      borderColor: "var(--color-border)",
-                    }}
-                    formatter={(value) => [value, "Applications"]}
-                  />
+                  <Tooltip content={<DashboardChartTooltip kind="ipo" />} />
                   <Bar dataKey="count" name="Applications" fill="#4F46E5" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -609,14 +595,7 @@ export function DashboardPage() {
                     tick={{ fontSize: 11 }}
                   />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--color-surface)",
-                      borderRadius: "10px",
-                      borderColor: "var(--color-border)",
-                    }}
-                    formatter={(value) => [value, "Applications"]}
-                  />
+                  <Tooltip content={<DashboardChartTooltip kind="category" />} />
                   <Bar dataKey="count" name="Applications" fill="#0D9488" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -641,14 +620,7 @@ export function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6E9F2" />
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--color-surface)",
-                      borderRadius: "10px",
-                      borderColor: "var(--color-border)",
-                    }}
-                    formatter={(value) => [value, "Applications"]}
-                  />
+                  <Tooltip content={<DashboardChartTooltip kind="month" />} />
                   <Line
                     type="monotone"
                     dataKey="count"
@@ -690,14 +662,7 @@ export function DashboardPage() {
                     tick={{ fontSize: 11 }}
                   />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--color-surface)",
-                      borderRadius: "10px",
-                      borderColor: "var(--color-border)",
-                    }}
-                    formatter={(value) => [value, "Applications"]}
-                  />
+                  <Tooltip content={<DashboardChartTooltip kind="account" />} />
                   <Bar dataKey="count" name="Applications" fill="#312E81" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -925,6 +890,59 @@ function ChartCard({
   );
 }
 
+type DashboardChartTooltipKind = "status" | "ipo" | "category" | "month" | "account";
+
+type DashboardChartTooltipProps = Pick<TooltipProps<number, string>, "active" | "payload"> & {
+  kind: DashboardChartTooltipKind;
+};
+
+export function DashboardChartTooltip({ active, payload, kind }: DashboardChartTooltipProps) {
+  const entry = payload?.[0];
+  if (!active || !entry || typeof entry.value !== "number" || !Number.isFinite(entry.value)) {
+    return null;
+  }
+
+  const row = isRecord(entry.payload) ? entry.payload : {};
+  const field = (name: string) => (typeof row[name] === "string" ? row[name] : "");
+  let title = "";
+  let detail: string | undefined;
+
+  switch (kind) {
+    case "status":
+      title = humanize(field("status"));
+      break;
+    case "ipo":
+      title = field("company_name") || "IPO";
+      detail = field("symbol") ? `Symbol: ${field("symbol")}` : undefined;
+      break;
+    case "category":
+      title = categoryLabel(field("category"));
+      break;
+    case "month":
+      title = formatMonth(field("month"));
+      break;
+    case "account":
+      title = field("bank_name") || "Demat account";
+      detail = field("holder_name") ? `Account holder: ${field("holder_name")}` : undefined;
+      break;
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-lg">
+      <p className="font-semibold">{title}</p>
+      {detail ? <p className="mt-1 text-xs text-muted">{detail}</p> : null}
+      <p className="mt-1 tabular">
+        <span className="font-medium">{entry.value === 1 ? "Application" : "Applications"}: </span>
+        {new Intl.NumberFormat().format(entry.value)}
+      </p>
+    </div>
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function EmptyMessage({ label }: { label: string }) {
   return (
     <div className="rounded-xl border border-dashed border-border/80 bg-canvas/40 p-6 text-center text-sm text-muted">
@@ -973,6 +991,19 @@ function humanize(value: string): string {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function formatMonth(value: string): string {
+  const month = Number(value.slice(5, 7));
+  const date = new Date(`${value}-01T00:00:00Z`);
+  if (!/^\d{4}-\d{2}$/.test(value) || month < 1 || month > 12 || Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 function formatDate(value: string): string {

@@ -107,6 +107,7 @@ describe("account import dialog", () => {
         await screen.findByRole("dialog", { name: "Bulk account import" }),
       ).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByLabelText("Choose a CSV or XLSX file")).toHaveFocus());
 
       fireEvent.keyDown(document, { key: "Escape" });
 
