@@ -3,11 +3,25 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState } from "react";
+import { cloneElement, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Archive, Building2, CheckCircle2, Plus, Upload, WalletCards, X } from "lucide-react";
+import {
+  Archive,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  KeyRound,
+  Landmark,
+  NotebookPen,
+  Plus,
+  Upload,
+  UserRound,
+  WalletCards,
+  X,
+} from "lucide-react";
 import type { z } from "@ipo-mania/validation";
 import { dematAccountFormSchema } from "@ipo-mania/validation";
 import type { AccountImportPreviewRow, DematAccount } from "@ipo-mania/shared";
@@ -233,7 +247,7 @@ export function AccountDashboardPage() {
     queryKey: userQueryKey(session?.user?.id, ["accounts", "summary"]),
     enabled: Boolean(session),
     queryFn: ({ signal }) =>
-      apiRequest<AccountListResponse>("/api/accounts?page=1&pageSize=1&archived=all", session!, {
+      apiRequest<AccountListResponse>("/api/accounts?page=1&pageSize=10&archived=all", session!, {
         signal,
       }),
   });
@@ -826,83 +840,189 @@ export function AccountDetailsPage() {
 
   return (
     <div className="w-full space-y-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        <div>
-          <BackLink fallback="/accounts" allowedPath={/^\/accounts$/}>
-            Back to accounts
-          </BackLink>
-          <h1 className="text-2xl font-bold text-navy">Account details</h1>
-          <p className="mt-2 text-base text-muted">Saved credentials are displayed as entered.</p>
+      <header className="flex flex-col gap-4">
+        <BackLink fallback="/accounts" allowedPath={/^\/accounts$/}>
+          Back to accounts
+        </BackLink>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-action">
+              Demat account
+            </p>
+            <h1 className="mt-1 text-2xl font-bold text-navy">Account details</h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted sm:text-base">
+              Review your saved account information and credentials.
+            </p>
+          </div>
+          {account && !account.archived_at ? (
+            <DrawerRouteLink
+              className={`${secondaryLinkClass} w-full rounded-xl sm:w-auto`}
+              to={`/accounts/${account.id}/edit`}
+            >
+              Edit account
+            </DrawerRouteLink>
+          ) : null}
         </div>
-        {account && !account.archived_at ? (
-          <DrawerRouteLink
-            className={`${secondaryLinkClass} w-full rounded-xl sm:w-auto`}
-            to={`/accounts/${account.id}/edit`}
-          >
-            Edit account
-          </DrawerRouteLink>
-        ) : null}
       </header>
       {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       {account ? (
-        <Card>
-          <dl className="grid gap-5 sm:grid-cols-2">
-            <DetailItem label="Account holder" value={account.holder_name} />
-            <DetailItem label="Bank name" value={account.bank_name ?? "Not provided"} />
-            <DetailItem label="Username" value={account.username ?? "Not provided"} />
-            <div>
-              <dt className="text-sm font-semibold text-muted">Password</dt>
-              <dd className="mt-1 flex flex-wrap items-center gap-3 text-base text-ink">
-                <AccountPasswordText account={account} />
-              </dd>
-            </div>
-            <DetailItem label="Account status" value={account.account_status} />
-            <DetailItem label="Created" value={formatDate(account.created_at)} />
-            <DetailItem label="Last updated" value={formatDate(account.updated_at)} />
-            <DetailItem
-              label="Archived"
-              value={account.archived_at ? formatDate(account.archived_at) : "No"}
+        <div className="space-y-5">
+          <Card className="overflow-hidden border-indigo-100 bg-gradient-to-br from-white via-white to-indigo-50/70 p-0">
+            <div
+              className="h-1.5 bg-gradient-to-r from-action via-indigo-400 to-sky-300"
+              aria-hidden="true"
             />
-            <div className="sm:col-span-2">
-              <DetailItem label="Notes" value={account.notes || "No notes"} />
+            <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+              <div className="flex min-w-0 items-center gap-4">
+                <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-navy text-white shadow-sm sm:size-16">
+                  <Building2 className="size-7" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+                    Account holder
+                  </p>
+                  <h2 className="mt-1 break-words text-xl font-bold tracking-tight text-navy sm:text-2xl">
+                    {account.holder_name}
+                  </h2>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-muted">
+                      <Landmark className="size-4 text-action" aria-hidden="true" />
+                      {account.bank_name ?? "Bank not provided"}
+                    </span>
+                    <StatusBadge
+                      status={account.archived_at ? "archived" : account.account_status}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-          </dl>
-          <div className="mt-6 flex flex-wrap gap-3 border-t border-border pt-5">
-            {!account.archived_at ? (
-              <ConfirmButton
-                variant="outline"
-                disabled={action.isPending}
-                title="Archive this record?"
-                description="This record will be removed from the active list."
-                confirmLabel="Archive"
-                onConfirm={() => action.mutateAsync("archive")}
-              >
-                Archive account
-              </ConfirmButton>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  disabled={action.isPending}
-                  onClick={() => action.mutate("restore")}
-                >
-                  Restore account
-                </Button>
+          </Card>
+
+          <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+            <Card className="p-5 sm:p-6">
+              <div className="mb-5 flex items-center gap-3">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-action-light text-action">
+                  <KeyRound className="size-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 className="text-base font-bold text-navy">Sign-in credentials</h2>
+                  <p className="text-sm text-muted">The details saved for this account</p>
+                </div>
+              </div>
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <DetailItem
+                  icon={<UserRound />}
+                  label="Username"
+                  value={account.username ?? "Not provided"}
+                />
+                <div className="rounded-xl border border-border bg-canvas/70 p-4">
+                  <dt className="text-xs font-bold uppercase tracking-[0.12em] text-muted">
+                    Password
+                  </dt>
+                  <dd className="mt-2 flex min-h-6 flex-wrap items-center gap-2 text-sm text-ink">
+                    <AccountPasswordText account={account} />
+                  </dd>
+                </div>
+              </dl>
+            </Card>
+
+            <Card className="p-5 sm:p-6">
+              <div className="mb-5 flex items-center gap-3">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-action-light text-action">
+                  <Clock3 className="size-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 className="text-base font-bold text-navy">Account activity</h2>
+                  <p className="text-sm text-muted">Status and recent changes</p>
+                </div>
+              </div>
+              <dl className="space-y-4">
+                <DetailItem
+                  icon={<CheckCircle2 />}
+                  label="Status"
+                  value={
+                    account.archived_at
+                      ? "Archived"
+                      : `${account.account_status.charAt(0).toUpperCase()}${account.account_status.slice(1).toLowerCase()}`
+                  }
+                />
+                <DetailItem
+                  icon={<CalendarDays />}
+                  label="Created"
+                  value={formatDate(account.created_at)}
+                />
+                <DetailItem
+                  icon={<Clock3 />}
+                  label="Last updated"
+                  value={formatDate(account.updated_at)}
+                />
+                <DetailItem
+                  icon={<Archive />}
+                  label="Archived"
+                  value={account.archived_at ? formatDate(account.archived_at) : "Not archived"}
+                />
+              </dl>
+            </Card>
+          </div>
+
+          <Card className="flex items-start gap-3 border-indigo-100 bg-indigo-50/50 p-5 sm:p-6">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-action shadow-sm">
+              <NotebookPen className="size-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-navy">Notes</h2>
+              <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-muted">
+                {account.notes || "No notes added to this account yet."}
+              </p>
+            </div>
+          </Card>
+
+          <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div>
+              <h2 className="text-sm font-bold text-navy">Account management</h2>
+              <p className="mt-1 text-sm text-muted">
+                {account.archived_at
+                  ? "Restore this account to make it active again, or permanently remove it."
+                  : "Archive this account to remove it from your active accounts."}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {!account.archived_at ? (
                 <ConfirmButton
                   variant="outline"
-                  className="border-danger text-danger"
                   disabled={action.isPending}
-                  title="Confirm this action"
-                  description="Permanently delete this archived account? This cannot be undone."
-                  confirmLabel="Continue"
-                  onConfirm={() => action.mutateAsync("delete")}
+                  title="Archive this record?"
+                  description="This record will be removed from the active list."
+                  confirmLabel="Archive"
+                  onConfirm={() => action.mutateAsync("archive")}
                 >
-                  Delete archived account
+                  Archive account
                 </ConfirmButton>
-              </>
-            )}
-          </div>
-        </Card>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    disabled={action.isPending}
+                    onClick={() => action.mutate("restore")}
+                  >
+                    Restore account
+                  </Button>
+                  <ConfirmButton
+                    variant="outline"
+                    className="border-danger text-danger"
+                    disabled={action.isPending}
+                    title="Confirm this action"
+                    description="Permanently delete this archived account? This cannot be undone."
+                    confirmLabel="Continue"
+                    onConfirm={() => action.mutateAsync("delete")}
+                  >
+                    Delete archived account
+                  </ConfirmButton>
+                </>
+              )}
+            </div>
+          </Card>
+        </div>
       ) : null}
     </div>
   );
@@ -1503,11 +1623,24 @@ function AccountCardDetail({
   );
 }
 
-function DetailItem({ label, value }: { label: string; value: string }) {
+function DetailItem({
+  icon,
+  label,
+  value,
+}: {
+  icon?: React.ReactElement;
+  label: string;
+  value: string;
+}) {
   return (
-    <div>
-      <dt className="text-sm font-bold uppercase tracking-wide text-muted">{label}</dt>
-      <dd className="mt-1 break-words text-lg text-ink">{value}</dd>
+    <div className="rounded-xl border border-border bg-canvas/70 p-4">
+      <dt className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-muted">
+        {icon
+          ? cloneElement(icon, { className: "size-3.5 text-action", "aria-hidden": true })
+          : null}
+        {label}
+      </dt>
+      <dd className="mt-2 break-words text-sm font-semibold text-ink">{value}</dd>
     </div>
   );
 }

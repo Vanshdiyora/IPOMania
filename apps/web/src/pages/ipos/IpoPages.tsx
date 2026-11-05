@@ -341,7 +341,7 @@ function IpoListContent() {
                   >
                     {ipo.company_name}
                   </Link>
-                  <p className="mt-1 text-xs text-muted">{ipo.symbol || "-"}</p>
+                  {ipo.symbol ? <p className="mt-1 text-xs text-muted">{ipo.symbol}</p> : null}
                 </td>
                 <td className="p-4 text-sm text-ink">{ipo.exchange || "-"}</td>
                 <td className="p-4 text-sm font-medium text-ink">

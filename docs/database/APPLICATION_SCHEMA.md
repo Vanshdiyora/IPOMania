@@ -1,7 +1,8 @@
 # Application database schema
 
-Migrations: `supabase/migrations/20261031150000_application_manager.sql` and
-`supabase/migrations/20261104165000_manual_application_lots.sql`.
+Migrations: `supabase/migrations/20261031150000_application_manager.sql`,
+`supabase/migrations/20261104165000_manual_application_lots.sql`, and
+`supabase/migrations/20261105120000_global_metrics_pagination.sql`.
 
 ## `public.applications`
 
@@ -50,3 +51,7 @@ the API before insert.
 status separation, snapshot preservation, stable-reference uniqueness, confirmation retry, and
 reversal. It requires the repository's local Supabase/PostgreSQL test environment; see
 `TASKS.md` for current execution status.
+
+The application summary endpoint uses the migration's `get_application_summary` RPC. If that
+function is missing from the PostgREST schema cache, the API temporarily computes the same
+owner-scoped summary from paginated application rows until the migration is applied.
