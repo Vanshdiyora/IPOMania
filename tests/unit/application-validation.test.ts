@@ -3,6 +3,7 @@ import {
   applicationBulkCreateSchema,
   applicationBulkStatusSchema,
   applicationCreateSchema,
+  applicationImportHistoryQuerySchema,
   applicationListQuerySchema,
   applicationSummaryQuerySchema,
   ipoCategorySchema,
@@ -97,5 +98,14 @@ describe("application boundary validation", () => {
     expect(
       applicationSummaryQuerySchema.safeParse({ user_id: validApplication.ipo_id }).success,
     ).toBe(false);
+  });
+
+  it("uses the shared 10-row default and restricts import pagination sizes", () => {
+    expect(applicationImportHistoryQuerySchema.parse({})).toEqual({ page: 1, page_size: 10 });
+    expect(applicationImportHistoryQuerySchema.parse({ page: "2", page_size: "50" })).toEqual({
+      page: 2,
+      page_size: 50,
+    });
+    expect(applicationImportHistoryQuerySchema.safeParse({ page_size: "20" }).success).toBe(false);
   });
 });

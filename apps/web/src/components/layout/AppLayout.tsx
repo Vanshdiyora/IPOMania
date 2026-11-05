@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Menu } from "lucide-react";
 import { Outlet, useLocation, useOutlet, Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
@@ -6,9 +6,18 @@ import { useAuth } from "../../auth/useAuth";
 import { Sidebar } from "./Sidebar";
 import { useToast } from "../ui/ToastContext";
 import { LoadingState } from "../LoadingState";
-import { DrawerRouteHost } from "./DrawerRouteHost";
 import { DrawerRouteProvider } from "../ui/FormDrawer";
-import { AccountImportDialog } from "../../pages/accounts/AccountPages";
+import { useAppDispatch, useAppSelector } from "../../store";
+import { setMobileNavigationOpen } from "../../store/slices/uiSlice";
+
+const DrawerRouteHost = lazy(() =>
+  import("./DrawerRouteHost").then((module) => ({ default: module.DrawerRouteHost })),
+);
+const AccountImportDialog = lazy(() =>
+  import("../../pages/accounts/AccountPages").then((module) => ({
+    default: module.AccountImportDialog,
+  })),
+);
 
 export function AppLayout() {
   const { loading, user } = useAuth();
@@ -27,7 +36,12 @@ export function AppLayout() {
   const backgroundRef = useRef(drawerRoute ? null : outlet);
   if (!drawerRoute) backgroundRef.current = outlet;
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuOpen = useAppSelector((state) => state.ui.mobileNavigationOpen);
+  const dispatch = useAppDispatch();
+  const setMobileMenuOpen = useCallback(
+    (open: boolean) => dispatch(setMobileNavigationOpen(open)),
+    [dispatch],
+  );
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuWasOpen = useRef(false);
   const pageContentRef = useRef<HTMLDivElement>(null);
@@ -83,7 +97,7 @@ export function AppLayout() {
       window.removeEventListener("keydown", closeOnEscape);
       document.body.style.overflow = previousOverflow;
     };
-  }, [mobileMenuOpen]);
+  }, [mobileMenuOpen, setMobileMenuOpen]);
 
   if (pathname === "/" && loading) {
     return <LoadingState label="Restoring your session" fullPage />;
@@ -137,7 +151,7 @@ export function AppLayout() {
               aria-expanded={mobileMenuOpen}
               aria-controls="main-navigation"
               tabIndex={mobileMenuOpen ? -1 : undefined}
-              onClick={() => setMobileMenuOpen((current) => !current)}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               <Menu aria-hidden="true" size={20} />
             </button>
@@ -157,8 +171,16 @@ export function AppLayout() {
                 : outlet}
             </div>
             {drawerRoute && <div key={pathname}>{outlet}</div>}
-            <DrawerRouteHost path={localDrawerPath} />
-            {accountImportDialogOpen && <AccountImportDialog onClose={closeAccountImportDialog} />}
+            {localDrawerPath && (
+              <Suspense fallback={<LoadingState label="Opening form" />}>
+                <DrawerRouteHost path={localDrawerPath} />
+              </Suspense>
+            )}
+            {accountImportDialogOpen && (
+              <Suspense fallback={<LoadingState label="Opening import dialog" />}>
+                <AccountImportDialog onClose={closeAccountImportDialog} />
+              </Suspense>
+            )}
           </main>
         </div>
       </div>

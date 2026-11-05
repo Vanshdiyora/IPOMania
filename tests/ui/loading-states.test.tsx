@@ -11,6 +11,8 @@ import { Button } from "../../apps/web/src/components/ui/Button";
 import { ToastProvider } from "../../apps/web/src/components/ui/Toast";
 import { IpoListPage } from "../../apps/web/src/pages/ipos/IpoPages";
 import type * as ApiModule from "../../apps/web/src/lib/api";
+import { Provider } from "react-redux";
+import { createAppStore } from "../../apps/web/src/store";
 
 const { authState, apiRequestMock } = vi.hoisted(() => ({
   authState: {
@@ -64,15 +66,17 @@ describe("shared loading states", () => {
     authState.loading = true;
     authState.user = null;
     render(
-      <MemoryRouter initialEntries={["/"]}>
-        <ToastProvider>
-          <Routes>
-            <Route path="/" element={<AppLayout />}>
-              <Route index element={<p>Public homepage</p>} />
-            </Route>
-          </Routes>
-        </ToastProvider>
-      </MemoryRouter>,
+      <Provider store={createAppStore()}>
+        <MemoryRouter initialEntries={["/"]}>
+          <ToastProvider>
+            <Routes>
+              <Route path="/" element={<AppLayout />}>
+                <Route index element={<p>Public homepage</p>} />
+              </Route>
+            </Routes>
+          </ToastProvider>
+        </MemoryRouter>
+      </Provider>,
     );
 
     expect(screen.getByRole("status", { name: "Restoring your session" })).toBeInTheDocument();

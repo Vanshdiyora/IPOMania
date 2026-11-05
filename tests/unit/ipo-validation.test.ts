@@ -57,7 +57,7 @@ describe("IPO boundary validation", () => {
     });
     expect(ipoCatalogListQuerySchema.parse({})).toEqual({
       page: 1,
-      page_size: 25,
+      page_size: 10,
       sort: "date_desc",
     });
     expect(

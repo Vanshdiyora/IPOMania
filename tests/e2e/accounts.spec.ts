@@ -81,7 +81,7 @@ test("accounts tab shows readable cards without horizontal page overflow on mobi
   await expect(page.getByRole("heading", { name: "Demat accounts" })).toBeVisible();
   await expect(page.getByRole("article")).toContainText("Asha Mehta");
   await expect(page.getByRole("article")).toContainText("Example Bank");
-  await expect(page.getByRole("article")).toContainText("••••••••");
+  await expect(page.getByRole("article")).toContainText("example-bank-password");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
@@ -99,15 +99,11 @@ test("accounts tab renders the account table on desktop", async ({ page }) => {
   await expect(page.getByRole("columnheader", { name: "Password" })).toBeVisible();
 });
 
-test("account detail masks the password until the user reveals it", async ({ page }) => {
+test("account detail displays the password as text", async ({ page }) => {
   await prepareAccountPage(page);
   await page.goto(`/accounts/${account.id}`);
 
-  await expect(page.getByText("••••••••")).toBeVisible();
-  await page.getByRole("button", { name: "Reveal password" }).click();
   await expect(page.getByText("example-bank-password")).toBeVisible();
-  await page.getByRole("button", { name: "Hide password" }).click();
-  await expect(page.getByText("••••••••")).toBeVisible();
 });
 
 test("account dashboard shows totals without a capacity limit", async ({ page }) => {

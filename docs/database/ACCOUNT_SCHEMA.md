@@ -1,6 +1,10 @@
 # Account database schema
 
 Current shape: `supabase/migrations/20261104220100_replace_demat_identifiers_with_bank_credentials.sql`.
+The credential-column grants are reasserted by
+`supabase/migrations/20261105120000_reassert_demat_account_authenticated_grants.sql`.
+`20261105140000_allow_authenticated_account_ids.sql` permits callers to provide the account UUID
+that the API uses as password-encryption associated data.
 
 ## `public.demat_accounts`
 
@@ -21,6 +25,10 @@ depository, masked identifier, and masked client-reference columns are removed b
 A unique index on `(user_id, bank_name_normalized, username_normalized)` prevents duplicate bank
 logins for a user, including archived records.
 
+`authenticated` receives only the account operations and columns the application uses. RLS remains
+enabled and forced; its owner-based policies still determine which account rows a signed-in user can
+read, create, update, or delete.
+
 Passwords are encrypted in the API Worker with AES-256-GCM and a fresh 96-bit nonce before any
 database write; the authenticated owner and account IDs are included as authenticated encryption
 data. The encryption key is configured as the Worker secret
@@ -28,9 +36,9 @@ data. The encryption key is configured as the Worker secret
 committed. The database stores ciphertext only. List, details, create, update, and lifecycle
 responses never contain ciphertext or plaintext. The explicit `GET /api/accounts/:accountId/password`
 route verifies the caller, scopes the query to their user ID, decrypts only for that request, and
-sets `Cache-Control: no-store`. The UI keeps passwords masked unless the owner explicitly reveals
-them. Key loss or rotation without migration makes existing ciphertext unrecoverable; maintain
-protected backups and a deliberate key-rotation procedure.
+sets `Cache-Control: no-store`. The UI displays the retrieved password as text only to its owner.
+Key loss or rotation without migration makes existing ciphertext unrecoverable; maintain protected
+backups and a deliberate key-rotation procedure.
 
 ## Account count
 

@@ -1,6 +1,6 @@
 begin;
 
-select plan(17);
+select plan(26);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -199,6 +199,26 @@ select is(
   'The dashboard aggregates only User A applications'
 );
 select is(
+  public.get_application_summary()->>'total',
+  '1',
+  'The application summary counts every active application for the caller'
+);
+select is(
+  public.get_application_summary()->>'distinct_ipo_count',
+  '1',
+  'The application summary calculates distinct IPOs in the database'
+);
+select is(
+  public.get_application_summary()->'category_counts'->>'RETAIL',
+  '1',
+  'The application summary aggregates category totals in the database'
+);
+select is(
+  public.get_application_summary('55555555-5555-4555-8555-555555555555')->>'total',
+  '0',
+  'The application summary filter cannot reveal another user application'
+);
+select is(
   public.get_dashboard_analytics()->'totals'->>'active_demat_accounts',
   '1',
   'The dashboard reports the caller active demat accounts'
@@ -256,12 +276,27 @@ select is(
   '16161616-1616-4161-8161-161616161616',
   'Shared upcoming closing dates include the catalog issue'
 );
+select is(
+  public.get_ipo_catalog_status_counts('Shared')->>'upcoming',
+  '1',
+  'Catalog status counts include all matching records beyond the current page'
+);
+select is(
+  public.get_ipo_catalog_status_counts('Shared', array['open'])->>'upcoming',
+  '0',
+  'Catalog status counts apply selected filters in the database'
+);
 
 select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', true);
 select is(
   public.get_dashboard_analytics()->'totals'->>'applications',
   '1',
   'User B receives their own independent dashboard totals'
+);
+select is(
+  public.get_application_summary()->>'total',
+  '1',
+  'User B receives their own application summary'
 );
 select is(
   public.get_dashboard_catalog_analytics()->>'total',
@@ -275,11 +310,21 @@ select is(
   '5000',
   'The database aggregates a large application dataset without a paginated client scan'
 );
+select is(
+  public.get_application_summary()->>'total',
+  '5000',
+  'The application summary aggregates a large dataset without loading rows into the API'
+);
 select set_config('request.jwt.claim.sub', '33333333-3333-4333-8333-333333333333', true);
 select is(
   public.get_dashboard_analytics()->'totals'->>'applications',
   '0',
   'An empty user receives empty application analytics'
+);
+select is(
+  public.get_application_summary()->>'total',
+  '0',
+  'An empty user receives zero application summary totals'
 );
 select is(
   public.get_dashboard_analytics()->'allotment_performance'->>'success_rate_percent',

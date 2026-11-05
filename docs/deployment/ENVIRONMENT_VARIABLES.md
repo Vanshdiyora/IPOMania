@@ -54,7 +54,7 @@ Copy `.env.example` to the ignored repository-root `.env`. Vite reads the root f
 for Wrangler. Configure matching project values for `VITE_SUPABASE_URL`,
 `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY`. Local defaults are:
 
-- Web: `http://127.0.0.1:4175`
+- Web: `http://127.0.0.1:4179`
 - API: `http://127.0.0.1:8787`
 - Local Supabase database: port `54322` (`supabase status` reports local credentials)
 

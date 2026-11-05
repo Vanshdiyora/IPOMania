@@ -1,3 +1,4 @@
+import { userQueryKey } from "../../lib/queryKeys";
 import { toIsoDateTime, toLocalDateTime } from "../../lib/formValues";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -27,7 +28,9 @@ import {
 } from "@ipo-mania/validation";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
+import { Pagination as PaginationControls } from "../../components/ui/Pagination";
 import { ApiRequestError, apiRequest } from "../../lib/api";
+import { defaultPageSize } from "../../lib/pagination";
 import { EmptyState } from "../../components/ui/States";
 import {
   SkeletonCard,
@@ -110,9 +113,10 @@ export function MandateDetailsPage() {
   const [notes, setNotes] = useState("");
   const [loadedId, setLoadedId] = useState("");
   const detail = useQuery({
-    queryKey: ["mandate", mandateId],
+    queryKey: userQueryKey(session?.user?.id, ["mandate", mandateId]),
     enabled: Boolean(session && mandateId),
-    queryFn: () => apiRequest<MandateResponse>(`/api/mandates/${mandateId}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<MandateResponse>(`/api/mandates/${mandateId}`, session!, { signal }),
   });
   const mandate = detail.data?.data;
   useEffect(() => {
@@ -280,9 +284,10 @@ export function AllotmentDetailsPage() {
   const [date, setDate] = useState("");
   const [loadedId, setLoadedId] = useState("");
   const detail = useQuery({
-    queryKey: ["allotment", allotmentId],
+    queryKey: userQueryKey(session?.user?.id, ["allotment", allotmentId]),
     enabled: Boolean(session && allotmentId),
-    queryFn: () => apiRequest<AllotmentResponse>(`/api/allotments/${allotmentId}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<AllotmentResponse>(`/api/allotments/${allotmentId}`, session!, { signal }),
   });
   const allotment = detail.data?.data;
   useEffect(() => {
@@ -710,10 +715,12 @@ export function CapitalTrackerPage() {
   const [filters, setFilters] = useState(blankFilters);
   const filterQuery = useMemo(() => capitalFilterString(filters), [filters]);
   const summaryQuery = useQuery({
-    queryKey: ["capital", "summary", filterQuery],
+    queryKey: userQueryKey(session?.user?.id, ["capital", "summary", filterQuery]),
     enabled: Boolean(session),
-    queryFn: () =>
-      apiRequest<CapitalSummaryResponse>(`/api/capital/summary?${filterQuery}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<CapitalSummaryResponse>(`/api/capital/summary?${filterQuery}`, session!, {
+        signal,
+      }),
   });
   const summaries = summaryQuery.data?.data.summaries ?? [];
   return (
@@ -819,11 +826,13 @@ export function FinancialTransactionHistoryPage() {
   const { session } = useAuth();
   const [filters, setFilters] = useState(blankFilters);
   const [page, setPage] = useState(1);
-  const query = useMemo(() => queryString(filters, page), [filters, page]);
+  const [pageSize, setPageSize] = useState<number>(defaultPageSize);
+  const query = useMemo(() => queryString(filters, page, pageSize), [filters, page, pageSize]);
   const ledgerQuery = useQuery({
-    queryKey: ["capital", "ledger", query],
+    queryKey: userQueryKey(session?.user?.id, ["capital", "ledger", query]),
     enabled: Boolean(session),
-    queryFn: () => apiRequest<LedgerResponse>(`/api/capital/ledger?${query}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<LedgerResponse>(`/api/capital/ledger?${query}`, session!, { signal }),
   });
   const rows = ledgerQuery.data?.data.ledger ?? [];
   return (
@@ -884,7 +893,15 @@ export function FinancialTransactionHistoryPage() {
           </div>
         )}
       </Card>
-      <PaginationNav pagination={ledgerQuery.data?.data.pagination} onPageChange={setPage} />
+      <PaginationNav
+        pagination={ledgerQuery.data?.data.pagination}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSize(nextPageSize);
+          setPage(1);
+        }}
+      />
     </div>
   );
 }
@@ -893,15 +910,17 @@ export function RefundTrackerPage() {
   const { session } = useAuth();
   const [filters, setFilters] = useState({ ...blankFilters, refund_status: "PENDING" });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(defaultPageSize);
   const params = useMemo(() => {
-    const search = new URLSearchParams(queryString(filters, page));
+    const search = new URLSearchParams(queryString(filters, page, pageSize));
     if (filters.refund_status) search.set("refund_status", filters.refund_status);
     return search.toString();
-  }, [filters, page]);
+  }, [filters, page, pageSize]);
   const allotmentQuery = useQuery({
-    queryKey: ["allotments", "refunds", params],
+    queryKey: userQueryKey(session?.user?.id, ["allotments", "refunds", params]),
     enabled: Boolean(session),
-    queryFn: () => apiRequest<AllotmentsResponse>(`/api/allotments?${params}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<AllotmentsResponse>(`/api/allotments?${params}`, session!, { signal }),
   });
   const rows = allotmentQuery.data?.data.allotments ?? [];
   return (
@@ -984,7 +1003,15 @@ export function RefundTrackerPage() {
           ) : null}
         </div>
       </Card>
-      <PaginationNav pagination={allotmentQuery.data?.data.pagination} onPageChange={setPage} />
+      <PaginationNav
+        pagination={allotmentQuery.data?.data.pagination}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSize(nextPageSize);
+          setPage(1);
+        }}
+      />
     </div>
   );
 }
@@ -993,11 +1020,13 @@ function MandateList({ showAll }: { showAll: boolean }) {
   const { session } = useAuth();
   const [filters, setFilters] = useState(blankFilters);
   const [page, setPage] = useState(1);
-  const query = useMemo(() => queryString(filters, page), [filters, page]);
+  const [pageSize, setPageSize] = useState<number>(defaultPageSize);
+  const query = useMemo(() => queryString(filters, page, pageSize), [filters, page, pageSize]);
   const mandatesQuery = useQuery({
-    queryKey: ["mandates", query],
+    queryKey: userQueryKey(session?.user?.id, ["mandates", query]),
     enabled: Boolean(session),
-    queryFn: () => apiRequest<MandatesResponse>(`/api/mandates?${query}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<MandatesResponse>(`/api/mandates?${query}`, session!, { signal }),
   });
   const rows = mandatesQuery.data?.data.mandates ?? [];
   return (
@@ -1067,7 +1096,15 @@ function MandateList({ showAll }: { showAll: boolean }) {
         </div>
       </Card>
       {showAll ? (
-        <PaginationNav pagination={mandatesQuery.data?.data.pagination} onPageChange={setPage} />
+        <PaginationNav
+          pagination={mandatesQuery.data?.data.pagination}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setPage(1);
+          }}
+        />
       ) : null}
     </div>
   );
@@ -1077,11 +1114,13 @@ function AllotmentList({ showAll }: { showAll: boolean }) {
   const { session } = useAuth();
   const [filters, setFilters] = useState(blankFilters);
   const [page, setPage] = useState(1);
-  const query = useMemo(() => queryString(filters, page), [filters, page]);
+  const [pageSize, setPageSize] = useState<number>(defaultPageSize);
+  const query = useMemo(() => queryString(filters, page, pageSize), [filters, page, pageSize]);
   const allotmentsQuery = useQuery({
-    queryKey: ["allotments", query],
+    queryKey: userQueryKey(session?.user?.id, ["allotments", query]),
     enabled: Boolean(session),
-    queryFn: () => apiRequest<AllotmentsResponse>(`/api/allotments?${query}`, session!),
+    queryFn: ({ signal }) =>
+      apiRequest<AllotmentsResponse>(`/api/allotments?${query}`, session!, { signal }),
   });
   const rows = allotmentsQuery.data?.data.allotments ?? [];
   return (
@@ -1149,7 +1188,15 @@ function AllotmentList({ showAll }: { showAll: boolean }) {
         </div>
       </Card>
       {showAll ? (
-        <PaginationNav pagination={allotmentsQuery.data?.data.pagination} onPageChange={setPage} />
+        <PaginationNav
+          pagination={allotmentsQuery.data?.data.pagination}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setPage(1);
+          }}
+        />
       ) : null}
     </div>
   );
@@ -1358,14 +1405,16 @@ function FinancialFilters({
 }) {
   const { session } = useAuth();
   const ipos = useQuery({
-    queryKey: ["ipos", "capital-filters"],
+    queryKey: userQueryKey(session?.user?.id, ["ipos", "capital-filters"]),
     enabled: Boolean(session),
-    queryFn: () => apiRequest<IpoListResponse>("/api/ipos?page_size=100", session!),
+    queryFn: ({ signal }) =>
+      apiRequest<IpoListResponse>("/api/ipos?page_size=100", session!, { signal }),
   });
   const accounts = useQuery({
-    queryKey: ["accounts", "capital-filters"],
+    queryKey: userQueryKey(session?.user?.id, ["accounts", "capital-filters"]),
     enabled: Boolean(session),
-    queryFn: () => apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!),
+    queryFn: ({ signal }) =>
+      apiRequest<AccountListResponse>("/api/accounts?pageSize=100", session!, { signal }),
   });
   return (
     <Card>
@@ -1467,10 +1516,12 @@ function FinancialFilters({
 
 function useApplications(session: ReturnType<typeof useAuth>["session"]) {
   return useQuery({
-    queryKey: ["applications"],
+    queryKey: userQueryKey(session?.user?.id, ["applications"]),
     enabled: Boolean(session),
-    queryFn: () =>
-      apiRequest<ApplicationsResponse>("/api/capital/applications?page_size=100", session!),
+    queryFn: ({ signal }) =>
+      apiRequest<ApplicationsResponse>("/api/capital/applications?page_size=100", session!, {
+        signal,
+      }),
   });
 }
 
@@ -1535,32 +1586,26 @@ function Value({ label, value }: { label: string; value: string }) {
 
 function PaginationNav({
   pagination,
+  pageSize,
   onPageChange,
+  onPageSizeChange,
 }: {
   pagination?: Pagination;
+  pageSize: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
 }) {
-  if (!pagination || pagination.total_pages < 2) return null;
+  if (!pagination) return null;
   return (
-    <nav className="flex justify-between" aria-label="Financial record pages">
-      <Button
-        variant="outline"
-        disabled={pagination.page <= 1}
-        onClick={() => onPageChange(pagination.page - 1)}
-      >
-        Previous
-      </Button>
-      <span className="self-center text-sm text-muted">
-        Page {pagination.page} of {pagination.total_pages}
-      </span>
-      <Button
-        variant="outline"
-        disabled={pagination.page >= pagination.total_pages}
-        onClick={() => onPageChange(pagination.page + 1)}
-      >
-        Next
-      </Button>
-    </nav>
+    <PaginationControls
+      label="Financial record pages"
+      page={pagination.page}
+      totalPages={pagination.total_pages}
+      total={pagination.total}
+      pageSize={pageSize}
+      onPageChange={onPageChange}
+      onPageSizeChange={onPageSizeChange}
+    />
   );
 }
 
@@ -1604,8 +1649,15 @@ function accountTitle(application?: RelatedApplication): string {
   return account ? account.holder_name : "Account unavailable";
 }
 
-function queryString(filters: Filters, page = 1): string {
-  const parameters = new URLSearchParams({ page: String(page), page_size: "100" });
+function queryString(
+  filters: Filters,
+  page: number = 1,
+  pageSize: number = defaultPageSize,
+): string {
+  const parameters = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+  });
   for (const [key, value] of Object.entries(filters)) {
     if (value) parameters.set(key, value);
   }

@@ -97,7 +97,7 @@ describe("user IPO catalog", () => {
     apiRequestMock.mockReset();
   });
 
-  it("loads shared IPOs by default and shows incomplete provider data without hiding the name", async () => {
+  it("loads shared IPOs by default and displays missing table values as dashes", async () => {
     apiRequestMock.mockResolvedValue(listResponse());
     renderPage();
     const link = await screen.findByRole("link", { name: catalogIpo.company_name });
@@ -106,10 +106,12 @@ describe("user IPO catalog", () => {
     expect(screen.queryByRole("link", { name: "Add to catalog" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Source" })).not.toBeInTheDocument();
     expect(screen.queryByText("Admin-managed", { exact: true })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Not published")).toHaveLength(2);
+    expect(screen.getAllByText("-")).toHaveLength(4);
+    expect(screen.getByText("- – -")).toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
-      "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",
+      "/api/ipos/catalog?page=1&page_size=10&sort=date_desc",
       expect.anything(),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
 
@@ -133,8 +135,9 @@ describe("user IPO catalog", () => {
     expect(screen.queryByRole("link", { name: "My Private IPO" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "My IPOs" })).not.toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
-      "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",
+      "/api/ipos/catalog?page=1&page_size=10&sort=date_desc",
       expect.anything(),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
 
     expect(apiRequestMock).not.toHaveBeenCalledWith(
@@ -167,8 +170,9 @@ describe("user IPO catalog", () => {
     fireEvent.click(screen.getByRole("option", { name: "Price · high to low" }));
     await waitFor(() =>
       expect(apiRequestMock).toHaveBeenCalledWith(
-        "/api/ipos/catalog?page=1&page_size=25&sort=price_desc",
+        "/api/ipos/catalog?page=1&page_size=10&sort=price_desc",
         expect.anything(),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
       ),
     );
     fireEvent.click(screen.getByRole("button", { name: "Open", exact: true }));
@@ -179,8 +183,9 @@ describe("user IPO catalog", () => {
     );
     await waitFor(() =>
       expect(apiRequestMock).toHaveBeenCalledWith(
-        "/api/ipos/catalog?page=1&page_size=25&sort=price_desc&status=OPEN&status=CLOSED",
+        "/api/ipos/catalog?page=1&page_size=10&sort=price_desc&status=OPEN&status=CLOSED",
         expect.anything(),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
       ),
     );
     fireEvent.change(screen.getByRole("textbox", { name: "Search company or exact symbol" }), {
@@ -188,8 +193,9 @@ describe("user IPO catalog", () => {
     });
     await waitFor(() =>
       expect(apiRequestMock).toHaveBeenCalledWith(
-        "/api/ipos/catalog?page=1&page_size=25&sort=price_desc&search=Catalog&status=OPEN&status=CLOSED",
+        "/api/ipos/catalog?page=1&page_size=10&sort=price_desc&search=Catalog&status=OPEN&status=CLOSED",
         expect.anything(),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
       ),
     );
   });
@@ -200,8 +206,9 @@ describe("user IPO catalog", () => {
     expect(await screen.findByRole("heading", { name: "IPO catalog" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /calendar/i })).not.toBeInTheDocument();
     expect(apiRequestMock).toHaveBeenCalledWith(
-      "/api/ipos/catalog?page=1&page_size=25&sort=date_desc",
+      "/api/ipos/catalog?page=1&page_size=10&sort=date_desc",
       expect.anything(),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
 
@@ -320,7 +327,7 @@ describe("user IPO catalog", () => {
           : allAccounts;
         const params = new URLSearchParams(path.split("?")[1]);
         const page = Number(params.get("page") ?? 1);
-        const pageSize = Number(params.get("pageSize") ?? 25);
+        const pageSize = Number(params.get("pageSize") ?? 10);
         return {
           data: {
             accounts: matchedAccounts.slice((page - 1) * pageSize, page * pageSize),
@@ -378,12 +385,16 @@ describe("user IPO catalog", () => {
     expect(await screen.findByRole("row", { name: /Applied Holder/ })).toHaveTextContent("Retail");
     expect(screen.getByRole("row", { name: /Applied Holder/ })).toHaveTextContent("Applied");
     const appliedRow = screen.getByRole("row", { name: /Applied Holder/ });
-    expect(appliedRow).toHaveTextContent("2");
-    expect(appliedRow).toHaveTextContent("₹105.00");
+    expect(appliedRow).toHaveTextContent("2 × ₹105.00");
+    expect(appliedRow).toHaveTextContent("₹2,100.00");
+    expect(screen.getByRole("columnheader", { name: "Lots / price" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Total amount" })).toBeInTheDocument();
     expect(screen.queryByRole("row", { name: /Ready Holder/ })).not.toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "Demat account application pages" }),
-    ).toHaveTextContent("Page 1 of 2");
+    ).toHaveTextContent("Page 1 of 3");
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByRole("row", { name: /Other Holder 10/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(await screen.findByRole("row", { name: /Ready Holder/ })).toHaveTextContent(
       "Not Applied",
@@ -396,6 +407,7 @@ describe("user IPO catalog", () => {
       expect(apiRequestMock).toHaveBeenCalledWith(
         expect.stringContaining("holder_name=Applied"),
         expect.anything(),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
       ),
     );
     expect(await screen.findByRole("row", { name: /Applied Holder/ })).toBeInTheDocument();
@@ -410,6 +422,7 @@ describe("user IPO catalog", () => {
       expect(apiRequestMock).toHaveBeenCalledWith(
         expect.stringContaining("holder_name=Ready"),
         expect.anything(),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
       ),
     );
     expect(await screen.findByRole("row", { name: /Ready Holder/ })).toBeInTheDocument();
@@ -462,6 +475,7 @@ describe("user IPO catalog", () => {
     expect(apiRequestMock).toHaveBeenCalledWith(
       `/api/admin/ipos/catalog/${catalogIpo.id}/categories`,
       expect.anything(),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
 
@@ -526,8 +540,9 @@ describe("user IPO catalog", () => {
     expect(screen.getByRole("row", { name: /APP-2026-001/ })).toHaveTextContent("RETAIL");
     expect(screen.getByRole("row", { name: /APP-2026-001/ })).toHaveTextContent("₹200");
     expect(apiRequestMock).toHaveBeenCalledWith(
-      `/api/applications?ipo_id=${catalogIpo.id}&page=1&page_size=25`,
+      `/api/applications?ipo_id=${catalogIpo.id}&page=1&page_size=10`,
       expect.anything(),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
 

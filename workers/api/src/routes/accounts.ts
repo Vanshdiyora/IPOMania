@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import * as XLSX from "@e965/xlsx";
 import {
   accountListQuerySchema,
+  accountImportHistoryQuerySchema,
   dematAccountImportSchema,
   dematAccountSchema,
   dematAccountUpdateSchema,
@@ -286,19 +287,19 @@ accountsRoutes.post("/import/confirm", async (context) => {
 });
 
 accountsRoutes.get("/import/history", async (context) => {
-  const page = parsePositiveInteger(context.req.query("page"), 1);
-  const pageSize = Math.min(parsePositiveInteger(context.req.query("pageSize"), 25), 100);
-  if (!page || !pageSize) {
+  const parsed = accountImportHistoryQuerySchema.safeParse(context.req.query());
+  if (!parsed.success) {
     return context.json(
       {
         error: {
           code: "VALIDATION_ERROR",
-          message: "Pagination values must be positive integers.",
+          message: "The import history pagination values are invalid.",
         },
       },
       400,
     );
   }
+  const { page, pageSize } = parsed.data;
   const { data, error, count } = await context
     .get("rlsSupabase")
     .from("account_imports")
@@ -313,7 +314,15 @@ accountsRoutes.get("/import/history", async (context) => {
     .range((page - 1) * pageSize, page * pageSize - 1);
   if (error) throw error;
   return context.json({
-    data: { imports: data, page, pageSize, total: count ?? 0 },
+    data: {
+      imports: data,
+      pagination: {
+        page,
+        pageSize,
+        total: count ?? 0,
+        totalPages: Math.max(1, Math.ceil((count ?? 0) / pageSize)),
+      },
+    },
   });
 });
 
@@ -761,13 +770,19 @@ function databaseError(context: AccountRouteContext, error: { code?: string; mes
       409,
     );
   }
-  throw error;
-}
-
-function parsePositiveInteger(value: string | undefined, defaultValue: number) {
-  if (value === undefined) return defaultValue;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
+  console.error("Account database operation failed", {
+    code: error.code ?? "UNKNOWN",
+    message: error.message,
+  });
+  return context.json(
+    {
+      error: {
+        code: "ACCOUNT_DATABASE_ERROR",
+        message: "The account could not be saved. Please try again later.",
+      },
+    },
+    500,
+  );
 }
 
 function hasControlCharacters(value: string) {

@@ -4,6 +4,17 @@ export const apiBaseUrl =
   import.meta.env.VITE_API_BASE_URL ??
   (import.meta.env.DEV ? "" : "https://ipo-mania-api.vanshadiyora.workers.dev");
 
+let developmentRequestCount = 0;
+
+function recordDevelopmentRequest(path: string, method: string) {
+  if (!import.meta.env.DEV || import.meta.env.VITE_LOG_API_REQUESTS !== "true") return;
+  const route = path
+    .split("?", 1)[0]!
+    .replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi, ":id")
+    .replace(/\/\d+(?=\/|$)/g, "/:id");
+  console.debug("[IPO Mania API]", ++developmentRequestCount, method, route);
+}
+
 type ApiErrorResponse = {
   error?: {
     code?: string;
@@ -57,6 +68,7 @@ export async function apiRequest<T>(
 ): Promise<T> {
   let response: Response;
   try {
+    recordDevelopmentRequest(path, init.method ?? "GET");
     response = await fetch(`${apiBaseUrl}${path}`, {
       ...init,
       headers: {
@@ -67,7 +79,8 @@ export async function apiRequest<T>(
         ...init.headers,
       },
     });
-  } catch {
+  } catch (error) {
+    if (init.signal?.aborted) throw error;
     throw new ApiRequestError(fallbackMessage(0), 0);
   }
 
@@ -87,6 +100,7 @@ export async function apiRequest<T>(
 export async function downloadApiFile(path: string, session: Session): Promise<void> {
   let response: Response;
   try {
+    recordDevelopmentRequest(path, "GET");
     response = await fetch(`${apiBaseUrl}${path}`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     });

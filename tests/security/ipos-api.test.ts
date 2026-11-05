@@ -108,6 +108,11 @@ function installSupabaseMock(
           headers: { "Content-Type": "application/json" },
         });
       }
+      if (new URL(request.url).pathname.endsWith("/rpc/get_ipo_catalog_status_counts")) {
+        return new Response(JSON.stringify({ upcoming: 1, open: 0, closed: 0, listed: 0 }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       requests.push(request.clone());
       return handleRest(request);
     }),
@@ -348,6 +353,111 @@ describe("IPO management API", () => {
     );
     expect(denied.status).toBe(403);
     expect(nonAdminRequests).toHaveLength(0);
+  });
+
+  it("validates and bounds the admin catalog page in the caller's RLS context", async () => {
+    const adminUser = { ...user, email: "admin@gmail.com" };
+    const requests = installSupabaseMock((request) => {
+      const path = new URL(request.url).pathname;
+      if (path.endsWith("/profiles"))
+        return new Response(JSON.stringify({ role: "ADMIN" }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      if (path.endsWith("/ipo_catalog"))
+        return new Response(JSON.stringify([catalogRow]), {
+          headers: { "Content-Type": "application/json", "Content-Range": "20-20/21" },
+        });
+      throw new Error(`Unexpected request: ${path}`);
+    }, adminUser);
+    const response = await createApp().request(
+      "/api/admin/ipos/catalog?page=2&page_size=10&status=upcoming&search=Catalog",
+      { headers: authHeaders() },
+      bindings,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      pagination: { page: 2, page_size: 10, total: 21, total_pages: 3 },
+    });
+    const catalogRequest = requests.find((request) =>
+      new URL(request.url).pathname.endsWith("/ipo_catalog"),
+    );
+    expect(new URL(catalogRequest!.url).searchParams.get("offset")).toBe("10");
+    expect(new URL(catalogRequest!.url).searchParams.get("limit")).toBe("10");
+    expect(catalogRequest?.headers.get("authorization")).toBe(authHeaders().Authorization);
+    expect(new URL(catalogRequest!.url).searchParams.get("ipo_status")).toBe("eq.upcoming");
+
+    const invalid = await createApp().request(
+      "/api/admin/ipos/catalog?page=0&page_size=1000",
+      { headers: authHeaders() },
+      bindings,
+    );
+    expect(invalid.status).toBe(400);
+    expect((await invalid.json()).error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("pages administrator sync history with validated search", async () => {
+    const adminUser = { ...user, email: "admin@gmail.com" };
+    const requests = installSupabaseMock((request) => {
+      const path = new URL(request.url).pathname;
+      if (path.endsWith("/profiles"))
+        return new Response(JSON.stringify({ role: "ADMIN" }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      if (path.endsWith("/ipo_sync_logs"))
+        return new Response(JSON.stringify([]), {
+          headers: { "Content-Type": "application/json", "Content-Range": "0-0/0" },
+        });
+      throw new Error(`Unexpected request: ${path}`);
+    }, adminUser);
+    const response = await createApp().request(
+      "/api/admin/ipos/sync/history?page=2&page_size=10&search=manual",
+      { headers: authHeaders() },
+      bindings,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      pagination: { page: 2, page_size: 10, total: 0, total_pages: 1 },
+    });
+    const historyRequest = requests.find((request) =>
+      new URL(request.url).pathname.endsWith("/ipo_sync_logs"),
+    );
+    expect(new URL(historyRequest!.url).searchParams.get("offset")).toBe("10");
+    expect(new URL(historyRequest!.url).searchParams.get("limit")).toBe("10");
+    expect(new URL(historyRequest!.url).searchParams.get("or")).toContain("manual");
+    const invalid = await createApp().request(
+      "/api/admin/ipos/sync/history?page_size=200",
+      { headers: authHeaders() },
+      bindings,
+    );
+    expect(invalid.status).toBe(400);
+  });
+
+  it("aggregates administrator overview counts in the database", async () => {
+    const adminUser = { ...user, email: "admin@gmail.com" };
+    const requests = installSupabaseMock((request) => {
+      const path = new URL(request.url).pathname;
+      if (path.endsWith("/profiles"))
+        return new Response(JSON.stringify({ role: "ADMIN" }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      if (path.endsWith("/ipo_sync_logs"))
+        return new Response(JSON.stringify([]), {
+          headers: { "Content-Type": "application/json" },
+        });
+      throw new Error(`Unexpected request: ${path}`);
+    }, adminUser);
+    const response = await createApp().request(
+      "/api/admin/ipos/overview",
+      { headers: authHeaders() },
+      bindings,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { counts: { total: 1, upcoming: 1, open: 0, closed: 0, listed: 0 } },
+    });
+    expect(requests.some((request) => new URL(request.url).pathname.endsWith("/ipo_catalog"))).toBe(
+      false,
+    );
   });
 
   it("copies shared IPO data and latest category rules into the user's IPO record", async () => {

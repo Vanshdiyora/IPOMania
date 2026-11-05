@@ -2,7 +2,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { profileUpdateSchema } from "@ipo-mania/validation";
-import type { z } from "@ipo-mania/validation";
 import { AlertTriangle, ShieldAlert, Trash2 } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../components/ui/Button";
@@ -10,26 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../co
 import { FormField, Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
 import { useToast } from "../components/ui/ToastContext";
-import { ApiRequestError, apiRequest } from "../lib/api";
+import { ApiRequestError } from "../lib/api";
 import { SkeletonFormFields } from "../components/ui/Skeleton";
-
-type Profile = {
-  id: string;
-  full_name: string | null;
-  created_at: string;
-  updated_at: string;
-};
-type ProfileResponse = { data: Profile | null };
-type ProfileValues = z.infer<typeof profileUpdateSchema>;
+import {
+  useDeleteProfileMutation,
+  useProfileQuery,
+  useUpdateProfileMutation,
+} from "../queries/profile";
+import type { ProfileValues } from "../services/profile";
 
 export function ProfilePage() {
   const { session, user, markSessionExpired, signOut } = useAuth();
   const { notify } = useToast();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [loadAttempt, setLoadAttempt] = useState(0);
-  const [deleting, setDeleting] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
   const {
     register,
@@ -38,63 +29,36 @@ export function ProfilePage() {
     formState: { errors, isSubmitting },
   } = useForm<ProfileValues>({ resolver: zodResolver(profileUpdateSchema) });
 
+  const profileQuery = useProfileQuery(session);
+  const profile = profileQuery.data?.data;
   useEffect(() => {
-    if (!session) {
-      setProfileLoading(false);
-      return;
+    if (profileQuery.error instanceof ApiRequestError && profileQuery.error.status === 401) {
+      markSessionExpired();
     }
-    let active = true;
-    setProfileLoading(true);
-    setErrorMessage("");
-    void apiRequest<ProfileResponse>("/api/me/profile", session)
-      .then(({ data }) => {
-        if (!active) return;
-        setProfile(data);
-        reset({ full_name: data?.full_name ?? "" });
-      })
-      .catch((error: unknown) => {
-        if (!active) return;
-        if (error instanceof ApiRequestError && error.status === 401) {
-          markSessionExpired();
-        } else {
-          setErrorMessage("We could not load your profile. Please try again.");
-        }
-      })
-      .finally(() => {
-        if (active) setProfileLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [session, reset, markSessionExpired, loadAttempt]);
-
-  async function save(values: ProfileValues) {
-    if (!session) return;
-    try {
-      const { data } = await apiRequest<ProfileResponse>("/api/me/profile", session, {
-        method: "PATCH",
-        body: JSON.stringify(values),
-      });
-      setProfile(data);
-      notify({ title: "Profile updated", tone: "success" });
-    } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 401) {
-        markSessionExpired();
-      } else {
-        notify({
-          title: "Profile could not be saved",
-          description: "Please try again.",
-          tone: "error",
-        });
-      }
-    }
-  }
+  }, [markSessionExpired, profileQuery.error]);
+  useEffect(() => {
+    if (profileQuery.isSuccess) reset({ full_name: profile?.full_name ?? "" });
+  }, [profileQuery.isSuccess, profile, reset]);
+  const saveMutation = useUpdateProfileMutation(session);
+  const deleteMutation = useDeleteProfileMutation(session);
+  const save = (values: ProfileValues) =>
+    saveMutation.mutate(values, {
+      onSuccess: () => notify({ title: "Profile updated", tone: "success" }),
+      onError: (error) => {
+        if (error instanceof ApiRequestError && error.status === 401) markSessionExpired();
+        else
+          notify({
+            title: "Profile could not be saved",
+            description: "Please try again.",
+            tone: "error",
+          });
+      },
+    });
 
   async function deleteAccount() {
     if (!session) return;
-    setDeleting(true);
     try {
-      await apiRequest("/api/auth/account", session, { method: "DELETE" });
+      await deleteMutation.mutateAsync();
       notify({ title: "Account deleted", tone: "success" });
       await signOut("local");
     } catch {
@@ -103,8 +67,6 @@ export function ProfilePage() {
         description: "Please try again or contact support.",
         tone: "error",
       });
-    } finally {
-      setDeleting(false);
     }
   }
 
@@ -147,7 +109,7 @@ export function ProfilePage() {
             )}
           </div>
 
-          {profileLoading ? (
+          {profileQuery.isPending ? (
             <div role="status" aria-label="Loading profile" aria-busy="true">
               <span className="sr-only">Loading profile…</span>
               <SkeletonFormFields fields={1} />
@@ -164,8 +126,12 @@ export function ProfilePage() {
                 />
               </FormField>
 
-              <Button type="submit" loading={isSubmitting} className="shadow-xs">
-                {isSubmitting ? "Saving changes…" : "Save changes"}
+              <Button
+                type="submit"
+                loading={isSubmitting || saveMutation.isPending}
+                className="shadow-xs"
+              >
+                {isSubmitting || saveMutation.isPending ? "Saving changes…" : "Save changes"}
               </Button>
             </form>
           )}
@@ -205,26 +171,28 @@ export function ProfilePage() {
           <Button
             type="button"
             variant="danger"
-            disabled={!confirmDeletion || deleting}
+            disabled={!confirmDeletion || deleteMutation.isPending}
             onClick={() => void deleteAccount()}
             className="gap-2"
           >
             <Trash2 size={16} />
-            <span>{deleting ? "Deleting account…" : "Delete my account permanently"}</span>
+            <span>
+              {deleteMutation.isPending ? "Deleting account…" : "Delete my account permanently"}
+            </span>
           </Button>
         </CardContent>
       </Card>
 
-      {errorMessage && (
+      {profileQuery.isError && (
         <div className="space-y-3">
           <div
             className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm font-medium text-danger"
             role="alert"
           >
             <AlertTriangle size={16} />
-            <span>{errorMessage}</span>
+            <span>We could not load your profile. Please try again.</span>
           </div>
-          <Button variant="outline" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>
+          <Button variant="outline" onClick={() => void profileQuery.refetch()}>
             Retry profile
           </Button>
         </div>

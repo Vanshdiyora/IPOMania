@@ -15,7 +15,22 @@ vi.mock("../../apps/web/src/auth/useAuth", () => ({
   useAuth: () => ({ session: { access_token: "regular-user-token" } }),
 }));
 vi.mock("../../apps/web/src/components/ui/FormDrawer", () => ({
-  RouteFormDrawer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  RouteFormDrawer: ({
+    children,
+    disabled,
+    submitLabel,
+  }: {
+    children: React.ReactNode;
+    disabled?: boolean;
+    submitLabel: string;
+  }) => (
+    <div>
+      <button type="button" disabled={disabled}>
+        {submitLabel}
+      </button>
+      {children}
+    </div>
+  ),
   DrawerRouteLink: ({ children, to }: { children: React.ReactNode; to: string }) => (
     <a href={to}>{children}</a>
   ),
@@ -100,6 +115,192 @@ describe("application form IPO selection", () => {
     await waitFor(() => expect(categorySelect).not.toBeDisabled());
     fireEvent.click(categorySelect);
     expect(await screen.findByRole("option", { name: "Retail" })).toBeInTheDocument();
+  });
+
+  it("shows a preselected catalog-imported IPO in the issue selector", async () => {
+    const ipoId = "99999999-9999-4999-8999-999999999999";
+    const catalogIpoId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      }
+      if (path.startsWith("/api/ipos?")) {
+        return {
+          data: {
+            ipos: [
+              {
+                id: ipoId,
+                source_catalog_id: catalogIpoId,
+                company_name: "Preselected Imported IPO",
+                status: "OPEN",
+                issue_price_max: "66",
+              },
+            ],
+            pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+          },
+        };
+      }
+      if (path === `/api/ipos/${ipoId}`) {
+        return {
+          data: {
+            id: ipoId,
+            source_catalog_id: catalogIpoId,
+            company_name: "Preselected Imported IPO",
+            issue_price_max: "66",
+          },
+        };
+      }
+      if (path.startsWith("/api/accounts?")) {
+        return {
+          data: {
+            accounts: [
+              {
+                id: "demat-account",
+                holder_name: "IPO Test Holder",
+                bank_name: "Test Bank",
+                username: "test-user",
+                account_status: "active",
+                archived_at: null,
+              },
+            ],
+            pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
+          },
+        };
+      }
+      if (path.startsWith("/api/applications?")) {
+        return {
+          data: {
+            applications: [],
+            pagination: { page: 1, page_size: 100, total: 0, total_pages: 1 },
+          },
+        };
+      }
+      if (path === `/api/ipos/${ipoId}/categories`) {
+        return { data: { configurations: [] } };
+      }
+      throw new Error("Unexpected request: " + path);
+    });
+
+    renderForm(`/applications/new?ipo_id=${ipoId}&demat_account_id=demat-account`);
+
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "IPO" })).toHaveTextContent(
+        "Preselected Imported IPO",
+      ),
+    );
+    expect(screen.getByRole("combobox", { name: "Demat account" })).toHaveTextContent(
+      "IPO Test Holder",
+    );
+    expect(screen.getByRole("textbox", { name: /Price/ })).toHaveValue("66");
+  });
+
+  it("allows saving an application when the same IPO is active on another account", async () => {
+    const ipoId = "99999999-9999-4999-8999-999999999999";
+    apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos/catalog?")) {
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      }
+      if (path.startsWith("/api/ipos?")) {
+        return {
+          data: {
+            ipos: [
+              {
+                id: ipoId,
+                company_name: "Archived Application IPO",
+                status: "OPEN",
+                issue_price_max: "66",
+                lot_size: 2000,
+              },
+            ],
+            pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+          },
+        };
+      }
+      if (path === `/api/ipos/${ipoId}`) {
+        return {
+          data: {
+            id: ipoId,
+            company_name: "Archived Application IPO",
+            issue_price_max: "66",
+            lot_size: 2000,
+          },
+        };
+      }
+      if (path.startsWith("/api/accounts?")) {
+        return {
+          data: {
+            accounts: [
+              {
+                id: "demat-account",
+                holder_name: "IPO Test Holder",
+                bank_name: "Test Bank",
+                username: "test-user",
+                account_status: "active",
+                archived_at: null,
+              },
+              {
+                id: "another-demat-account",
+                holder_name: "Other IPO Test Holder",
+                bank_name: "Other Test Bank",
+                username: "other-test-user",
+                account_status: "active",
+                archived_at: null,
+              },
+            ],
+            pagination: { page: 1, pageSize: 100, total: 2, totalPages: 1 },
+          },
+        };
+      }
+      if (path.startsWith("/api/applications?")) {
+        return {
+          data: {
+            applications: [
+              {
+                id: "other-account-application",
+                ipo_id: ipoId,
+                demat_account_id: "another-demat-account",
+                archived_at: null,
+                application_status: "DRAFT",
+              },
+            ],
+            pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 },
+          },
+        };
+      }
+      if (path === `/api/ipos/${ipoId}/categories`) return { data: { configurations: [] } };
+      throw new Error("Unexpected request: " + path);
+    });
+
+    const { container } = renderForm(
+      `/applications/new?ipo_id=${ipoId}&demat_account_id=demat-account`,
+    );
+
+    const categorySelect = await screen.findByRole("combobox", { name: "Investor category" });
+    await waitFor(() => expect(categorySelect).toBeEnabled());
+    const nativeCategorySelect = container.querySelector("select");
+    if (!nativeCategorySelect) throw new Error("The category selector was not rendered.");
+    fireEvent.change(nativeCategorySelect, { target: { value: "RETAIL" } });
+
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Demat account" })).toHaveTextContent(
+        "IPO Test Holder",
+      ),
+    );
+    expect(categorySelect).toHaveTextContent("Retail");
+    expect(screen.getByRole("spinbutton", { name: "Lots" })).toHaveValue(1);
+    expect(screen.getByRole("textbox", { name: /Price/ })).toHaveValue("66");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Save application" })).toBeEnabled(),
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Demat account" }));
+    fireEvent.click(await screen.findByRole("option", { name: /Other IPO Test Holder/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Save application" })).toBeDisabled(),
+    );
+    expect(
+      screen.getByText(/An active application already exists for this IPO and demat account/),
+    ).toBeInTheDocument();
   });
 
   it("explains how to add an IPO to the catalog when no options are returned", async () => {
@@ -198,6 +399,7 @@ describe("application form IPO selection", () => {
       expect(apiRequestMock).toHaveBeenCalledWith(
         `/api/ipos/catalog/${catalogIpoId}/categories`,
         expect.anything(),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
       ),
     );
     expect(screen.getByRole("textbox", { name: /Price/ })).toHaveValue("110");

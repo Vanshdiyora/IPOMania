@@ -1,8 +1,9 @@
+import { userQueryKey } from "../../lib/queryKeys";
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useModalLayer } from "../../components/ui/useModalLayer";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminIpoSchema } from "@ipo-mania/validation";
 import { isAdminEmail } from "@ipo-mania/shared";
 import { Link, Navigate, Outlet, useLocation, useSearchParams } from "react-router-dom";
@@ -21,7 +22,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../auth/useAuth";
 import { apiRequest } from "../../lib/api";
-import { supabase } from "../../lib/supabase";
+import { getAdminRole } from "../../services/admin";
+import { queryKeys } from "../../lib/queryKeys";
 import { ConfirmButton } from "../../components/ui/ConfirmButton";
 import { Button } from "../../components/ui/Button";
 import { ConfirmationDialog } from "../../components/ui/ConfirmationDialog";
@@ -30,6 +32,7 @@ import { SearchInput, Select } from "../../components/ui/Input";
 import { FormDrawer } from "../../components/ui/FormDrawer";
 import { FormInput, FormSelect } from "../../components/ui/FormControls";
 import { Pagination } from "../../components/ui/Pagination";
+import { defaultPageSize, parsePageSize } from "../../lib/pagination";
 import { PageHeader, StatCard } from "../../components/ui/PageHeader";
 import { DataTable } from "../../components/ui/DataTable";
 import { StatusBadge } from "../../components/ui/Badge";
@@ -50,31 +53,17 @@ const nav = [
 
 export function AdminRoute({ children }: { children: ReactNode }) {
   const { user, loading, session } = useAuth();
-  const [admin, setAdmin] = useState<boolean | null>(null);
-  useEffect(() => {
-    if (!user || !supabase) {
-      setAdmin(false);
-      return;
-    }
-    let active = true;
-    setAdmin(null);
-    void supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (active) setAdmin(isAdminEmail(user.email) && data?.role === "ADMIN");
-      });
-    return () => {
-      active = false;
-    };
-  }, [user]);
-  if (loading || (admin === null && user)) {
+  const adminQuery = useQuery({
+    queryKey: userQueryKey(user?.id, ["admin", "role"]),
+    enabled: Boolean(user && session && isAdminEmail(user.email)),
+    queryFn: ({ signal }) => getAdminRole(user!.id, signal),
+    staleTime: 5 * 60_000,
+  });
+  if (loading || (adminQuery.isPending && user && isAdminEmail(user.email))) {
     return <LoadingState label="Checking administrator access" fullPage />;
   }
   if (!user || !session) return <Navigate to="/login" replace />;
-  if (!admin)
+  if (!isAdminEmail(user.email) || !adminQuery.data || adminQuery.isError)
     return (
       <main className="grid min-h-screen place-items-center bg-slate-50 p-6">
         <section className="rounded-xl border bg-white p-8 text-center">
@@ -202,40 +191,34 @@ function Card({ children }: { children: ReactNode }) {
 export function AdminOverviewPage() {
   const { session } = useAuth();
   const { notify } = useToast();
-  const [overview, setOverview] = useState<any>(null);
-  const [status, setStatus] = useState<any>(null);
-  const [syncing, setSyncing] = useState(false);
+  const queryClient = useQueryClient();
+  const syncMutation = useMutation({
+    mutationFn: () => apiRequest<any>("/api/admin/ipos/sync", session!, { method: "POST" }),
+  });
+  const syncing = syncMutation.isPending;
   const [message, setMessage] = useState("");
-  const [loadError, setLoadError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
+  const overviewQuery = useQuery({
+    queryKey: queryKeys.admin.overview(session?.user?.id),
+    enabled: Boolean(session),
+    queryFn: ({ signal }) => apiRequest<any>("/api/admin/ipos/overview", session!, { signal }),
+  });
+  const statusQuery = useQuery({
+    queryKey: queryKeys.admin.status(session?.user?.id),
+    enabled: Boolean(session),
+    queryFn: ({ signal }) => apiRequest<any>("/api/admin/ipos/sync/status", session!, { signal }),
+  });
+  const overview = overviewQuery.data?.data;
+  const status = statusQuery.data?.data;
+  const loadError = overviewQuery.error ?? statusQuery.error;
+  const loading = overviewQuery.isPending || statusQuery.isPending;
   const load = async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      if (!session) return;
-      const [a, b] = await Promise.all([
-        apiRequest<any>("/api/admin/ipos/overview", session),
-        apiRequest<any>("/api/admin/ipos/sync/status", session),
-      ]);
-      setOverview(a.data);
-      setStatus(b.data);
-    } catch (error) {
-      setLoadError(
-        error instanceof Error ? error : new Error("Unable to load administration data."),
-      );
-    } finally {
-      setLoading(false);
-    }
+    await Promise.all([overviewQuery.refetch(), statusQuery.refetch()]);
   };
-  useEffect(() => {
-    void load();
-  }, [session]);
   const sync = async () => {
     if (!session || syncing) return;
-    setSyncing(true);
     setMessage("Fetching provider data and saving records…");
     try {
-      const result = await apiRequest<any>("/api/admin/ipos/sync", session, { method: "POST" });
+      const result = await syncMutation.mutateAsync();
       setMessage("");
       notify({
         title: "IPO synchronization complete",
@@ -243,6 +226,12 @@ export function AdminOverviewPage() {
         tone: "success",
       });
       await load();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "sync-history"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] }),
+        queryClient.invalidateQueries({ queryKey: ["ipos"] }),
+        queryClient.invalidateQueries({ queryKey: ["ipo-catalog"] }),
+      ]);
     } catch (error) {
       setMessage("");
       notify({
@@ -250,8 +239,6 @@ export function AdminOverviewPage() {
         description: error instanceof Error ? error.message : "Please try again.",
         tone: "error",
       });
-    } finally {
-      setSyncing(false);
     }
   };
   const counts = overview?.counts ?? {};
@@ -386,9 +373,15 @@ export function AdminIposPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [draftStatus, setDraftStatus] = useState("");
   const search = listParams.get("search") ?? "";
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   const statusFilter = listParams.get("status") ?? "";
   const pageValue = Number(listParams.get("page"));
   const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const pageSize = parsePageSize(listParams.get("page_size"));
   const updateFilter = (key: string, value: string) => {
     setListParams(
       (previous) => {
@@ -428,49 +421,59 @@ export function AdminIposPage() {
     lot_size: "",
     issue_size: "",
   };
-  const [rows, setRows] = useState<any[]>([]);
+  const queryClient = useQueryClient();
+  const catalogParams = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  if (debouncedSearch) catalogParams.set("search", debouncedSearch);
+  if (statusFilter) catalogParams.set("status", statusFilter);
+  const catalogQueryString = catalogParams.toString();
+  const catalogQuery = useQuery({
+    queryKey: userQueryKey(session?.user?.id, ["admin", "catalog", catalogQueryString]),
+    enabled: Boolean(session),
+    queryFn: ({ signal }) =>
+      apiRequest<{
+        data: any[];
+        pagination?: { page: number; page_size: number; total: number; total_pages: number };
+      }>(`/api/admin/ipos/catalog?${catalogQueryString}`, session!, { signal }),
+  });
+  const rows = catalogQuery.data?.data ?? [];
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [initialForm, setInitialForm] = useState(emptyForm);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const loading = catalogQuery.isPending;
+  const saveMutation = useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string | null;
+      data: ReturnType<typeof adminIpoSchema.parse>;
+    }) =>
+      apiRequest(id ? `/api/admin/ipos/catalog/${id}` : "/api/admin/ipos/catalog", session!, {
+        method: id ? "PATCH" : "POST",
+        body: JSON.stringify(data),
+      }),
+  });
+  const saving = saveMutation.isPending;
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saveError, setSaveError] = useState("");
-  const [loadError, setLoadError] = useState("");
-  const pageSize = 20;
+  const loadError = catalogQuery.error?.message ?? "";
   const [archiveId, setArchiveId] = useState<string | null>(null);
-  const [archiving, setArchiving] = useState(false);
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest(`/api/admin/ipos/catalog/${id}`, session!, { method: "DELETE" }),
+  });
+  const archiving = archiveMutation.isPending;
   const load = async () => {
-    if (!session) return;
-    setLoading(true);
-    setLoadError("");
-    try {
-      const result = await apiRequest<any>("/api/admin/ipos/catalog", session);
-      setRows(result.data ?? []);
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Unable to load IPO catalog.");
-    } finally {
-      setLoading(false);
-    }
+    await catalogQuery.refetch();
   };
-  useEffect(() => {
-    void load();
-  }, [session]);
 
-  const filtered = useMemo(
-    () =>
-      rows.filter(
-        (row) =>
-          (!statusFilter || row.ipo_status === statusFilter) &&
-          (!search ||
-            `${row.company_name} ${row.symbol ?? ""}`.toLowerCase().includes(search.toLowerCase())),
-      ),
-    [rows, search, statusFilter],
-  );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const totalPages =
+    catalogQuery.data?.pagination?.total_pages ?? Math.max(page, Math.ceil(rows.length / pageSize));
   const visiblePage = Math.min(page, totalPages);
-  const visibleRows = filtered.slice((visiblePage - 1) * pageSize, visiblePage * pageSize);
+  const visibleRows = catalogQuery.data?.pagination
+    ? rows
+    : rows.slice((visiblePage - 1) * pageSize, visiblePage * pageSize);
   const openCreate = () => {
     setFieldErrors({});
     setSaveError("");
@@ -515,47 +518,41 @@ export function AdminIposPage() {
       return;
     }
     setFieldErrors({});
-    setSaving(true);
     try {
-      if (editingId) {
-        await apiRequest(`/api/admin/ipos/catalog/${editingId}`, session, {
-          method: "PATCH",
-          body: JSON.stringify(parsed.data),
-        });
-      } else {
-        await apiRequest("/api/admin/ipos/catalog", session, {
-          method: "POST",
-          body: JSON.stringify(parsed.data),
-        });
-      }
+      await saveMutation.mutateAsync({ id: editingId, data: parsed.data });
       setDrawerOpen(false);
       notify({ title: editingId ? "IPO updated" : "IPO created", tone: "success" });
-      await load();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "overview"] }),
+        queryClient.invalidateQueries({ queryKey: ["ipos", "catalog"] }),
+        queryClient.invalidateQueries({ queryKey: ["ipo-catalog"] }),
+      ]);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to save IPO. Please try again.";
       setSaveError(message);
       notify({ title: "Unable to save IPO", description: message, tone: "error" });
-    } finally {
-      setSaving(false);
     }
   };
   const archive = async () => {
     if (!session || !archiveId || archiving) return;
-    setArchiving(true);
     try {
-      await apiRequest(`/api/admin/ipos/catalog/${archiveId}`, session, { method: "DELETE" });
+      await archiveMutation.mutateAsync(archiveId);
       setArchiveId(null);
       notify({ title: "IPO archived", tone: "success" });
-      await load();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "overview"] }),
+        queryClient.invalidateQueries({ queryKey: ["ipos", "catalog"] }),
+        queryClient.invalidateQueries({ queryKey: ["ipo-catalog"] }),
+      ]);
     } catch (error) {
       notify({
         title: "Unable to archive IPO",
         description: error instanceof Error ? error.message : undefined,
         tone: "error",
       });
-    } finally {
-      setArchiving(false);
     }
   };
 
@@ -563,7 +560,7 @@ export function AdminIposPage() {
     <div className="space-y-5">
       <PageHeader
         title="IPO catalog"
-        description={`${filtered.length} records`}
+        description={`${catalogQuery.data?.pagination?.total ?? rows.length} records`}
         actions={<Button onClick={openCreate}>Add IPO</Button>}
       />
       <ListToolbar
@@ -674,7 +671,7 @@ export function AdminIposPage() {
                   </div>
                 </article>
               ))}
-              {!filtered.length && (
+              {!rows.length && (
                 <div className="p-8 text-center text-sm text-slate-500">No IPOs found.</div>
               )}
             </div>
@@ -748,7 +745,7 @@ export function AdminIposPage() {
                     </td>
                   </tr>
                 ))}
-                {!filtered.length && (
+                {!rows.length && (
                   <tr>
                     <td colSpan={6} className="p-8 text-center text-slate-500">
                       No IPOs found.
@@ -763,9 +760,21 @@ export function AdminIposPage() {
 
       <Pagination
         label="Catalog pagination"
-        page={visiblePage}
+        page={page}
         totalPages={totalPages}
-        total={filtered.length}
+        total={catalogQuery.data?.pagination?.total ?? rows.length}
+        pageSize={pageSize}
+        onPageSizeChange={(nextPageSize) => {
+          setListParams(
+            (previous) => {
+              const next = new URLSearchParams(previous);
+              next.set("page_size", String(nextPageSize));
+              next.delete("page");
+              return next;
+            },
+            { replace: true },
+          );
+        }}
         onPageChange={changePage}
       />
       <FormDrawer
@@ -927,20 +936,35 @@ type SyncRun = {
 export function AdminHistoryPage() {
   const { session } = useAuth();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   const [page, setPage] = useState(1);
-  const history = useQuery({
-    queryKey: ["admin", "sync-history"],
-    enabled: Boolean(session),
-    queryFn: () => apiRequest<{ data: SyncRun[] }>("/api/admin/ipos/sync/history", session!),
+  const [pageSize, setPageSize] = useState<number>(defaultPageSize);
+  const historyParams = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
   });
-  const rows = (history.data?.data ?? []).filter((row) =>
-    `${row.trigger_type} ${row.provider} ${row.status}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
-  );
-  const totalPages = Math.max(1, Math.ceil(rows.length / 20));
+  if (debouncedSearch) historyParams.set("search", debouncedSearch);
+  const historyQueryString = historyParams.toString();
+  const history = useQuery({
+    queryKey: userQueryKey(session?.user?.id, ["admin", "sync-history", historyQueryString]),
+    enabled: Boolean(session),
+    queryFn: ({ signal }) =>
+      apiRequest<{
+        data: SyncRun[];
+        pagination?: { page: number; page_size: number; total: number; total_pages: number };
+      }>(`/api/admin/ipos/sync/history?${historyQueryString}`, session!, { signal }),
+  });
+  const rows = history.data?.data ?? [];
+  const totalPages =
+    history.data?.pagination?.total_pages ?? Math.max(1, Math.ceil(rows.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const visibleRows = rows.slice((currentPage - 1) * 20, currentPage * 20);
+  const visibleRows = history.data?.pagination
+    ? rows
+    : rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const metrics = [
     ["records_fetched", "Fetched"],
     ["records_inserted", "Inserted"],
@@ -1060,15 +1084,22 @@ export function AdminHistoryPage() {
               </tbody>
             </DataTable>
           </div>
-          <Pagination
-            label="History pagination"
-            page={currentPage}
-            totalPages={totalPages}
-            total={rows.length}
-            onPageChange={setPage}
-          />
         </>
       )}
+      {!history.isLoading && history.data?.pagination ? (
+        <Pagination
+          label="History pagination"
+          page={page}
+          totalPages={totalPages}
+          total={history.data.pagination.total}
+          pageSize={pageSize}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setPage(1);
+          }}
+          onPageChange={setPage}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1076,34 +1107,30 @@ export function AdminHistoryPage() {
 export function AdminSyncPage() {
   const { session } = useAuth();
   const { notify } = useToast();
-  const [status, setStatus] = useState<any>(null);
+  const queryClient = useQueryClient();
+  const statusQuery = useQuery({
+    queryKey: queryKeys.admin.status(session?.user?.id),
+    enabled: Boolean(session),
+    queryFn: ({ signal }) => apiRequest<any>("/api/admin/ipos/sync/status", session!, { signal }),
+  });
+  const status = statusQuery.data?.data;
   const [message, setMessage] = useState("");
-  const [loadError, setLoadError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
+  const syncMutation = useMutation({
+    mutationFn: () => apiRequest<any>("/api/admin/ipos/sync", session!, { method: "POST" }),
+  });
+  const loadError = statusQuery.error;
+  const loading = statusQuery.isPending;
   const syncCoolingDown = Boolean(
     status?.nextAllowedAt && new Date(status.nextAllowedAt).getTime() > Date.now(),
   );
   const load = async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      if (session) setStatus((await apiRequest<any>("/api/admin/ipos/sync/status", session)).data);
-    } catch (error) {
-      setLoadError(
-        error instanceof Error ? error : new Error("Unable to load administration data."),
-      );
-    } finally {
-      setLoading(false);
-    }
+    await statusQuery.refetch();
   };
-  useEffect(() => {
-    void load();
-  }, [session]);
   const sync = async () => {
     if (!session) return;
     setMessage("Fetching IPO list and saving records…");
     try {
-      const r = await apiRequest<any>("/api/admin/ipos/sync", session, { method: "POST" });
+      const r = await syncMutation.mutateAsync();
       setMessage("");
       notify({
         title: "IPO synchronization complete",
@@ -1111,6 +1138,13 @@ export function AdminSyncPage() {
         tone: "success",
       });
       await load();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "overview"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "sync-history"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] }),
+        queryClient.invalidateQueries({ queryKey: ["ipos"] }),
+        queryClient.invalidateQueries({ queryKey: ["ipo-catalog"] }),
+      ]);
     } catch (e) {
       setMessage("");
       notify({
@@ -1149,6 +1183,7 @@ export function AdminSyncPage() {
           <ConfirmButton
             disabled={
               loading ||
+              syncMutation.isPending ||
               Boolean(loadError) ||
               status?.running ||
               !status?.providerConfigured ||
@@ -1198,16 +1233,20 @@ export function AdminSyncPage() {
 export function AdminSettingsPage() {
   const { session } = useAuth();
   const settings = useQuery({
-    queryKey: ["admin", "settings"],
+    queryKey: userQueryKey(session?.user?.id, ["admin", "settings"]),
     enabled: Boolean(session),
-    queryFn: () =>
-      apiRequest<{ data: { providerConfigured: boolean } }>("/api/admin/ipos/settings", session!),
+    queryFn: ({ signal }) =>
+      apiRequest<{ data: { providerConfigured: boolean } }>("/api/admin/ipos/settings", session!, {
+        signal,
+      }),
   });
   const status = useQuery({
-    queryKey: ["admin", "sync-status"],
+    queryKey: userQueryKey(session?.user?.id, ["admin", "sync-status"]),
     enabled: Boolean(session),
-    queryFn: () =>
-      apiRequest<{ data: { syncIntervalHours: number } }>("/api/admin/ipos/sync/status", session!),
+    queryFn: ({ signal }) =>
+      apiRequest<{ data: { syncIntervalHours: number } }>("/api/admin/ipos/sync/status", session!, {
+        signal,
+      }),
   });
   if (settings.isLoading || status.isLoading) return <SkeletonFormPage sections={2} />;
   if (settings.error || status.error)

@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import {
+  adminIpoCatalogListQuerySchema,
+  adminIpoSyncHistoryQuerySchema,
   adminIpoSchema as manualIpoSchema,
   ipoCategoryConfigurationSchema,
   z,
@@ -23,6 +25,13 @@ const normalizedRows = (payload: unknown): Record<string, unknown>[] => {
   return [];
 };
 
+const catalogCountsSchema = z.object({
+  upcoming: z.number().int().nonnegative(),
+  open: z.number().int().nonnegative(),
+  closed: z.number().int().nonnegative(),
+  listed: z.number().int().nonnegative(),
+});
+
 const first = (...values: unknown[]) =>
   values.find((value) => value !== undefined && value !== null && value !== "") ?? null;
 const text = (value: unknown) =>
@@ -38,6 +47,10 @@ const date = (value: unknown) => {
   const iso = /^\d{4}-\d{2}-\d{2}/.exec(parsed)?.[0];
   return iso ?? null;
 };
+
+function escapePostgrestLike(value: string) {
+  return value.replace(/[\\%_]/g, "\\$&").replace(/"/g, '\\"');
+}
 
 export function normalizeProviderIpo(row: Record<string, unknown>) {
   const companyName = first(row.company_name, row.companyName, row.company, row.name);
@@ -346,18 +359,20 @@ export function adminIpoRoutes() {
 
   app.get("/overview", async (context) => {
     const supabase = context.get("rlsSupabase") as SupabaseClient;
-    const { data: ipos } = await supabase
-      .from("ipo_catalog")
-      .select("ipo_status,issue_type,listing_date")
-      .is("archived_at", null);
-    const counts = (ipos ?? []).reduce<Record<string, number>>((result, row) => {
-      result.total = (result.total ?? 0) + 1;
-      result[row.ipo_status] = (result[row.ipo_status] ?? 0) + 1;
-      return result;
-    }, {});
+    const { data: countData, error: countError } = await supabase.rpc(
+      "get_ipo_catalog_status_counts",
+      { p_search: null, p_statuses: null },
+    );
+    if (countError) throw countError;
+    const parsedCounts = catalogCountsSchema.safeParse(countData);
+    if (!parsedCounts.success) throw new Error("The IPO catalog counts are invalid.");
+    const counts = {
+      ...parsedCounts.data,
+      total: Object.values(parsedCounts.data).reduce((total, count) => total + count, 0),
+    };
     const { data: logs } = await supabase
       .from("ipo_sync_logs")
-      .select("*")
+      .select("id,trigger_type,provider,status,started_at")
       .order("started_at", { ascending: false })
       .limit(10);
     return context.json({ data: { counts, recentSyncs: logs ?? [] } });
@@ -365,18 +380,51 @@ export function adminIpoRoutes() {
 
   app.get("/catalog", async (context) => {
     const supabase = context.get("rlsSupabase") as SupabaseClient;
-    const { data, error } = await supabase
+    const hasListParameters = ["page", "page_size", "search", "status"].some((name) =>
+      new URL(context.req.url).searchParams.has(name),
+    );
+    const parsed = adminIpoCatalogListQuerySchema.safeParse(context.req.query());
+    if (!parsed.success)
+      return context.json(
+        { error: { code: "VALIDATION_ERROR", message: "The catalog filters are invalid." } },
+        400,
+      );
+    const query = parsed.data;
+    let request = supabase
       .from("ipo_catalog")
-      .select("*")
+      .select(
+        "id,company_name,issue_type,ipo_status,data_source,symbol,exchange,isin,bidding_start_date,bidding_end_date,allotment_date,listing_date,price_band_min,price_band_max,issue_price,listing_price,lot_size,issue_size",
+        { count: "exact" },
+      )
       .is("archived_at", null)
       .order("updated_at", { ascending: false })
-      .limit(500);
+      .order("id", { ascending: true });
+    if (query.status) request = request.eq("ipo_status", query.status);
+    if (query.search) {
+      const term = escapePostgrestLike(query.search).replace(/\\/g, "\\\\");
+      request = request.or(`company_name.ilike."%${term}%",symbol.ilike."%${term}%"`);
+    }
+    const { data, error, count } = await (hasListParameters
+      ? request.range((query.page - 1) * query.page_size, query.page * query.page_size - 1)
+      : request.limit(500));
     if (error)
       return context.json(
         { error: { code: "DATABASE_ERROR", message: "IPO records could not be loaded." } },
         500,
       );
-    return context.json({ data: data ?? [] });
+    return context.json({
+      data: data ?? [],
+      ...(hasListParameters
+        ? {
+            pagination: {
+              page: query.page,
+              page_size: query.page_size,
+              total: count ?? 0,
+              total_pages: Math.max(1, Math.ceil((count ?? 0) / query.page_size)),
+            },
+          }
+        : {}),
+    });
   });
 
   app.get("/catalog/:id/categories", async (context) => {
@@ -523,14 +571,14 @@ export function adminIpoRoutes() {
     const supabase = context.get("rlsSupabase") as SupabaseClient;
     const { data: running } = await supabase
       .from("ipo_sync_logs")
-      .select("*")
+      .select("id,status,started_at")
       .eq("status", "running")
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     const { data: latest } = await supabase
       .from("ipo_sync_logs")
-      .select("*")
+      .select("id,status,started_at")
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -564,17 +612,51 @@ export function adminIpoRoutes() {
 
   app.get("/sync/history", async (context) => {
     const supabase = context.get("rlsSupabase") as SupabaseClient;
-    const { data, error } = await supabase
+    const hasListParameters = ["page", "page_size", "search"].some((name) =>
+      new URL(context.req.url).searchParams.has(name),
+    );
+    const parsed = adminIpoSyncHistoryQuerySchema.safeParse(context.req.query());
+    if (!parsed.success)
+      return context.json(
+        { error: { code: "VALIDATION_ERROR", message: "The history filters are invalid." } },
+        400,
+      );
+    const query = parsed.data;
+    let request = supabase
       .from("ipo_sync_logs")
-      .select("*")
+      .select(
+        "id,started_at,trigger_type,provider,status,records_fetched,records_inserted,records_updated,records_failed",
+        { count: "exact" },
+      )
       .order("started_at", { ascending: false })
-      .limit(100);
+      .order("id", { ascending: true });
+    if (query.search) {
+      const term = escapePostgrestLike(query.search).replace(/\\/g, "\\\\");
+      request = request.or(
+        `trigger_type.ilike."%${term}%",provider.ilike."%${term}%",status.ilike."%${term}%"`,
+      );
+    }
+    const { data, error, count } = await (hasListParameters
+      ? request.range((query.page - 1) * query.page_size, query.page * query.page_size - 1)
+      : request.limit(100));
     if (error)
       return context.json(
         { error: { code: "DATABASE_ERROR", message: "Sync history could not be loaded." } },
         500,
       );
-    return context.json({ data: data ?? [] });
+    return context.json({
+      data: data ?? [],
+      ...(hasListParameters
+        ? {
+            pagination: {
+              page: query.page,
+              page_size: query.page_size,
+              total: count ?? 0,
+              total_pages: Math.max(1, Math.ceil((count ?? 0) / query.page_size)),
+            },
+          }
+        : {}),
+    });
   });
 
   app.post("/sync", async (context) => {

@@ -57,9 +57,12 @@ values. Applications created from a saved quota calculation keep their terms loc
 `409 APPLICATION_TERMS_LOCKED`. Supplied number, reference, submission date, statuses, and notes
 are applied as before.
 
-Bulk creation validates every row before one insert. If any row is invalid, it returns an
-account-specific `422 BULK_VALIDATION_FAILED` report and inserts nothing. Duplicate detection is
-non-blocking except for the unique stable external reference constraint.
+Each demat account can have one active application per IPO; archived records remain available as
+history, and separate accounts may each have an application for the same IPO. Bulk creation
+validates every row before one insert. If any row is invalid, it returns an account-specific
+`422 BULK_VALIDATION_FAILED` report and inserts nothing. Duplicate detection is non-blocking except
+for an active application for the same IPO and demat account or the unique stable external
+reference constraint.
 
 ## Statuses and errors
 
@@ -68,5 +71,6 @@ Application, mandate, and allotment statuses are distinct columns. Imported rows
 not disclosed.
 
 Common errors include `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `APPLICATION_NOT_FOUND` /
-`IMPORT_NOT_FOUND` (404), `DUPLICATE_EXTERNAL_REFERENCE` (409),
+`IMPORT_NOT_FOUND` (404), `DUPLICATE_EXTERNAL_REFERENCE` /
+`DUPLICATE_IPO_APPLICATION` (409),
 `IMPORT_REVERSAL_BLOCKED` (409), `BULK_VALIDATION_FAILED` (422), and `EXPORT_TOO_LARGE` (413).

@@ -23,6 +23,7 @@ type IpoContext = {
   Variables: { authenticatedUser: User; rlsSupabase: SupabaseClient };
 };
 type IpoRouteContext = Context<IpoContext>;
+type CatalogStatusCounts = Record<"upcoming" | "open" | "closed" | "listed", number>;
 
 const ipoColumns =
   "id, company_name, symbol, ipo_type, exchange, issue_price_min, issue_price_max, cut_off_price, lot_size, issue_size, opening_date, closing_date, allotment_date, listing_date, status, data_source, source_reference, last_verified_at, source_catalog_id, created_at, updated_at, archived_at";
@@ -140,6 +141,7 @@ iposRoutes.get("/catalog", async (context) => {
   const parsed = ipoCatalogListQuerySchema.safeParse(queryWithStatuses(context));
   if (!parsed.success) return validationError(context);
   const query = parsed.data;
+  const supabase = context.get("rlsSupabase");
   const sortColumn =
     query.sort === "opening_asc" || query.sort.startsWith("date_")
       ? "bidding_start_date"
@@ -147,8 +149,7 @@ iposRoutes.get("/catalog", async (context) => {
         ? "price_band_min"
         : "company_name";
   const sortAscending = query.sort.endsWith("_asc");
-  let request = context
-    .get("rlsSupabase")
+  let request = supabase
     .from("ipo_catalog")
     .select(catalogColumns, { count: "exact" })
     .is("archived_at", null)
@@ -173,16 +174,25 @@ iposRoutes.get("/catalog", async (context) => {
     const term = escapeLike(query.search).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     request = request.or(`company_name.ilike."%${term}%",symbol.ilike."${term}"`);
   }
-  const { data, error, count } = await request.range(
-    (query.page - 1) * query.page_size,
-    query.page * query.page_size - 1,
-  );
+  const [listResult, countsResult] = await Promise.all([
+    request.range((query.page - 1) * query.page_size, query.page * query.page_size - 1),
+    supabase.rpc("get_ipo_catalog_status_counts", {
+      p_search: query.search ?? null,
+      p_statuses: selectedStatuses.length
+        ? selectedStatuses.map((status) => status.toLowerCase())
+        : null,
+    }),
+  ]);
+  const { data, error, count } = listResult;
   if (error) throw error;
+  if (countsResult.error) throw countsResult.error;
+  const statusCounts = parseCatalogStatusCounts(countsResult.data);
   const catalogRows = (data ?? []).map(catalogRecord);
   if (catalogRows.length === 0) {
     return context.json({
       data: {
         ipos: [],
+        status_counts: statusCounts,
         pagination: {
           page: query.page,
           page_size: query.page_size,
@@ -238,6 +248,7 @@ iposRoutes.get("/catalog", async (context) => {
         alreadyApplied: sourceCatalogIds.has(ipo.id),
         applicationStatus: statusByCatalogId.get(ipo.id) ?? null,
       })),
+      status_counts: statusCounts,
       pagination: {
         page: query.page,
         page_size: query.page_size,
@@ -247,6 +258,25 @@ iposRoutes.get("/catalog", async (context) => {
     },
   });
 });
+
+function parseCatalogStatusCounts(value: unknown): CatalogStatusCounts {
+  if (!value || typeof value !== "object") {
+    throw new Error("The IPO catalog status aggregation returned an invalid response.");
+  }
+  const counts = value as Record<string, unknown>;
+  const statuses = ["upcoming", "open", "closed", "listed"] as const;
+  if (
+    !statuses.every((status) => Number.isSafeInteger(counts[status]) && Number(counts[status]) >= 0)
+  ) {
+    throw new Error("The IPO catalog status aggregation returned invalid counts.");
+  }
+  return {
+    upcoming: Number(counts.upcoming),
+    open: Number(counts.open),
+    closed: Number(counts.closed),
+    listed: Number(counts.listed),
+  };
+}
 
 iposRoutes.get("/catalog/:ipoId", async (context) => {
   const parsed = z.uuid().safeParse(context.req.param("ipoId"));

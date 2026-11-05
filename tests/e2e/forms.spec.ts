@@ -123,7 +123,7 @@ async function prepare(page: Page, admin = false) {
   await page.route(`**/api/ipos/${recordId}/categories`, (route) =>
     route.fulfill({ json: { data: { configurations: [] } } }),
   );
-  await page.route("**/api/admin/ipos/catalog", (route) =>
+  await page.route("**/api/admin/ipos/catalog?**", (route) =>
     route.fulfill({
       json: {
         data: [
@@ -159,25 +159,29 @@ async function prepare(page: Page, admin = false) {
   await page.route("**/api/admin/ipos/overview", (route) =>
     route.fulfill({ json: { data: { counts: { total: 1, upcoming: 1 }, recentSyncs: [] } } }),
   );
-  await page.route("**/api/admin/ipos/sync/history", (route) =>
-    route.fulfill({
+  await page.route("**/api/admin/ipos/sync/history?**", (route) => {
+    const search = new URL(route.request().url()).searchParams.get("search") ?? "";
+    return route.fulfill({
       json: {
-        data: [
-          {
-            id: recordId,
-            started_at: "2026-11-01T10:00:00Z",
-            trigger_type: "manual",
-            provider: "IPO_GURU",
-            status: "COMPLETED",
-            records_fetched: 1,
-            records_inserted: 1,
-            records_updated: 0,
-            records_failed: 0,
-          },
-        ],
+        data:
+          search && !"manual IPO_GURU COMPLETED".toLowerCase().includes(search.toLowerCase())
+            ? []
+            : [
+                {
+                  id: recordId,
+                  started_at: "2026-11-01T10:00:00Z",
+                  trigger_type: "manual",
+                  provider: "IPO_GURU",
+                  status: "COMPLETED",
+                  records_fetched: 1,
+                  records_inserted: 1,
+                  records_updated: 0,
+                  records_failed: 0,
+                },
+              ],
       },
-    }),
-  );
+    });
+  });
 }
 
 test("account form preserves typed values, validates, saves, and loads existing values", async ({
@@ -385,8 +389,17 @@ test("admin typing remains focused, errors stay inline, and edits and archive ac
 }) => {
   await prepare(page, true);
   const errors: string[] = [];
+  let catalogGets = 0;
+  page.on("request", (request) => {
+    if (request.method() === "GET" && new URL(request.url()).pathname === "/api/admin/ipos/catalog")
+      catalogGets += 1;
+  });
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/admin/ipos");
+  await expect(
+    page.getByRole("button", { name: "Edit", exact: true }).filter({ visible: true }),
+  ).toBeVisible();
+  const requestsBeforeSave = catalogGets;
   await page.getByRole("button", { name: "Add IPO", exact: true }).click();
   await page.getByLabel("Company name").fill("Typed company");
   await page.getByLabel("Symbol", { exact: true }).pressSequentially("test");
@@ -415,6 +428,8 @@ test("admin typing remains focused, errors stay inline, and edits and archive ac
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByText("IPO updated", { exact: true })).toBeVisible();
+  await expect.poll(() => catalogGets).toBe(requestsBeforeSave + 1);
+  const requestsBeforeArchive = catalogGets;
   await page
     .getByRole("button", { name: "Archive", exact: true })
     .filter({ visible: true })
@@ -422,6 +437,7 @@ test("admin typing remains focused, errors stay inline, and edits and archive ac
   await expect(page.getByRole("alertdialog")).toHaveAccessibleName("Archive this IPO?");
   await page.getByRole("button", { name: "Archive IPO", exact: true }).click();
   await expect(page.getByText("IPO archived", { exact: true })).toBeVisible();
+  await expect.poll(() => catalogGets).toBe(requestsBeforeArchive + 1);
   expect(errors).toEqual([]);
 });
 
@@ -511,30 +527,45 @@ for (const width of [390, 1440]) {
 test("admin catalog filters, paginates, and recovers from a loading failure", async ({ page }) => {
   await prepare(page, true);
   let fail = true;
-  await page.route("**/api/admin/ipos/catalog", (route) =>
-    route.fulfill(
-      fail
-        ? { status: 503, json: { error: { message: "Catalog unavailable." } } }
-        : {
-            json: {
-              data: Array.from({ length: 21 }, (_, index) => ({
-                id: `${index}`,
-                company_name: `Company ${index}`,
-                symbol: `TEST${index}`,
-                issue_type: "mainboard",
-                ipo_status: index === 20 ? "listed" : "upcoming",
-              })),
-            },
-          },
-    ),
-  );
+  await page.route("**/api/admin/ipos/catalog?**", (route) => {
+    if (fail)
+      return route.fulfill({ status: 503, json: { error: { message: "Catalog unavailable." } } });
+    const params = new URL(route.request().url()).searchParams;
+    const pageNumber = Number(params.get("page") ?? 1);
+    const pageSize = Number(params.get("page_size") ?? 10);
+    const search = (params.get("search") ?? "").toLowerCase();
+    const status = params.get("status");
+    const matching = Array.from({ length: 21 }, (_, index) => ({
+      id: `${index}`,
+      company_name: `Company ${index}`,
+      symbol: `TEST${index}`,
+      issue_type: "mainboard",
+      ipo_status: index === 20 ? "listed" : "upcoming",
+    })).filter(
+      (row) =>
+        (!status || row.ipo_status === status) &&
+        (!search || `${row.company_name} ${row.symbol}`.toLowerCase().includes(search)),
+    );
+    return route.fulfill({
+      json: {
+        data: matching.slice((pageNumber - 1) * pageSize, pageNumber * pageSize),
+        pagination: {
+          page: pageNumber,
+          page_size: pageSize,
+          total: matching.length,
+          total_pages: Math.max(1, Math.ceil(matching.length / pageSize)),
+        },
+      },
+    });
+  });
   await page.goto("/admin/ipos");
   await expect(page.getByRole("alert")).toContainText("Catalog unavailable.");
   fail = false;
   await page.getByRole("button", { name: "Retry", exact: true }).click();
-  await expect(page.getByText("Page 1 of 2 · 21 records")).toBeVisible();
+  await expect(page.getByText("Page 1 of 3 · 21 records")).toBeVisible();
   await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(page.getByText("Page 2 of 2 · 21 records")).toBeVisible();
+  await expect(page).toHaveURL(/page=2/);
+  await expect(page.getByText("Page 2 of 3 · 21 records")).toBeVisible();
   await page.getByRole("button", { name: "Filters", exact: true }).click();
   const catalogStatus = page.getByRole("combobox", { name: "Filter catalog status" });
   await catalogStatus.click();
@@ -566,6 +597,27 @@ test("admin catalog view returns to the filtered management list", async ({ page
   await page.getByRole("link", { name: "Back to IPOs" }).click();
   await expect(page).toHaveURL(/\/admin\/ipos\?search=Catalog&status=upcoming$/);
   await expect(page.getByRole("searchbox", { name: "Search IPO catalog" })).toHaveValue("Catalog");
+});
+
+test("administrator status request is reused across overview, sync, and settings", async ({
+  page,
+}) => {
+  await prepare(page, true);
+  let statusRequests = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/admin/ipos/sync/status") statusRequests += 1;
+  });
+  await page.goto("/admin");
+  await expect(page.getByRole("heading", { name: "IPO overview" })).toBeVisible();
+  await expect(page.getByText(/Manual runs remaining:/)).toBeVisible();
+  const requestsAfterOverview = statusRequests;
+  expect(requestsAfterOverview).toBeGreaterThan(0);
+
+  await page.getByRole("link", { name: "IPO Data Sync" }).click();
+  await expect(page.getByRole("heading", { name: "IPO data sync", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Settings" }).click();
+  await expect(page.getByRole("heading", { name: "Administration settings" })).toBeVisible();
+  expect(statusRequests).toBe(requestsAfterOverview);
 });
 
 test("disabled synchronization actions retain readable contrast", async ({ page }) => {
@@ -625,6 +677,31 @@ test("application search and IPO filter update the actual list request", async (
   await page.getByRole("option", { name: /Form test company/ }).click();
   await filteredRequest;
   await expect(page).toHaveURL(new RegExp(`ipo_id=${recordId}`));
+});
+
+test("IPO catalog search waits until the user finishes typing", async ({ page }) => {
+  await prepare(page);
+  let catalogRequests = 0;
+  page.route("**/api/ipos/catalog?**", (route) => {
+    catalogRequests += 1;
+    return route.fulfill({
+      json: {
+        data: {
+          ipos: [ipo],
+          pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+        },
+      },
+    });
+  });
+  await page.goto("/ipos");
+  await expect(page.getByRole("heading", { name: "IPO catalog" })).toBeVisible();
+  const search = page.getByRole("textbox", { name: "Search company or exact symbol" });
+  await search.fill("F");
+  await search.fill("Fo");
+  await search.fill("Form");
+  await expect(search).toHaveValue("Form");
+  await expect.poll(() => catalogRequests).toBe(2);
+  expect(catalogRequests).toBe(2);
 });
 
 test("application filter options remain visible in the mobile drawer", async ({ page }) => {

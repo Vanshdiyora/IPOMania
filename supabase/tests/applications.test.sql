@@ -1,6 +1,6 @@
 begin;
 
-select plan(18);
+select plan(19);
 
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -81,6 +81,11 @@ values
     'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
     '22222222-2222-4222-8222-222222222222', 'Application Holder B',
     'Application Bank B', 'application-b'
+  ),
+  (
+    '12121212-1212-4121-8121-121212121212',
+    '11111111-1111-4111-8111-111111111111', 'Application Holder A2',
+    'Application Bank A2', 'application-a2'
   );
 
 insert into public.applications (
@@ -193,6 +198,19 @@ select throws_ok(
   'new row violates row-level security policy for table "applications"',
   'User A cannot create an application for User B'
 );
+select lives_ok(
+  $$insert into public.applications (
+      user_id, ipo_id, demat_account_id, category_id, lots, total_shares,
+      application_amount, rule_version, calculation_snapshot
+    ) values (
+      '11111111-1111-4111-8111-111111111111',
+      '88888888-8888-4888-8888-888888888888',
+      '12121212-1212-4121-8121-121212121212',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      1, 10, 200, 1, '{}'::jsonb
+    )$$,
+  'A user can track this IPO on a different demat account'
+);
 select throws_ok(
   $$insert into public.applications (
       user_id, ipo_id, demat_account_id, category_id, lots, total_shares,
@@ -220,16 +238,16 @@ select throws_ok(
       1, 10, 200, 'stable-a-duplicate', 1, '{}'::jsonb
     )$$,
   '23505',
-  'duplicate key value violates unique constraint "applications_user_ipo_unique"',
-  'Duplicate active applications per user and IPO are rejected atomically'
+  'duplicate key value violates unique constraint "applications_user_ipo_account_unique"',
+  'Duplicate active applications per demat account are rejected atomically'
 );
 select is(
   (select count(*) from public.applications
    where user_id = '11111111-1111-4111-8111-111111111111'
      and ipo_id = '88888888-8888-4888-8888-888888888888'
      and archived_at is null),
-  1::bigint,
-  'Only one active application is kept per user and IPO'
+  2::bigint,
+  'Active applications are allowed across different demat accounts'
 );
 select is(
   public.confirm_application_import('55555555-5555-4555-8555-555555555555')->>'imported_rows',
@@ -241,7 +259,7 @@ select is(
   '1',
   'Retry returns the stored import result'
 );
-select is((select count(*) from public.applications), 2::bigint, 'Retry does not create duplicates');
+select is((select count(*) from public.applications), 3::bigint, 'Retry does not create duplicates');
 select is(
   public.reverse_application_import('55555555-5555-4555-8555-555555555555')->>'archived_rows',
   '1',

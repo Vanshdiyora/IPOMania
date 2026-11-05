@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
+import { useAppDispatch } from "../store";
+import { clearSessionState } from "./clearSessionState";
+import { setAuthUiStatus, setSigningOut } from "../store/slices/authUiSlice";
 import { AuthContext } from "./AuthContext";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -15,9 +21,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef<Session | null>(null);
   const intentionalSignOut = useRef(false);
 
+  const clearUserState = useCallback(() => {
+    clearSessionState(queryClient, dispatch);
+  }, [dispatch, queryClient]);
+
   useEffect(() => {
     if (!supabase) {
       setLoading(false);
+      dispatch(setAuthUiStatus("ready"));
       return;
     }
 
@@ -26,22 +37,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) return;
+      if (sessionRef.current?.user.id !== nextSession?.user.id && sessionRef.current) {
+        clearUserState();
+      }
       if (event === "SIGNED_OUT" && sessionRef.current && !intentionalSignOut.current) {
         setSessionExpired(true);
+        dispatch(setAuthUiStatus("expired"));
       }
       sessionRef.current = nextSession;
       setSession(nextSession);
-      if (nextSession) setSessionExpired(false);
-      setLoading(false);
-    });
-
-    void supabase.auth.getSession().then(({ data, error }) => {
-      if (!active) return;
-      if (error) {
-        console.error("Unable to restore the authentication session.", { name: error.name });
+      if (nextSession) {
+        setSessionExpired(false);
+        dispatch(setAuthUiStatus("ready"));
+      } else if (event !== "SIGNED_OUT") {
+        dispatch(setAuthUiStatus("ready"));
       }
-      sessionRef.current = data.session;
-      setSession(data.session);
       setLoading(false);
     });
 
@@ -49,27 +59,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [clearUserState, dispatch]);
 
-  const signOut = useCallback(async (scope: "global" | "local" = "global") => {
-    if (!supabase) return;
-    intentionalSignOut.current = true;
-    try {
-      const { error } = await supabase.auth.signOut({ scope });
-      if (error) throw error;
-    } finally {
-      intentionalSignOut.current = false;
-    }
-    sessionRef.current = null;
-    setSession(null);
-    setSessionExpired(false);
-  }, []);
+  const signOut = useCallback(
+    async (scope: "global" | "local" = "global") => {
+      if (!supabase) return;
+      intentionalSignOut.current = true;
+      dispatch(setSigningOut(true));
+      try {
+        const { error } = await supabase.auth.signOut({ scope });
+        if (error) throw error;
+      } finally {
+        intentionalSignOut.current = false;
+        dispatch(setSigningOut(false));
+      }
+      clearUserState();
+      sessionRef.current = null;
+      setSession(null);
+      setSessionExpired(false);
+      dispatch(setAuthUiStatus("ready"));
+    },
+    [clearUserState, dispatch],
+  );
 
   const markSessionExpired = useCallback(() => {
+    clearUserState();
     sessionRef.current = null;
     setSession(null);
     setSessionExpired(true);
-  }, []);
+    dispatch(setAuthUiStatus("expired"));
+  }, [clearUserState, dispatch]);
 
   return (
     <AuthContext.Provider

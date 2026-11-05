@@ -2,6 +2,24 @@ export { z } from "zod";
 
 import { z } from "zod";
 
+export const paginationPageSizes = [10, 25, 50, 100] as const;
+
+const pageNumberSchema = z.coerce.number().int().min(1).default(1);
+const pageSizeSchema = z.coerce
+  .number()
+  .int()
+  .refine((value) => paginationPageSizes.some((pageSize) => pageSize === value), {
+    message: "Page size must be 10, 25, 50, or 100.",
+  })
+  .default(10);
+
+const paginationQueryFields = {
+  page: pageNumberSchema,
+  page_size: pageSizeSchema,
+};
+
+export const paginationQuerySchema = z.object(paginationQueryFields).strict();
+
 export const registerSchema = z
   .object({
     email: z.string("Enter a valid email address.").trim().email("Enter a valid email address."),
@@ -97,8 +115,8 @@ export const accountImportRowSchema = dematAccountImportSchema.extend({
 
 export const accountListQuerySchema = z
   .object({
-    page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(100).default(25),
+    page: pageNumberSchema,
+    pageSize: pageSizeSchema,
     holder_name: z.string().trim().max(160).optional(),
     status: accountStatusSchema.optional(),
     created_from: z.iso.datetime().optional(),
@@ -113,6 +131,13 @@ export const accountListQuerySchema = z
       new Date(query.created_from) <= new Date(query.created_to),
     { message: "created_from must be earlier than created_to.", path: ["created_from"] },
   );
+
+export const accountImportHistoryQuerySchema = z
+  .object({
+    page: pageNumberSchema,
+    pageSize: pageSizeSchema,
+  })
+  .strict();
 
 export const accountImportPreviewSchema = z
   .object({
@@ -256,8 +281,7 @@ export const ipoUpdateSchema = ipoObjectSchema.partial().superRefine((ipo, conte
 
 export const ipoCatalogListQuerySchema = z
   .object({
-    page: z.coerce.number().int().min(1).default(1),
-    page_size: z.coerce.number().int().min(1).max(100).default(25),
+    ...paginationQueryFields,
     search: z.string().trim().max(160).optional(),
     status: z
       .union([
@@ -286,8 +310,7 @@ export const ipoCatalogListQuerySchema = z
 
 export const ipoListQuerySchema = z
   .object({
-    page: z.coerce.number().int().min(1).default(1),
-    page_size: z.coerce.number().int().min(1).max(100).default(25),
+    ...paginationQueryFields,
     source: z.enum(["all", "personal", "catalog"]).default("personal"),
     search: z.string().trim().max(160).optional(),
     status: z
@@ -622,8 +645,7 @@ const managementFilterFields = {
   date_to: z.iso.date().optional(),
 };
 const managementListQueryFields = {
-  page: z.coerce.number().int().min(1).default(1),
-  page_size: z.coerce.number().int().min(1).max(100).default(25),
+  ...paginationQueryFields,
   ...managementFilterFields,
 };
 
@@ -832,8 +854,7 @@ export const applicationBulkStatusSchema = z
   );
 export const applicationListQuerySchema = z
   .object({
-    page: z.coerce.number().int().min(1).default(1),
-    page_size: z.coerce.number().int().min(1).max(100).default(25),
+    ...paginationQueryFields,
     ipo_id: z.uuid().optional(),
     ipo_ids: z
       .string()
@@ -869,6 +890,23 @@ export const applicationSummaryQuerySchema = z
     ipo_id: z.uuid().optional(),
   })
   .strict();
+
+export const adminIpoCatalogListQuerySchema = z
+  .object({
+    ...paginationQueryFields,
+    search: z.string().trim().max(160).optional(),
+    status: z.enum(["upcoming", "open", "closed", "listed"]).optional(),
+  })
+  .strict();
+
+export const adminIpoSyncHistoryQuerySchema = z
+  .object({
+    ...paginationQueryFields,
+    search: z.string().trim().max(160).optional(),
+  })
+  .strict();
+
+export const applicationImportHistoryQuerySchema = paginationQuerySchema;
 
 const dashboardFilterFields = {
   date_from: z.iso.date().optional(),
