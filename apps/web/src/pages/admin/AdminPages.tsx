@@ -469,7 +469,8 @@ export function AdminIposPage() {
   };
 
   const totalPages =
-    catalogQuery.data?.pagination?.total_pages ?? Math.max(1, Math.ceil(rows.length / pageSize));
+    catalogQuery.data?.pagination?.total_pages ??
+    Math.max(page, Math.ceil(rows.length / pageSize));
   const visiblePage = Math.min(page, totalPages);
   const visibleRows = catalogQuery.data?.pagination
     ? rows

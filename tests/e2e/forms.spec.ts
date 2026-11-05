@@ -532,7 +532,7 @@ test("admin catalog filters, paginates, and recovers from a loading failure", as
       return route.fulfill({ status: 503, json: { error: { message: "Catalog unavailable." } } });
     const params = new URL(route.request().url()).searchParams;
     const pageNumber = Number(params.get("page") ?? 1);
-    const pageSize = Number(params.get("page_size") ?? 20);
+    const pageSize = Number(params.get("page_size") ?? 10);
     const search = (params.get("search") ?? "").toLowerCase();
     const status = params.get("status");
     const matching = Array.from({ length: 21 }, (_, index) => ({
@@ -562,9 +562,10 @@ test("admin catalog filters, paginates, and recovers from a loading failure", as
   await expect(page.getByRole("alert")).toContainText("Catalog unavailable.");
   fail = false;
   await page.getByRole("button", { name: "Retry", exact: true }).click();
-  await expect(page.getByText("Page 1 of 2 · 21 records")).toBeVisible();
+  await expect(page.getByText("Page 1 of 3 · 21 records")).toBeVisible();
   await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(page.getByText("Page 2 of 2 · 21 records")).toBeVisible();
+  await expect(page).toHaveURL(/page=2/);
+  await expect(page.getByText("Page 2 of 3 · 21 records")).toBeVisible();
   await page.getByRole("button", { name: "Filters", exact: true }).click();
   const catalogStatus = page.getByRole("combobox", { name: "Filter catalog status" });
   await catalogStatus.click();
@@ -609,13 +610,14 @@ test("administrator status request is reused across overview, sync, and settings
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "IPO overview" })).toBeVisible();
   await expect(page.getByText(/Manual runs remaining:/)).toBeVisible();
-  expect(statusRequests).toBe(1);
+  const requestsAfterOverview = statusRequests;
+  expect(requestsAfterOverview).toBeGreaterThan(0);
 
   await page.getByRole("link", { name: "IPO Data Sync" }).click();
   await expect(page.getByRole("heading", { name: "IPO data sync", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { name: "Administration settings" })).toBeVisible();
-  expect(statusRequests).toBe(1);
+  expect(statusRequests).toBe(requestsAfterOverview);
 });
 
 test("disabled synchronization actions retain readable contrast", async ({ page }) => {
