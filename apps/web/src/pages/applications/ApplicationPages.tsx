@@ -766,6 +766,11 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     queryFn: ({ signal }) =>
       apiRequest<IpoResponse>(`/api/ipos/${preselectedIpoId}`, session!, { signal }),
   });
+  const editingIpo = useQuery({
+    queryKey: userQueryKey(session?.user?.id, ["ipo", ipoId]),
+    enabled: Boolean(session && editing && ipoId),
+    queryFn: ({ signal }) => apiRequest<IpoResponse>(`/api/ipos/${ipoId}`, session!, { signal }),
+  });
   const catalogIpos = useInfiniteQuery({
     queryKey: userQueryKey(session?.user?.id, ["ipo-catalog", "application-options"]),
     enabled: Boolean(session && !editing),
@@ -807,12 +812,23 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       return latest;
     }, new Map<IpoCategoryConfiguration["category"], ApplicationCategoryConfiguration>()),
   ).map(([, configuration]) => configuration);
-  const activeCategory = categories.find((category) => category.id === categoryId);
+  // Keep the recorded rule selectable while editing an application created with
+  // an older immutable version. New applications only offer current versions.
+  const activeCategory = categoryConfigurations.find((category) => category.id === categoryId);
+  const recordedCategory =
+    editing && activeCategory && !categories.some((category) => category.id === categoryId)
+      ? activeCategory
+      : null;
   const personalIpos = lists.ipos.filter((item) => !item.source_catalog_id);
   const preselectedOwnedIpo =
     preselectedIpo.data?.data.id === preselectedIpoId ? preselectedIpo.data.data : null;
   const selectableIpos = editing
-    ? lists.ipos
+    ? [
+        ...lists.ipos,
+        ...(editingIpo.data?.data && !lists.ipos.some((item) => item.id === editingIpo.data.data.id)
+          ? [editingIpo.data.data]
+          : []),
+      ]
     : [
         ...personalIpos,
         ...(preselectedOwnedIpo && !personalIpos.some((item) => item.id === preselectedOwnedIpo.id)
@@ -823,9 +839,10 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const selectedIpo =
     selectedCatalogIpo ??
     lists.ipos.find((item) => item.id === ipoId) ??
+    (editingIpo.data?.data.id === ipoId ? editingIpo.data.data : null) ??
     (preselectedIpo.data?.data.id === ipoId ? preselectedIpo.data.data : null);
   const selectedAccountAlreadyApplied = Boolean(
-    ipoId && accountId && lists.activeAccountIdsByIpoId.get(ipoId)?.has(accountId),
+    !editing && ipoId && accountId && lists.activeAccountIdsByIpoId.get(ipoId)?.has(accountId),
   );
   const enteredLots = Number(lots);
   const lotBounds = getApplicationLotBounds(
@@ -1009,7 +1026,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       busy={mutation.isPending}
       dirty={dirty}
       disabled={
-        Boolean(detail.error || lists.error) ||
+        Boolean(detail.error || lists.error || editingIpo.error) ||
         (editing && !application) ||
         !ipoId ||
         !accountId ||
@@ -1019,7 +1036,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
         !price ||
         !localCalculation ||
         !validLotSelection ||
-        (!editing && selectedAccountAlreadyApplied)
+        selectedAccountAlreadyApplied
       }
     >
       <form
@@ -1043,6 +1060,14 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
         ) : null}
         <div hidden={editing && (detail.isLoading || Boolean(detail.error))}>
           {lists.error ? <ErrorMessage error={lists.error} /> : null}
+          {editingIpo.error ? (
+            <div className="mb-4 space-y-2">
+              <ErrorMessage error={editingIpo.error} />
+              <Button variant="outline" onClick={() => void editingIpo.refetch()}>
+                Retry IPO details
+              </Button>
+            </div>
+          ) : null}
           {preselectedIpo.error ? <ErrorMessage error={preselectedIpo.error} /> : null}
           {preselectedIpo.error ? (
             <Button
@@ -1218,6 +1243,12 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                       {formatCategory(item.category)}
                     </option>
                   ))}
+                {recordedCategory ? (
+                  <option value={recordedCategory.id}>
+                    {formatCategory(recordedCategory.category)} (recorded rule v
+                    {recordedCategory.rule_version})
+                  </option>
+                ) : null}
               </FormSelect>
               <div className="sm:col-span-2">
                 <FormInput

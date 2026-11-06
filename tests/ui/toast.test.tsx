@@ -35,9 +35,17 @@ describe("toast notifications", () => {
 
     expect(await screen.findByText("Record created")).toBeInTheDocument();
     const toast = screen.getByRole("status");
-    expect(toast).toHaveClass("p-3", "pr-2");
+    expect(toast).toHaveClass("px-3", "py-2", "sm:p-3", "sm:pr-2");
     expect(toast.querySelector(".flex")).toHaveClass("items-center");
-    expect(toast.parentElement).toHaveClass("inset-x-3", "top-3", "sm:right-5");
+    expect(toast.parentElement).toHaveClass(
+      "inset-x-3",
+      "bottom-[calc(env(safe-area-inset-bottom)+0.75rem)]",
+      "flex-col-reverse",
+      "sm:bottom-auto",
+      "sm:top-4",
+      "sm:right-5",
+      "sm:flex-col",
+    );
     expect(screen.getByText("Your record is ready.")).toBeInTheDocument();
     const dismissButton = screen.getByRole("button", { name: "Dismiss notification" });
     expect(dismissButton).toHaveClass("min-h-touch", "min-w-touch");

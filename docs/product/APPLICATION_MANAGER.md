@@ -36,6 +36,11 @@ amount from price, lots, and IPO lot size. The server records the submission dat
 form is saved. A saved application remains a tracking record, not issuer eligibility verification
 or investment advice.
 
+The edit form loads the application's IPO directly even when it is beyond the first page of issue
+options. It keeps the recorded category rule version available and does not treat the application
+being edited as a duplicate of itself. The duplicate IPO/account warning applies when creating
+another active application for the same pair.
+
 The saved record includes exact application amount, total shares, an optional rule version, a
 server-recorded submission timestamp, and a snapshot of the IPO pricing/lot-size inputs, optional
 category rule, applicant inputs, and result. This snapshot is historical evidence of the calculation, not issuer

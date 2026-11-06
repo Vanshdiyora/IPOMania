@@ -84,3 +84,5 @@ The Phase 3 database/RLS, concurrency, and repository-wide formatting gate remai
 - A single app-level toast viewport presents create, update, archive, import, synchronization,
   authentication, and password-reset outcomes. Dialog and form errors may also remain inline for
   correction, while the action outcome appears as a toast.
+  On phones, toasts use a compact card above the bottom safe area and stack upward; on wider
+  screens, they use the full card at the top right.
