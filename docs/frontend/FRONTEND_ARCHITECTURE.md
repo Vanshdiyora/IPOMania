@@ -76,7 +76,9 @@ Its View action carries
 that URL to the catalog detail page so Back returns to the filtered admin list.
 Dashboard detail links also carry their route context so Back returns to the signed-in home view.
 Application-summary and IPO-catalog status cards use database aggregates rather than calculating
-counts from paginated page contents.
+counts from paginated page contents. Account and IPO catalog metric cards use dedicated summary
+requests, separate from their paginated list queries; pagination changes therefore do not reload
+the metric skeletons or refetch summary data.
 
 The authenticated home route shows the responsive dashboard and analytics page. TanStack Query
 loads bounded PostgreSQL aggregates, the canonical Phase 6 capital summary, and paginated IPO and

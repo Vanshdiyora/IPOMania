@@ -111,7 +111,7 @@ export function ProfilePage() {
 
           {profileQuery.isPending ? (
             <div role="status" aria-label="Loading profile" aria-busy="true">
-              <span className="sr-only">Loading profile…</span>
+              <span className="sr-only">Loading profile</span>
               <SkeletonFormFields fields={1} />
             </div>
           ) : (
@@ -131,7 +131,7 @@ export function ProfilePage() {
                 loading={isSubmitting || saveMutation.isPending}
                 className="shadow-xs"
               >
-                {isSubmitting || saveMutation.isPending ? "Saving changes…" : "Save changes"}
+                {isSubmitting || saveMutation.isPending ? "Saving changes" : "Save changes"}
               </Button>
             </form>
           )}
@@ -171,13 +171,14 @@ export function ProfilePage() {
           <Button
             type="button"
             variant="danger"
+            loading={deleteMutation.isPending}
             disabled={!confirmDeletion || deleteMutation.isPending}
             onClick={() => void deleteAccount()}
             className="gap-2"
           >
             <Trash2 size={16} />
             <span>
-              {deleteMutation.isPending ? "Deleting account…" : "Delete my account permanently"}
+              {deleteMutation.isPending ? "Deleting account" : "Delete my account permanently"}
             </span>
           </Button>
         </CardContent>

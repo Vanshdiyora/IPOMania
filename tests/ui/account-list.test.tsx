@@ -4,7 +4,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ApiModule from "../../apps/web/src/lib/api";
 import { ToastProvider } from "../../apps/web/src/components/ui/Toast";
 import {
@@ -64,32 +64,26 @@ function renderDashboardPage() {
 }
 
 describe("account list", () => {
-  it("requests the dashboard summary using an allowed account page size", async () => {
-    apiRequestMock.mockClear();
-    apiRequestMock
-      .mockResolvedValueOnce({
-        data: {
-          accounts: [],
-          pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
-          summary: { total: 0, active: 0, archived: 0 },
-        },
-      })
-      .mockResolvedValueOnce({
-        data: {
-          accounts: [],
-          pagination: { page: 1, pageSize: 50, total: 0, totalPages: 0 },
-          summary: { total: 0, active: 0, archived: 0 },
-        },
-      });
+  beforeEach(() => {
+    apiRequestMock.mockReset();
+  });
+
+  it("requests dashboard totals from the separate summary endpoint", async () => {
+    apiRequestMock.mockImplementation(async (path: string) =>
+      path === "/api/accounts/summary"
+        ? { data: { total: 0, active: 0, archived: 0 } }
+        : {
+            data: {
+              accounts: [],
+              pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
+            },
+          },
+    );
 
     renderDashboardPage();
 
     await waitFor(() =>
-      expect(
-        apiRequestMock.mock.calls.some(
-          ([url]) => url === "/api/accounts?page=1&pageSize=10&archived=all",
-        ),
-      ).toBe(true),
+      expect(apiRequestMock.mock.calls.some(([url]) => url === "/api/accounts/summary")).toBe(true),
     );
   });
 

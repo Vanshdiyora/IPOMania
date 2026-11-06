@@ -190,16 +190,10 @@ export function DashboardPage() {
   const catalogOptions = catalogOptionsQuery.data?.pages.flatMap((page) => page.data.ipos) ?? [];
   const accountOptions =
     accountOptionsQuery.data?.pages.flatMap((page) => page.data.accounts) ?? [];
-  const loading =
-    analyticsQuery.isLoading ||
-    ipoOptionsQuery.isLoading ||
-    catalogOptionsQuery.isLoading ||
-    accountOptionsQuery.isLoading;
   const optionsError =
     ipoOptionsQuery.error ?? catalogOptionsQuery.error ?? accountOptionsQuery.error;
 
   function analyticsCount(value: number | undefined): string {
-    if (analyticsQuery.isLoading) return "Loading…";
     if (analyticsQuery.error || value === undefined) return "Unavailable";
     return String(value);
   }
@@ -253,6 +247,7 @@ export function DashboardPage() {
               variant="outline"
               size="sm"
               className="gap-2 border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15 hover:text-white"
+              loading={exportMutation.isPending}
               disabled={exportMutation.isPending || !analytics}
               onClick={() => exportMutation.mutate("csv")}
             >
@@ -263,6 +258,7 @@ export function DashboardPage() {
               type="button"
               size="sm"
               className="gap-2 border border-white bg-white text-indigo-950 shadow-md hover:bg-indigo-50"
+              loading={exportMutation.isPending}
               disabled={exportMutation.isPending || !analytics}
               onClick={() => exportMutation.mutate("xlsx")}
             >
@@ -374,9 +370,9 @@ export function DashboardPage() {
       <section
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
         aria-label="Dashboard totals"
-        aria-busy={loading}
+        aria-busy={analyticsQuery.isLoading}
       >
-        {loading ? (
+        {analyticsQuery.isLoading ? (
           <>
             <SkeletonStatCard />
             <SkeletonStatCard />
@@ -960,7 +956,7 @@ function AnalyticsStateMessage({
   loading: boolean;
   error?: unknown;
 }) {
-  if (loading) return <LoadingState label="Loading analytics…" inline />;
+  if (loading) return <LoadingState label="Loading analytics" inline />;
   if (error)
     return <EmptyMessage label={sectionErrorMessage(error, "Analytics section unavailable")} />;
   return <EmptyMessage label={label} />;

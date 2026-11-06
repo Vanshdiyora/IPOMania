@@ -193,7 +193,7 @@ export function RouteFormDrawer({
               loading={busy}
               disabled={disabled || closing}
             >
-              {busy ? "Saving…" : submitLabel}
+              {busy ? "Saving" : submitLabel}
             </Button>
           </div>
         }

@@ -35,9 +35,11 @@ import {
   SkeletonIpoDetails,
   SkeletonPage,
   Skeleton,
+  SkeletonStatCard,
   SkeletonTable,
 } from "../../components/ui/Skeleton";
 import { ApiRequestError, apiRequest } from "../../lib/api";
+import { LoadingState } from "../../components/LoadingState";
 import { applicationDrawerPath } from "../../lib/applicationDrawer";
 import { toIsoDateTime, toLocalDateTime } from "../../lib/formValues";
 import { defaultPageSize, parsePageSize } from "../../lib/pagination";
@@ -47,7 +49,12 @@ type IpoListResponse<T = IpoRecord> = {
   data: {
     ipos: T[];
     pagination: { page: number; page_size: number; total: number; total_pages: number };
-    status_counts?: { upcoming: number; open: number; closed: number; listed: number };
+  };
+};
+type IpoCatalogMetricsResponse = {
+  data: {
+    total: number;
+    status_counts: { upcoming: number; open: number; closed: number; listed: number };
   };
 };
 type IpoResponse = { data: IpoRecord };
@@ -181,12 +188,30 @@ function IpoListContent() {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
   });
   selectedStatuses.forEach((selectedStatus) => params.append("status", selectedStatus));
+  const metricsParams = new URLSearchParams();
+  if (debouncedSearch) metricsParams.set("search", debouncedSearch);
+  selectedStatuses.forEach((selectedStatus) => metricsParams.append("status", selectedStatus));
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: userQueryKey(session?.user?.id, ["ipos", "catalog", params.toString()]),
     enabled: Boolean(session),
     queryFn: ({ signal }) =>
       apiRequest<IpoListResponse<IpoRecord | IpoCatalogRecord>>(
         `/api/ipos/catalog?${params}`,
+        session!,
+        { signal },
+      ),
+  });
+  const metrics = useQuery({
+    queryKey: userQueryKey(session?.user?.id, [
+      "ipos",
+      "catalog",
+      "metrics",
+      metricsParams.toString(),
+    ]),
+    enabled: Boolean(session),
+    queryFn: ({ signal }) =>
+      apiRequest<IpoCatalogMetricsResponse>(
+        `/api/ipos/catalog/summary${metricsParams.size ? `?${metricsParams}` : ""}`,
         session!,
         { signal },
       ),
@@ -202,31 +227,39 @@ function IpoListContent() {
         compact
         className="border-action/15 bg-gradient-to-r from-white via-white to-indigo-50/60"
       />
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="IPO totals">
-        <Card className="px-4 py-3 sm:p-4">
-          <p className="text-sm font-semibold text-muted">Total IPOs</p>
-          <p className="mt-1 text-2xl font-bold text-navy">
-            {isLoading ? "Loading…" : error ? "Unavailable" : (data?.data.pagination.total ?? 0)}
-          </p>
-        </Card>
-        {(
-          [
-            ["Open", "open"],
-            ["Upcoming", "upcoming"],
-            ["Listed", "listed"],
-          ] as const
-        ).map(([title, status]) => (
-          <Card key={status} className="px-4 py-3 sm:p-4">
-            <p className="text-sm font-semibold text-muted">{title} IPOs</p>
-            <p className="mt-1 text-2xl font-bold text-navy">
-              {isLoading
-                ? "Loading…"
-                : error || !data?.data.status_counts
-                  ? "Unavailable"
-                  : data.data.status_counts[status]}
-            </p>
-          </Card>
-        ))}
+      <section
+        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        aria-label="IPO totals"
+        aria-busy={metrics.isLoading}
+      >
+        {metrics.isLoading ? (
+          Array.from({ length: 4 }, (_, index) => <SkeletonStatCard key={index} className="p-4" />)
+        ) : (
+          <>
+            <Card className="px-4 py-3 sm:p-4">
+              <p className="text-sm font-semibold text-muted">Total IPOs</p>
+              <p className="mt-1 text-2xl font-bold text-navy">
+                {metrics.error ? "Unavailable" : (metrics.data?.data.total ?? 0)}
+              </p>
+            </Card>
+            {(
+              [
+                ["Open", "open"],
+                ["Upcoming", "upcoming"],
+                ["Listed", "listed"],
+              ] as const
+            ).map(([title, status]) => (
+              <Card key={status} className="px-4 py-3 sm:p-4">
+                <p className="text-sm font-semibold text-muted">{title} IPOs</p>
+                <p className="mt-1 text-2xl font-bold text-navy">
+                  {metrics.error
+                    ? "Unavailable"
+                    : (metrics.data?.data.status_counts?.[status] ?? 0)}
+                </p>
+              </Card>
+            ))}
+          </>
+        )}
       </section>
       <Card className="overflow-hidden">
         <div className="flex flex-col gap-3">
@@ -298,6 +331,9 @@ function IpoListContent() {
         </div>
       </Card>
       {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
+      {metrics.error && !error ? (
+        <ErrorNotice error={metrics.error} onRetry={() => void metrics.refetch()} />
+      ) : null}
       {isLoading ? (
         <SkeletonPage label="Loading IPO records">
           <div className="grid gap-4">
@@ -589,7 +625,7 @@ export function IpoCatalogApplicationsPage() {
           ownedIpoQuery.isLoading ||
           applicationsQuery.isLoading ? (
           <div role="status" aria-label="Loading demat account applications" aria-busy="true">
-            <span className="sr-only">Loading accounts and applications…</span>
+            <span className="sr-only">Loading accounts and applications</span>
             <SkeletonTable rows={5} cols={6} />
           </div>
         ) : accounts.length ? (
@@ -862,7 +898,7 @@ export function IpoDetailsPage() {
           </div>
         ) : categoriesQuery.isLoading ? (
           <div role="status" aria-label="Loading category rules" aria-busy="true">
-            <span className="sr-only">Loading category rules…</span>
+            <span className="sr-only">Loading category rules</span>
             <ul aria-hidden="true" className="mt-4 grid gap-2 sm:grid-cols-2">
               {categories.map((category) => (
                 <li key={category} className="rounded-lg border border-border p-3">
@@ -915,7 +951,7 @@ export function IpoDetailsPage() {
             onRetry={() => void Promise.all([applicationsQuery.refetch(), accountsQuery.refetch()])}
           />
         ) : applicationsQuery.isLoading || accountsQuery.isLoading ? (
-          <p role="status">Loading applications…</p>
+          <LoadingState label="Loading applications" inline />
         ) : applicationRows.length || historicalApplicationRows.length ? (
           <>
             <DataTable minWidth="980px">
@@ -1472,8 +1508,12 @@ export function IpoCategoryConfigurationPage({
               ))}
             </ul>
           </div>
-          <Button type="submit" disabled={createRule.isPending || rulesQuery.isLoading}>
-            {createRule.isPending ? "Saving…" : "Save new rule version"}
+          <Button
+            type="submit"
+            loading={createRule.isPending}
+            disabled={createRule.isPending || rulesQuery.isLoading}
+          >
+            {createRule.isPending ? "Saving" : "Save new rule version"}
           </Button>
         </form>
       </Card>
@@ -1649,7 +1689,7 @@ export function QuotaCalculatorPage() {
             >
               <option value="">
                 {iposQuery.isLoading
-                  ? "Loading IPOs…"
+                  ? "Choose an IPO"
                   : iposQuery.error
                     ? "IPO list unavailable"
                     : "Choose an IPO"}
@@ -1660,6 +1700,7 @@ export function QuotaCalculatorPage() {
                 </option>
               ))}
             </CustomSelect>
+            {iposQuery.isLoading ? <LoadingState label="Loading IPOs" inline /> : null}
           </label>
           <label className="text-sm font-semibold text-ink">
             Demat account
@@ -1671,7 +1712,7 @@ export function QuotaCalculatorPage() {
             >
               <option value="">
                 {accountsQuery.isLoading
-                  ? "Loading accounts…"
+                  ? "Choose an account"
                   : accountsQuery.error
                     ? "Account list unavailable"
                     : "Choose an account"}
@@ -1683,6 +1724,7 @@ export function QuotaCalculatorPage() {
                 </option>
               ))}
             </CustomSelect>
+            {accountsQuery.isLoading ? <LoadingState label="Loading accounts" inline /> : null}
           </label>
           <label className="text-sm font-semibold text-ink">
             Category
@@ -1792,6 +1834,7 @@ export function QuotaCalculatorPage() {
         ) : null}
         <div className="mt-5 flex flex-wrap gap-3">
           <Button
+            loading={calculationMutation.isPending}
             disabled={
               !ipoId ||
               !dematAccountId ||
@@ -1801,10 +1844,11 @@ export function QuotaCalculatorPage() {
             }
             onClick={() => submitCalculation(false)}
           >
-            {calculationMutation.isPending ? "Validating…" : "Validate"}
+            {calculationMutation.isPending ? "Validating" : "Validate"}
           </Button>
           <Button
             variant="secondary"
+            loading={calculationMutation.isPending}
             disabled={
               !ipoId ||
               !dematAccountId ||
@@ -1814,7 +1858,7 @@ export function QuotaCalculatorPage() {
             }
             onClick={() => submitCalculation(true)}
           >
-            {calculationMutation.isPending ? "Calculating…" : "Calculate and save audit"}
+            {calculationMutation.isPending ? "Calculating" : "Calculate and save audit"}
           </Button>
         </div>
       </Card>
@@ -1855,11 +1899,12 @@ export function QuotaCalculatorPage() {
             <Button
               className="mt-4"
               variant="secondary"
+              loading={recordApplicationMutation.isPending}
               disabled={recordApplicationMutation.isPending}
               onClick={recordApplication}
             >
               {recordApplicationMutation.isPending
-                ? "Recording…"
+                ? "Recording"
                 : "Record application for tracking"}
             </Button>
           ) : null}

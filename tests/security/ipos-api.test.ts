@@ -210,20 +210,45 @@ describe("IPO management API", () => {
     );
 
     const response = await createApp().request(
-      "/api/ipos/catalog?page=1&page_size=100",
+      "/api/ipos/catalog/summary",
       { headers: authHeaders() },
       bindings,
     );
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      data: { ipos: [], status_counts: counts, pagination: { total: 0 } },
+      data: { total: 28, status_counts: counts },
     });
     const countRequests = requests.filter((request) => request.method === "HEAD");
     expect(countRequests).toHaveLength(4);
     expect(
       countRequests.map((request) => new URL(request.url).searchParams.get("ipo_status")).sort(),
     ).toEqual(["eq.closed", "eq.listed", "eq.open", "eq.upcoming"]);
+  });
+
+  it("returns catalog metrics from the dedicated filtered summary endpoint", async () => {
+    const requests = installSupabaseMock(
+      () => new Response("[]", { headers: { "Content-Type": "application/json" } }),
+      user,
+      new Response(JSON.stringify({ upcoming: 2, open: 3, closed: 0, listed: 0 }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const response = await createApp().request(
+      "/api/ipos/catalog/summary?search=Example&status=UPCOMING&status=OPEN",
+      { headers: authHeaders() },
+      bindings,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        total: 5,
+        status_counts: { upcoming: 2, open: 3, closed: 0, listed: 0 },
+      },
+    });
+    expect(requests).toHaveLength(0);
   });
 
   it("returns paginated personal IPOs and shared catalog metadata from the list endpoint", async () => {

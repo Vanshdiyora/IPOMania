@@ -72,7 +72,12 @@ export function ConfirmationDialog({
           <Button data-confirmation-cancel variant="outline" onClick={cancel} disabled={busy}>
             {cancelLabel}
           </Button>
-          <Button variant={danger ? "danger" : "default"} onClick={onConfirm} disabled={busy}>
+          <Button
+            variant={danger ? "danger" : "default"}
+            onClick={onConfirm}
+            loading={busy}
+            disabled={busy}
+          >
             {confirmLabel}
           </Button>
         </div>

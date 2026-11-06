@@ -266,7 +266,8 @@ it("keeps a failed confirmation retryable and disables repeated submissions", as
   const user = userEvent.setup();
   await user.click(screen.getByText("Archive record"));
   await user.click(screen.getByText("Archive", { exact: true }));
-  expect(screen.getByText("Processing…")).toBeDisabled();
+  expect(screen.getByText("Processing")).toBeDisabled();
+  expect(screen.getByText("Processing").closest("button")).toHaveAttribute("aria-busy", "true");
   await user.keyboard("{Escape}");
   expect(screen.getByRole("alertdialog")).toBeInTheDocument();
   rejectAction(new Error("Please retry."));

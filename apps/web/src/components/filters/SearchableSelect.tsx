@@ -155,7 +155,7 @@ export function SearchableSelect({
   };
   const selectedLabel =
     loading && !selectedOptions.length
-      ? "Loading options…"
+      ? "Loading options"
       : multiple
         ? selectedOptions.length === 1
           ? selectedOptions[0]!.label
@@ -433,7 +433,7 @@ export function SearchableSelect({
               {loadingMore ? (
                 <p className="flex min-h-10 items-center justify-center gap-2 text-sm text-muted">
                   <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-                  Loading more options…
+                  Loading more options
                 </p>
               ) : null}
             </div>
