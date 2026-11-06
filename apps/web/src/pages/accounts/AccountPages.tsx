@@ -34,6 +34,7 @@ import { DrawerRouteLink, RouteFormDrawer } from "../../components/ui/FormDrawer
 import { FormSection } from "../../components/ui/FormSection";
 import { useToast } from "../../components/ui/ToastContext";
 import { Card } from "../../components/ui/Card";
+import { LoadingState } from "../../components/LoadingState";
 import { StatusBadge } from "../../components/ui/Badge";
 import { BackLink } from "../../components/ui/BackLink";
 import { DataTable } from "../../components/ui/DataTable";
@@ -48,21 +49,23 @@ import {
   SkeletonCard,
   SkeletonDetailsPage,
   SkeletonFormFields,
+  Skeleton,
   SkeletonStatCard,
   SkeletonTable,
   SkeletonTableRows,
 } from "../../components/ui/Skeleton";
 
-type AccountSummary = {
-  total: number;
-  active: number;
-  archived: number;
-};
 type AccountListResponse = {
   data: {
     accounts: DematAccount[];
     pagination: { page: number; pageSize: number; total: number; totalPages: number };
-    summary: AccountSummary;
+  };
+};
+type AccountSummaryResponse = {
+  data: {
+    total: number;
+    active: number;
+    archived: number;
   };
 };
 type AccountResponse = { data: DematAccount };
@@ -182,7 +185,7 @@ function AccountPasswordText({ account }: { account: DematAccount }) {
   });
 
   if (!account.password_saved) return <>-</>;
-  if (isLoading) return <>Loading…</>;
+  if (isLoading) return <LoadingState label="Loading password" inline />;
   if (isError) return <>Unavailable</>;
 
   return <span className="break-all font-mono">{data?.data.password ?? "Unavailable"}</span>;
@@ -247,14 +250,12 @@ export function AccountDashboardPage() {
     queryKey: userQueryKey(session?.user?.id, ["accounts", "summary"]),
     enabled: Boolean(session),
     queryFn: ({ signal }) =>
-      apiRequest<AccountListResponse>("/api/accounts?page=1&pageSize=10&archived=all", session!, {
-        signal,
-      }),
+      apiRequest<AccountSummaryResponse>("/api/accounts/summary", session!, { signal }),
   });
   useEffect(() => {
     if (error instanceof ApiRequestError && error.status === 401) markSessionExpired();
   }, [error, markSessionExpired]);
-  const summary = data?.data.summary;
+  const summary = data?.data;
 
   return (
     <div className="space-y-6">
@@ -729,7 +730,7 @@ export function AccountFormPage({ editing = false }: { editing?: boolean }) {
     >
       {editing && loadingAccount ? (
         <div role="status" aria-label="Loading account form" aria-busy="true">
-          <span className="sr-only">Loading account form…</span>
+          <span className="sr-only">Loading account form</span>
           <SkeletonFormFields fields={6} />
         </div>
       ) : null}
@@ -1004,6 +1005,7 @@ export function AccountDetailsPage() {
                 <>
                   <Button
                     variant="outline"
+                    loading={action.isPending}
                     disabled={action.isPending}
                     onClick={() => action.mutate("restore")}
                   >
@@ -1185,9 +1187,10 @@ export function AccountImportDialog({ onClose }: { onClose: () => void }) {
               <Button
                 className="mt-4"
                 disabled={!file || upload.isPending}
+                loading={upload.isPending}
                 onClick={() => upload.mutate(false)}
               >
-                {upload.isPending ? "Reading file…" : "Upload and read columns"}
+                {upload.isPending ? "Reading file" : "Upload and read columns"}
               </Button>
             </Card>
             {headers.length ? (
@@ -1298,10 +1301,11 @@ export function AccountImportDialog({ onClose }: { onClose: () => void }) {
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Button
                     disabled={!preview.summary?.ready || confirm.isPending}
+                    loading={confirm.isPending}
                     onClick={() => confirm.mutate()}
                   >
                     {confirm.isPending
-                      ? "Saving rows…"
+                      ? "Saving rows"
                       : `Confirm ${preview.summary?.ready ?? 0} ready rows`}
                   </Button>
                   <Link className={secondaryLinkClass} to="/accounts/import-history">
@@ -1419,7 +1423,7 @@ export function ImportHistoryPage() {
           aria-label={importId ? "Loading import report" : "Loading import history"}
           aria-busy="true"
         >
-          <span className="sr-only">Loading import data…</span>
+          <span className="sr-only">Loading import data</span>
           {importId ? <SkeletonDetailsPage rows={5} /> : <SkeletonTable rows={5} cols={5} />}
         </div>
       ) : null}
@@ -1440,12 +1444,13 @@ export function ImportHistoryPage() {
               <ConfirmButton
                 variant="outline"
                 disabled={reverse.isPending}
+                loading={reverse.isPending}
                 title="Confirm this action"
                 description="Reverse this import by archiving all unchanged accounts created by it?"
                 confirmLabel="Continue"
                 onConfirm={() => reverse.mutateAsync()}
               >
-                {reverse.isPending ? "Reversing…" : "Reverse import"}
+                {reverse.isPending ? "Reversing" : "Reverse import"}
               </ConfirmButton>
             ) : null}
           </div>
@@ -1564,7 +1569,7 @@ function SummaryCard({
         </span>
       </div>
       <p className="mt-3 text-3xl font-bold tracking-tight text-navy" aria-live="polite">
-        {loading ? "…" : (value ?? "—")}
+        {loading ? <Skeleton className="mt-3 h-9 w-24" /> : (value ?? "—")}
       </p>
     </Card>
   );

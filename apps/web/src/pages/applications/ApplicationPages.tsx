@@ -40,6 +40,7 @@ import { FormSection } from "../../components/ui/FormSection";
 import { useFormValidation } from "../../components/ui/useFormValidation";
 import { applicationCreateSchema, applicationUpdateSchema } from "@ipo-mania/validation";
 import { Card } from "../../components/ui/Card";
+import { LoadingState } from "../../components/LoadingState";
 import { BackLink } from "../../components/ui/BackLink";
 import { Pagination } from "../../components/ui/Pagination";
 import { DataTable } from "../../components/ui/DataTable";
@@ -1057,7 +1058,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       >
         {editing && detail.isLoading ? (
           <div role="status" aria-label="Loading application" aria-busy="true">
-            <span className="sr-only">Loading application…</span>
+            <span className="sr-only">Loading application</span>
             <SkeletonFormFields fields={5} />
           </div>
         ) : null}
@@ -1181,10 +1182,9 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                 required
                 error={validation.errors.demat_account_id}
                 value={accountId}
-                placeholder={
-                  lists.optionLoading.accounts ? "Loading accounts…" : "Choose an active account"
-                }
+                placeholder="Choose an active account"
                 disabled={editing || lists.optionLoading.accounts}
+                loading={lists.optionLoading.accounts}
                 options={lists.accounts
                   .filter((account) => account.account_status === "active" && !account.archived_at)
                   .map((account) => ({
@@ -1229,7 +1229,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
               >
                 <option value="">
                   {categoriesQuery.isLoading
-                    ? "Loading categories…"
+                    ? "Choose an investor category"
                     : categoriesQuery.error
                       ? "Categories unavailable"
                       : "Choose an investor category"}
@@ -1256,6 +1256,9 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                   </option>
                 ) : null}
               </FormSelect>
+              {categoriesQuery.isLoading ? (
+                <LoadingState label="Loading categories" inline />
+              ) : null}
               <div className="sm:col-span-2">
                 <FormInput
                   label="Lots"
@@ -1832,15 +1835,20 @@ export function BulkApplicationPage() {
         {previewMutation.error ? <ErrorMessage error={previewMutation.error} /> : null}
         <div className="mt-5 flex flex-wrap gap-3">
           <Button
+            loading={previewMutation.isPending}
             disabled={
               !ipoId || !categoryId || !selectedAccounts.length || previewMutation.isPending
             }
             onClick={() => previewMutation.mutate()}
           >
-            {previewMutation.isPending ? "Checking accounts…" : "Validate and preview"}
+            {previewMutation.isPending ? "Checking accounts" : "Validate and preview"}
           </Button>
           {preview?.length && preview.every((row) => row.ready) ? (
-            <Button disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>
+            <Button
+              loading={createMutation.isPending}
+              disabled={createMutation.isPending}
+              onClick={() => createMutation.mutate()}
+            >
               Confirm creation
             </Button>
           ) : null}
@@ -1942,6 +1950,7 @@ export function ApplicationImportPage() {
         {file ? <p className="mt-2 text-muted">Selected: {file.name}</p> : null}
         <Button
           className="mt-4"
+          loading={previewMutation.isPending}
           disabled={!file || previewMutation.isPending}
           onClick={() => previewMutation.mutate()}
         >
@@ -2037,6 +2046,7 @@ export function ApplicationImportPage() {
             </div>
             <Button
               className="mt-4"
+              loading={confirmMutation.isPending}
               disabled={confirmMutation.isPending || !preview.import}
               onClick={() => confirmMutation.mutate()}
             >
@@ -2099,7 +2109,7 @@ export function ApplicationImportHistoryPage() {
         <Card>
           {isLoading ? (
             <div role="status" aria-label="Loading application import history" aria-busy="true">
-              <span className="sr-only">Loading import history…</span>
+              <span className="sr-only">Loading import history</span>
               <SkeletonTable rows={5} cols={5} />
             </div>
           ) : (

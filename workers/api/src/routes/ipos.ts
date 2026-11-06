@@ -9,6 +9,7 @@ import {
 } from "@ipo-mania/shared";
 import {
   ipoCatalogListQuerySchema,
+  ipoCatalogMetricsQuerySchema,
   ipoCategoryConfigurationSchema,
   ipoListQuerySchema,
   ipoUpdateSchema,
@@ -137,6 +138,28 @@ async function hydrateApplicationFlags(
 export const iposRoutes = new Hono<IpoContext>();
 iposRoutes.use("*", authenticate);
 
+iposRoutes.get("/catalog/summary", async (context) => {
+  const parsed = ipoCatalogMetricsQuerySchema.safeParse(queryWithStatuses(context));
+  if (!parsed.success) return validationError(context);
+  const query = parsed.data;
+  const selectedStatuses = Array.isArray(query.status)
+    ? query.status
+    : query.status
+      ? [query.status]
+      : [];
+  const statusCounts = await catalogStatusCounts(
+    context.get("rlsSupabase"),
+    query.search,
+    selectedStatuses,
+  );
+  return context.json({
+    data: {
+      total: Object.values(statusCounts).reduce((total, count) => total + count, 0),
+      status_counts: statusCounts,
+    },
+  });
+});
+
 iposRoutes.get("/catalog", async (context) => {
   const parsed = ipoCatalogListQuerySchema.safeParse(queryWithStatuses(context));
   if (!parsed.success) return validationError(context);
@@ -172,30 +195,17 @@ iposRoutes.get("/catalog", async (context) => {
   if (query.search) {
     request = request.or(catalogSearchFilter(query.search));
   }
-  const [listResult, countsResult] = await Promise.all([
-    request.range((query.page - 1) * query.page_size, query.page * query.page_size - 1),
-    supabase.rpc("get_ipo_catalog_status_counts", {
-      p_search: query.search ?? null,
-      p_statuses: selectedStatuses.length
-        ? selectedStatuses.map((status) => status.toLowerCase())
-        : null,
-    }),
-  ]);
+  const listResult = await request.range(
+    (query.page - 1) * query.page_size,
+    query.page * query.page_size - 1,
+  );
   const { data, error, count } = listResult;
   if (error) throw error;
-  let statusCounts: CatalogStatusCounts;
-  if (countsResult.error) {
-    if (!isMissingCatalogStatusCountsRpc(countsResult.error)) throw countsResult.error;
-    statusCounts = await queryCatalogStatusCounts(supabase, query.search, selectedStatuses);
-  } else {
-    statusCounts = parseCatalogStatusCounts(countsResult.data);
-  }
   const catalogRows = (data ?? []).map(catalogRecord);
   if (catalogRows.length === 0) {
     return context.json({
       data: {
         ipos: [],
-        status_counts: statusCounts,
         pagination: {
           page: query.page,
           page_size: query.page_size,
@@ -251,7 +261,6 @@ iposRoutes.get("/catalog", async (context) => {
         alreadyApplied: sourceCatalogIds.has(ipo.id),
         applicationStatus: statusByCatalogId.get(ipo.id) ?? null,
       })),
-      status_counts: statusCounts,
       pagination: {
         page: query.page,
         page_size: query.page_size,
@@ -261,6 +270,24 @@ iposRoutes.get("/catalog", async (context) => {
     },
   });
 });
+
+async function catalogStatusCounts(
+  supabase: SupabaseClient,
+  search: string | undefined,
+  selectedStatuses: string[],
+): Promise<CatalogStatusCounts> {
+  const { data, error } = await supabase.rpc("get_ipo_catalog_status_counts", {
+    p_search: search ?? null,
+    p_statuses: selectedStatuses.length
+      ? selectedStatuses.map((status) => status.toLowerCase())
+      : null,
+  });
+  if (error) {
+    if (!isMissingCatalogStatusCountsRpc(error)) throw error;
+    return queryCatalogStatusCounts(supabase, search, selectedStatuses);
+  }
+  return parseCatalogStatusCounts(data);
+}
 
 function parseCatalogStatusCounts(value: unknown): CatalogStatusCounts {
   if (!value || typeof value !== "object") {

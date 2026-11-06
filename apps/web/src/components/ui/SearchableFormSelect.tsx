@@ -5,10 +5,12 @@ import { SearchableSelect } from "../filters/SearchableSelect";
 export function SearchableFormSelect({
   options,
   placeholder = "Choose an option",
+  loading = false,
   ...props
 }: Omit<ComponentProps<typeof FormSelect>, "children" | "onChange"> & {
   options: Array<{ value: string; label: string }>;
   placeholder?: string;
+  loading?: boolean;
   onChange?: (value: string) => void;
 }) {
   return (
@@ -19,6 +21,7 @@ export function SearchableFormSelect({
         options={options}
         value={String(props.value ?? "")}
         disabled={props.disabled}
+        loading={loading}
         onChange={(value) => {
           if (!props.onChange) return;
           const nextValue = Array.isArray(value) ? (value[0] ?? "") : value;

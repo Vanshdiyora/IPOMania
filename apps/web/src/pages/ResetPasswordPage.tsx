@@ -6,6 +6,7 @@ import { resetPasswordSchema } from "@ipo-mania/validation";
 import type { z } from "@ipo-mania/validation";
 import { AuthPage } from "../auth/AuthPage";
 import { Button } from "../components/ui/Button";
+import { LoadingState } from "../components/LoadingState";
 import { Input, FormField } from "../components/ui/Input";
 import { getSupabaseClient } from "../lib/supabase";
 import { CheckCircle } from "lucide-react";
@@ -128,13 +129,11 @@ export function ResetPasswordPage() {
           </FormField>
 
           <Button type="submit" className="w-full" loading={isSubmitting}>
-            {isSubmitting ? "Updating…" : "Update password"}
+            {isSubmitting ? "Updating" : "Update password"}
           </Button>
         </form>
       ) : !errorMessage ? (
-        <p role="status" className="text-sm text-muted">
-          Verifying your reset link…
-        </p>
+        <LoadingState label="Verifying your reset link" inline />
       ) : null}
 
       <p className="mt-5 text-center text-sm">

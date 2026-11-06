@@ -222,15 +222,15 @@ describe("demat account API", () => {
           });
     });
     const response = await createApp().request(
-      "/api/accounts",
+      "/api/accounts/summary",
       { headers: bearerHeaders() },
       bindings,
     );
 
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { data: { summary: Record<string, number> } };
-    expect(body.data.summary).toEqual({ total: 501, active: 501, archived: 0 });
-    expect(body.data.summary).not.toHaveProperty("remainingCapacity");
+    const body = (await response.json()) as { data: Record<string, number> };
+    expect(body.data).toEqual({ total: 501, active: 501, archived: 0 });
+    expect(body.data).not.toHaveProperty("remainingCapacity");
   });
 
   it("omits encrypted password data from account list responses", async () => {
@@ -315,5 +315,36 @@ describe("demat account API", () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { pagination: { page: 2, pageSize: 50, total: 520, totalPages: 11 } },
     });
+  });
+
+  it("returns account totals from the owner-scoped summary endpoint", async () => {
+    const requests = installSupabaseMock(async (request) => {
+      const params = new URL(request.url).searchParams;
+      const count =
+        params.get("account_status") === "eq.active"
+          ? 4
+          : params.get("archived_at") === "not.is.null"
+            ? 2
+            : 7;
+      return new Response(null, { headers: { "Content-Range": `*/${count}` } });
+    });
+
+    const response = await createApp().request(
+      "/api/accounts/summary",
+      { headers: bearerHeaders() },
+      bindings,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: { total: 7, active: 4, archived: 2 },
+    });
+    expect(requests).toHaveLength(3);
+    for (const request of requests) {
+      const query = new URL(request.url).searchParams;
+      expect(request.method).toBe("HEAD");
+      expect(query.get("user_id")).toBe(`eq.${userId}`);
+      expect(query.get("user_id")).not.toContain(otherUserId);
+    }
   });
 });

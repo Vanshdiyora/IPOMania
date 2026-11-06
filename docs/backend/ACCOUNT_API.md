@@ -8,16 +8,17 @@ payloads do not accept `user_id`.
 
 ## Account routes
 
-| Method and path                         | Behavior                                      |
-| --------------------------------------- | --------------------------------------------- |
-| `GET /api/accounts`                     | List, filters, pagination, and account totals |
-| `POST /api/accounts`                    | Create an account                             |
-| `GET /api/accounts/:accountId`          | Read one owned account                        |
-| `GET /api/accounts/:accountId/password` | Reveal an owned account password on demand    |
-| `PATCH /api/accounts/:accountId`        | Update a non-archived owned account           |
-| `POST /api/accounts/:accountId/archive` | Soft-archive an account                       |
-| `POST /api/accounts/:accountId/restore` | Restore an account                            |
-| `DELETE /api/accounts/:accountId`       | Permanently delete an archived account only   |
+| Method and path                         | Behavior                                    |
+| --------------------------------------- | ------------------------------------------- |
+| `GET /api/accounts`                     | List, filters, and pagination               |
+| `GET /api/accounts/summary`             | Return owner-scoped account totals          |
+| `POST /api/accounts`                    | Create an account                           |
+| `GET /api/accounts/:accountId`          | Read one owned account                      |
+| `GET /api/accounts/:accountId/password` | Reveal an owned account password on demand  |
+| `PATCH /api/accounts/:accountId`        | Update a non-archived owned account         |
+| `POST /api/accounts/:accountId/archive` | Soft-archive an account                     |
+| `POST /api/accounts/:accountId/restore` | Restore an account                          |
+| `DELETE /api/accounts/:accountId`       | Permanently delete an archived account only |
 
 Create and update accept only the account fields in
 [DEMAT_ACCOUNT_SPECIFICATION.md](../product/DEMAT_ACCOUNT_SPECIFICATION.md). Unknown properties
@@ -45,9 +46,9 @@ production with `npx wrangler secret put ACCOUNT_CREDENTIAL_ENCRYPTION_KEY`.
 - `created_from`, `created_to`: ISO-8601 timestamps, inclusive
 - `archived`: `false` (default), `true`, or `all`
 
-The response contains `accounts`, `pagination` (`page`, `pageSize`, `total`, `totalPages`), and
-`summary` (`total`, `active`, `archived`). `total` includes inactive and
-closed records; `active` counts only unarchived active records.
+The list response contains `accounts` and `pagination` (`page`, `pageSize`, `total`, `totalPages`).
+The dedicated summary response contains `total`, `active`, and `archived`. `total` includes
+inactive and closed records; `active` counts only unarchived active records.
 
 ## Import routes
 

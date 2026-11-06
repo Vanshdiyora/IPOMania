@@ -92,7 +92,7 @@ export function LoginPage() {
         </div>
 
         <Button type="submit" className="w-full" loading={isSubmitting}>
-          {isSubmitting ? "Signing in…" : "Sign in"}
+          {isSubmitting ? "Signing in" : "Sign in"}
         </Button>
       </form>
     </AuthPage>

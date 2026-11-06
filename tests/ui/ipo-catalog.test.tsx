@@ -95,6 +95,16 @@ function renderPage(path = "/ipos") {
 describe("user IPO catalog", () => {
   beforeEach(() => {
     apiRequestMock.mockReset();
+    apiRequestMock.mockImplementation(async (path: string) =>
+      path.startsWith("/api/ipos/catalog/summary")
+        ? {
+            data: {
+              total: 1,
+              status_counts: { upcoming: 1, open: 0, closed: 0, listed: 0 },
+            },
+          }
+        : listResponse(),
+    );
   });
 
   it("loads shared IPOs by default and displays missing table values as dashes", async () => {
@@ -114,6 +124,46 @@ describe("user IPO catalog", () => {
       expect.anything(),
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/api/ipos/catalog/summary",
+      expect.anything(),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it("keeps catalog metrics loaded while moving between result pages", async () => {
+    apiRequestMock.mockImplementation(async (path: string) => {
+      if (path === "/api/ipos/catalog/summary") {
+        return {
+          data: {
+            total: 25,
+            status_counts: { upcoming: 10, open: 5, closed: 5, listed: 5 },
+          },
+        };
+      }
+      if (path.includes("page=2")) return new Promise(() => {});
+      return listResponse([catalogIpo], 1, 2);
+    });
+
+    renderPage();
+    await screen.findByRole("link", { name: catalogIpo.company_name });
+    await waitFor(() =>
+      expect(screen.getByLabelText("IPO totals")).toHaveAttribute("aria-busy", "false"),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Page 2" }));
+
+    await waitFor(() =>
+      expect(apiRequestMock).toHaveBeenCalledWith(
+        "/api/ipos/catalog?page=2&page_size=10&sort=date_desc",
+        expect.anything(),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      ),
+    );
+    expect(screen.getByLabelText("IPO totals")).toHaveAttribute("aria-busy", "false");
+    expect(
+      apiRequestMock.mock.calls.filter(([path]) => path === "/api/ipos/catalog/summary"),
+    ).toHaveLength(1);
   });
 
   it("ignores the legacy personal source and only shows the shared catalog", async () => {

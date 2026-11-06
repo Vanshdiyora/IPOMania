@@ -13,6 +13,7 @@ import {
   Edit3,
   Eye,
   History,
+  LoaderCircle,
   LogOut,
   Menu,
   RefreshCw,
@@ -218,7 +219,7 @@ export function AdminOverviewPage() {
   };
   const sync = async () => {
     if (!session || syncing) return;
-    setMessage("Fetching provider data and saving records…");
+    setMessage("Fetching provider data and saving records");
     try {
       const result = await syncMutation.mutateAsync();
       setMessage("");
@@ -289,7 +290,11 @@ export function AdminOverviewPage() {
         }
       />
       {message && (
-        <div role="status" className="rounded-lg border bg-white px-4 py-3 text-sm">
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-lg border bg-white px-4 py-3 text-sm"
+        >
+          {syncing ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
           {message}
         </div>
       )}
@@ -299,7 +304,7 @@ export function AdminOverviewPage() {
             key={String(label)}
             label={String(label)}
             value={overview ? String(value) : "—"}
-            loading={loading && !overview}
+            loading={overviewQuery.isLoading && !overview}
           />
         ))}
       </div>
@@ -308,21 +313,25 @@ export function AdminOverviewPage() {
           <h3 className="font-bold">Synchronization</h3>
           <p className="mt-3 text-sm text-slate-600">
             Status:{" "}
-            {loading && !status
-              ? "Checking…"
-              : loadError && !status
-                ? "Unavailable"
-                : (status?.latest?.status ?? (status?.running ? "Running" : "Not run"))}
+            {loading && !status ? (
+              <LoadingState label="Checking status" inline />
+            ) : loadError && !status ? (
+              "Unavailable"
+            ) : (
+              (status?.latest?.status ?? (status?.running ? "Running" : "Not run"))
+            )}
           </p>
           <p className="text-sm text-slate-600">
             Provider:{" "}
-            {loading && !status
-              ? "Checking…"
-              : loadError && !status
-                ? "Unavailable"
-                : status?.providerConfigured
-                  ? "Configured"
-                  : "Setup required"}
+            {loading && !status ? (
+              <LoadingState label="Checking provider" inline />
+            ) : loadError && !status ? (
+              "Unavailable"
+            ) : status?.providerConfigured ? (
+              "Configured"
+            ) : (
+              "Setup required"
+            )}
           </p>
           <p className="text-sm text-slate-600">
             Manual runs remaining:{" "}
@@ -342,7 +351,7 @@ export function AdminOverviewPage() {
           <h3 className="font-bold">Recent activity</h3>
           {loading && !overview ? (
             <div role="status" aria-label="Loading recent activity" className="mt-3 space-y-3">
-              <span className="sr-only">Loading recent activity…</span>
+              <span className="sr-only">Loading recent activity</span>
               <div className="skeleton h-9 w-full" />
               <div className="skeleton h-9 w-full" />
               <div className="skeleton h-9 w-full" />
@@ -616,7 +625,7 @@ export function AdminIposPage() {
       <div className="overflow-hidden rounded-xl border bg-white md:overflow-x-auto">
         {loading ? (
           <div role="status" aria-label="Loading IPO catalog" aria-busy="true">
-            <span className="sr-only">Loading IPO catalog…</span>
+            <span className="sr-only">Loading IPO catalog</span>
             <div className="space-y-3 p-4 md:hidden">
               <SkeletonCard />
               <SkeletonCard />
@@ -791,8 +800,8 @@ export function AdminIposPage() {
             <Button variant="outline" disabled={saving} onClick={requestClose}>
               Cancel
             </Button>
-            <Button type="submit" form="ipo-catalog-form" disabled={saving}>
-              {saving ? "Saving…" : editingId ? "Save changes" : "Create IPO"}
+            <Button type="submit" form="ipo-catalog-form" loading={saving} disabled={saving}>
+              {saving ? "Saving" : editingId ? "Save changes" : "Create IPO"}
             </Button>
           </div>
         )}
@@ -914,7 +923,7 @@ export function AdminIposPage() {
         busy={archiving}
         title="Archive this IPO?"
         description={`${rows.find((row) => row.id === archiveId)?.company_name ?? "This IPO"} will be removed from the active catalog. This action can be reversed from the database.`}
-        confirmLabel={archiving ? "Archiving…" : "Archive IPO"}
+        confirmLabel={archiving ? "Archiving IPO" : "Archive IPO"}
         danger
         onCancel={() => !archiving && setArchiveId(null)}
         onConfirm={() => void archive()}
@@ -1007,7 +1016,7 @@ export function AdminHistoryPage() {
           aria-busy="true"
           className="space-y-3"
         >
-          <span className="sr-only">Loading synchronization history…</span>
+          <span className="sr-only">Loading synchronization history</span>
           <div className="space-y-3 md:hidden">
             <SkeletonCard />
             <SkeletonCard />
@@ -1130,7 +1139,7 @@ export function AdminSyncPage() {
   };
   const sync = async () => {
     if (!session) return;
-    setMessage("Fetching IPO list and saving records…");
+    setMessage("Fetching IPO list and saving records");
     try {
       const r = await syncMutation.mutateAsync();
       setMessage("");
@@ -1175,11 +1184,13 @@ export function AdminSyncPage() {
           <div>
             <h2 className="text-xl font-bold">IPO Data Sync</h2>
             <p className="mt-1 text-sm text-slate-500">
-              {loading
-                ? "Checking provider status…"
-                : loadError
-                  ? "Provider status unavailable"
-                  : `Provider: ${status?.providerConfigured ? "Configured" : "Not configured"}`}
+              {loading ? (
+                <LoadingState label="Checking provider status" inline />
+              ) : loadError ? (
+                "Provider status unavailable"
+              ) : (
+                `Provider: ${status?.providerConfigured ? "Configured" : "Not configured"}`
+              )}
             </p>
           </div>
           <ConfirmButton
@@ -1203,7 +1214,13 @@ export function AdminSyncPage() {
           </ConfirmButton>
         </div>
         {message && (
-          <p role="status" className="mt-4 rounded bg-slate-100 p-3 text-sm">
+          <p
+            role="status"
+            className="mt-4 flex items-center gap-2 rounded bg-slate-100 p-3 text-sm"
+          >
+            {syncMutation.isPending ? (
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+            ) : null}
             {message}
           </p>
         )}
@@ -1212,7 +1229,7 @@ export function AdminSyncPage() {
         <h3 className="font-bold">Quota status</h3>
         {loading ? (
           <div role="status" aria-label="Loading synchronization quota" className="mt-3 space-y-2">
-            <span className="sr-only">Loading synchronization quota…</span>
+            <span className="sr-only">Loading synchronization quota</span>
             <div className="skeleton h-4 w-2/3" />
             <div className="skeleton h-4 w-1/2" />
           </div>
