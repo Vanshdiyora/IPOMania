@@ -678,7 +678,7 @@ export function AdminIposPage() {
               )}
             </div>
             <DataTable minWidth="820px" className="hidden text-left text-sm md:table">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <thead className="bg-[#F0EBFF] text-xs uppercase text-muted">
                 <tr>
                   <th scope="col" className="px-4 py-3 text-left">
                     Company
@@ -695,7 +695,7 @@ export function AdminIposPage() {
                   <th scope="col" className="px-4 py-3 text-center">
                     Listing date
                   </th>
-                  <th scope="col" className="sticky right-0 bg-slate-50 px-4 py-3 text-right">
+                  <th scope="col" className="sticky right-0 bg-[#F0EBFF] px-4 py-3 text-right">
                     Actions
                   </th>
                 </tr>
@@ -1049,7 +1049,7 @@ export function AdminHistoryPage() {
           </div>
           <div className="hidden overflow-x-auto rounded-xl border bg-white md:block">
             <DataTable minWidth="720px">
-              <thead className="bg-slate-50">
+              <thead className="bg-[#F0EBFF]">
                 <tr>
                   {["Started", "Trigger", "Provider", "Status"].map((label) => (
                     <th

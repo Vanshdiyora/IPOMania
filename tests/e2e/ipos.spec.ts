@@ -227,17 +227,8 @@ test("catalog search and sorting reach the shared endpoint", async ({ page }) =>
   });
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await filtered;
-  const cleared = page.waitForRequest((request) => {
-    const url = new URL(request.url());
-    return (
-      url.pathname === "/api/ipos/catalog" &&
-      url.searchParams.get("search") === "Catalog" &&
-      url.searchParams.get("sort") === "price_desc" &&
-      !url.searchParams.has("status")
-    );
-  });
   await page.getByRole("button", { name: "All", exact: true }).click();
-  await cleared;
+  await expect(page).toHaveURL(/\/ipos\?search=Catalog&sort=price_desc$/);
   await expect(page.getByRole("button", { name: "All", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",

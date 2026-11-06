@@ -42,10 +42,10 @@ export function WelcomePage() {
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <div>
-        <section className="relative overflow-hidden px-4 py-16 sm:px-8 sm:py-24 lg:px-12">
+        <section className="relative overflow-hidden bg-gradient-to-r from-[#F2EDFF] via-[#FAF8FF] to-[#EEE7FF] px-4 py-16 sm:px-8 sm:py-24 lg:px-12">
           <div
             aria-hidden="true"
-            className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(79,70,229,0.09),transparent_28rem)]"
+            className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(75,15,232,0.10),transparent_28rem)]"
           />
           <div className="relative mx-auto max-w-4xl text-center">
             <p className="inline-flex items-center gap-2 rounded-full border border-action-border bg-action-light px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-action">
@@ -124,7 +124,7 @@ export function WelcomePage() {
               {capabilities.map(({ title, description, icon: Icon }) => (
                 <article
                   key={title}
-                  className="rounded-2xl border border-border bg-surface p-5 shadow-card transition-shadow hover:shadow-card-hover"
+                  className="rounded-2xl border border-action-border/60 bg-gradient-to-br from-white to-[#F6F2FF] p-5 shadow-card transition-shadow hover:shadow-card-hover"
                 >
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-action-light text-action">
                     <Icon size={20} aria-hidden="true" />
@@ -150,7 +150,7 @@ export function WelcomePage() {
             ].map(([number, title, description]) => (
               <article
                 key={number}
-                className="rounded-2xl border border-border bg-surface p-6 shadow-card"
+                className="rounded-2xl border border-action-border/60 bg-gradient-to-br from-white to-[#F6F2FF] p-6 shadow-card"
               >
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-navy text-sm font-bold text-white">
                   {number}
