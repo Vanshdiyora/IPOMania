@@ -35,6 +35,7 @@ import {
   SkeletonIpoDetails,
   SkeletonPage,
   Skeleton,
+  SkeletonStatCard,
   SkeletonTable,
 } from "../../components/ui/Skeleton";
 import { ApiRequestError, apiRequest } from "../../lib/api";
@@ -47,7 +48,12 @@ type IpoListResponse<T = IpoRecord> = {
   data: {
     ipos: T[];
     pagination: { page: number; page_size: number; total: number; total_pages: number };
-    status_counts?: { upcoming: number; open: number; closed: number; listed: number };
+  };
+};
+type IpoCatalogMetricsResponse = {
+  data: {
+    total: number;
+    status_counts: { upcoming: number; open: number; closed: number; listed: number };
   };
 };
 type IpoResponse = { data: IpoRecord };
@@ -181,12 +187,30 @@ function IpoListContent() {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
   });
   selectedStatuses.forEach((selectedStatus) => params.append("status", selectedStatus));
+  const metricsParams = new URLSearchParams();
+  if (debouncedSearch) metricsParams.set("search", debouncedSearch);
+  selectedStatuses.forEach((selectedStatus) => metricsParams.append("status", selectedStatus));
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: userQueryKey(session?.user?.id, ["ipos", "catalog", params.toString()]),
     enabled: Boolean(session),
     queryFn: ({ signal }) =>
       apiRequest<IpoListResponse<IpoRecord | IpoCatalogRecord>>(
         `/api/ipos/catalog?${params}`,
+        session!,
+        { signal },
+      ),
+  });
+  const metrics = useQuery({
+    queryKey: userQueryKey(session?.user?.id, [
+      "ipos",
+      "catalog",
+      "metrics",
+      metricsParams.toString(),
+    ]),
+    enabled: Boolean(session),
+    queryFn: ({ signal }) =>
+      apiRequest<IpoCatalogMetricsResponse>(
+        `/api/ipos/catalog/summary${metricsParams.size ? `?${metricsParams}` : ""}`,
         session!,
         { signal },
       ),
@@ -202,31 +226,39 @@ function IpoListContent() {
         compact
         className="border-action/15 bg-gradient-to-r from-white via-white to-indigo-50/60"
       />
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="IPO totals">
-        <Card className="px-4 py-3 sm:p-4">
-          <p className="text-sm font-semibold text-muted">Total IPOs</p>
-          <p className="mt-1 text-2xl font-bold text-navy">
-            {isLoading ? "Loading…" : error ? "Unavailable" : (data?.data.pagination.total ?? 0)}
-          </p>
-        </Card>
-        {(
-          [
-            ["Open", "open"],
-            ["Upcoming", "upcoming"],
-            ["Listed", "listed"],
-          ] as const
-        ).map(([title, status]) => (
-          <Card key={status} className="px-4 py-3 sm:p-4">
-            <p className="text-sm font-semibold text-muted">{title} IPOs</p>
-            <p className="mt-1 text-2xl font-bold text-navy">
-              {isLoading
-                ? "Loading…"
-                : error || !data?.data.status_counts
-                  ? "Unavailable"
-                  : data.data.status_counts[status]}
-            </p>
-          </Card>
-        ))}
+      <section
+        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        aria-label="IPO totals"
+        aria-busy={metrics.isLoading}
+      >
+        {metrics.isLoading ? (
+          Array.from({ length: 4 }, (_, index) => <SkeletonStatCard key={index} className="p-4" />)
+        ) : (
+          <>
+            <Card className="px-4 py-3 sm:p-4">
+              <p className="text-sm font-semibold text-muted">Total IPOs</p>
+              <p className="mt-1 text-2xl font-bold text-navy">
+                {metrics.error ? "Unavailable" : (metrics.data?.data.total ?? 0)}
+              </p>
+            </Card>
+            {(
+              [
+                ["Open", "open"],
+                ["Upcoming", "upcoming"],
+                ["Listed", "listed"],
+              ] as const
+            ).map(([title, status]) => (
+              <Card key={status} className="px-4 py-3 sm:p-4">
+                <p className="text-sm font-semibold text-muted">{title} IPOs</p>
+                <p className="mt-1 text-2xl font-bold text-navy">
+                  {metrics.error
+                    ? "Unavailable"
+                    : (metrics.data?.data.status_counts?.[status] ?? 0)}
+                </p>
+              </Card>
+            ))}
+          </>
+        )}
       </section>
       <Card className="overflow-hidden">
         <div className="flex flex-col gap-3">
@@ -298,6 +330,9 @@ function IpoListContent() {
         </div>
       </Card>
       {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
+      {metrics.error && !error ? (
+        <ErrorNotice error={metrics.error} onRetry={() => void metrics.refetch()} />
+      ) : null}
       {isLoading ? (
         <SkeletonPage label="Loading IPO records">
           <div className="grid gap-4">

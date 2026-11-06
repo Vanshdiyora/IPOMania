@@ -47,6 +47,38 @@ function serializeAccount(account: StoredDematAccount): DematAccount {
   return { ...publicAccount, password_saved: Boolean(password_encrypted) };
 }
 
+accountsRoutes.get("/summary", async (context) => {
+  const userId = context.get("authenticatedUser").id;
+  const supabase = context.get("rlsSupabase");
+  const [totalResult, activeResult, archivedResult] = await Promise.all([
+    supabase
+      .from("demat_accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId),
+    supabase
+      .from("demat_accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("account_status", "active")
+      .is("archived_at", null),
+    supabase
+      .from("demat_accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .not("archived_at", "is", null),
+  ]);
+  if (totalResult.error) throw totalResult.error;
+  if (activeResult.error) throw activeResult.error;
+  if (archivedResult.error) throw archivedResult.error;
+  return context.json({
+    data: {
+      total: totalResult.count ?? 0,
+      active: activeResult.count ?? 0,
+      archived: archivedResult.count ?? 0,
+    },
+  });
+});
+
 accountsRoutes.get("/", async (context) => {
   const parsedQuery = accountListQuerySchema.safeParse(context.req.query());
   if (!parsedQuery.success) {
@@ -75,32 +107,13 @@ accountsRoutes.get("/", async (context) => {
   if (query.created_from) accountsQuery = accountsQuery.gte("created_at", query.created_from);
   if (query.created_to) accountsQuery = accountsQuery.lte("created_at", query.created_to);
 
-  const [accountsResult, totalResult, activeResult, archivedResult] = await Promise.all([
-    accountsQuery.range((query.page - 1) * query.pageSize, query.page * query.pageSize - 1),
-    supabase
-      .from("demat_accounts")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId),
-    supabase
-      .from("demat_accounts")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("account_status", "active")
-      .is("archived_at", null),
-    supabase
-      .from("demat_accounts")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .not("archived_at", "is", null),
-  ]);
+  const accountsResult = await accountsQuery.range(
+    (query.page - 1) * query.pageSize,
+    query.page * query.pageSize - 1,
+  );
   if (accountsResult.error) throw accountsResult.error;
-  if (totalResult.error) throw totalResult.error;
-  if (activeResult.error) throw activeResult.error;
-  if (archivedResult.error) throw archivedResult.error;
 
   const total = accountsResult.count ?? 0;
-  const active = activeResult.count ?? 0;
-  const archived = archivedResult.count ?? 0;
   return context.json({
     data: {
       accounts: (accountsResult.data as StoredDematAccount[]).map(serializeAccount),
@@ -109,11 +122,6 @@ accountsRoutes.get("/", async (context) => {
         pageSize: query.pageSize,
         total,
         totalPages: Math.ceil(total / query.pageSize),
-      },
-      summary: {
-        total: totalResult.count ?? 0,
-        active,
-        archived,
       },
     },
   });

@@ -190,16 +190,10 @@ export function DashboardPage() {
   const catalogOptions = catalogOptionsQuery.data?.pages.flatMap((page) => page.data.ipos) ?? [];
   const accountOptions =
     accountOptionsQuery.data?.pages.flatMap((page) => page.data.accounts) ?? [];
-  const loading =
-    analyticsQuery.isLoading ||
-    ipoOptionsQuery.isLoading ||
-    catalogOptionsQuery.isLoading ||
-    accountOptionsQuery.isLoading;
   const optionsError =
     ipoOptionsQuery.error ?? catalogOptionsQuery.error ?? accountOptionsQuery.error;
 
   function analyticsCount(value: number | undefined): string {
-    if (analyticsQuery.isLoading) return "Loading…";
     if (analyticsQuery.error || value === undefined) return "Unavailable";
     return String(value);
   }
@@ -374,9 +368,9 @@ export function DashboardPage() {
       <section
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
         aria-label="Dashboard totals"
-        aria-busy={loading}
+        aria-busy={analyticsQuery.isLoading}
       >
-        {loading ? (
+        {analyticsQuery.isLoading ? (
           <>
             <SkeletonStatCard />
             <SkeletonStatCard />

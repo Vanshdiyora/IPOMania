@@ -53,16 +53,17 @@ import {
   SkeletonTableRows,
 } from "../../components/ui/Skeleton";
 
-type AccountSummary = {
-  total: number;
-  active: number;
-  archived: number;
-};
 type AccountListResponse = {
   data: {
     accounts: DematAccount[];
     pagination: { page: number; pageSize: number; total: number; totalPages: number };
-    summary: AccountSummary;
+  };
+};
+type AccountSummaryResponse = {
+  data: {
+    total: number;
+    active: number;
+    archived: number;
   };
 };
 type AccountResponse = { data: DematAccount };
@@ -247,14 +248,12 @@ export function AccountDashboardPage() {
     queryKey: userQueryKey(session?.user?.id, ["accounts", "summary"]),
     enabled: Boolean(session),
     queryFn: ({ signal }) =>
-      apiRequest<AccountListResponse>("/api/accounts?page=1&pageSize=10&archived=all", session!, {
-        signal,
-      }),
+      apiRequest<AccountSummaryResponse>("/api/accounts/summary", session!, { signal }),
   });
   useEffect(() => {
     if (error instanceof ApiRequestError && error.status === 401) markSessionExpired();
   }, [error, markSessionExpired]);
-  const summary = data?.data.summary;
+  const summary = data?.data;
 
   return (
     <div className="space-y-6">

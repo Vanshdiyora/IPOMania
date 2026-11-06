@@ -308,6 +308,11 @@ export const ipoCatalogListQuerySchema = z
   })
   .strict();
 
+export const ipoCatalogMetricsQuerySchema = ipoCatalogListQuerySchema.pick({
+  search: true,
+  status: true,
+});
+
 export const ipoListQuerySchema = z
   .object({
     ...paginationQueryFields,

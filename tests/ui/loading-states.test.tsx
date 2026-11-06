@@ -92,7 +92,7 @@ describe("shared loading states", () => {
       defaultOptions: { queries: { retry: false } },
     });
 
-    render(
+    const { container } = render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={["/ipos"]}>
           <IpoListPage />
@@ -102,5 +102,9 @@ describe("shared loading states", () => {
 
     expect(screen.getByRole("status", { name: "Loading IPO records" })).toBeInTheDocument();
     expect(screen.queryByText("No IPO records match these filters.")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("IPO totals")).toHaveAttribute("aria-busy", "true");
+    expect(container.querySelectorAll('section[aria-label="IPO totals"] .skeleton')).toHaveLength(
+      12,
+    );
   });
 });

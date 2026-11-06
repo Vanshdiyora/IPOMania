@@ -297,7 +297,7 @@ export function AdminOverviewPage() {
             key={String(label)}
             label={String(label)}
             value={overview ? String(value) : "—"}
-            loading={loading && !overview}
+            loading={overviewQuery.isLoading && !overview}
           />
         ))}
       </div>
