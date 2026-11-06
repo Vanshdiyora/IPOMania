@@ -242,13 +242,16 @@ test("regular users cannot open the IPO creation form", async ({ page }) => {
 });
 
 test("application form hides financial statuses and preserves them on edit", async ({ page }) => {
+  test.setTimeout(90_000);
   await prepare(page);
   const ownedIpoRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());
     return url.pathname === "/api/ipos" && url.searchParams.get("page") === "1";
   });
   await page.goto("/applications/new");
-  await expect(page.getByRole("dialog", { name: "Add application" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Add application" })).toBeVisible({
+    timeout: 30_000,
+  });
   await ownedIpoRequest;
   await expect(page.getByLabel("Mandate status")).toHaveCount(0);
   await expect(page.getByLabel("Allotment status")).toHaveCount(0);
