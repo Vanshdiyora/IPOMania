@@ -22,7 +22,7 @@ export function Card({
       className={cn(
         "rounded-2xl border border-border bg-surface shadow-card",
         !noPadding && "p-4 sm:p-6",
-        nested && "border-border bg-canvas shadow-none",
+        nested && "border-action-border/50 bg-action-light/40 shadow-none",
         hoverable && [
           "cursor-pointer transition-all duration-200 ease-smooth",
           "hover:border-border-strong hover:shadow-card-hover hover:-translate-y-0.5",

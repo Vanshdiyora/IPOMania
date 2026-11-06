@@ -215,19 +215,19 @@ export function DashboardPage() {
   return (
     <div className="min-w-0 w-full space-y-8 animate-fade-in">
       {/* ─── Page Header ─────────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-950 via-indigo-800 to-teal-700 px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-white/10 blur-2xl" />
-        <div className="pointer-events-none absolute bottom-0 right-28 h-24 w-24 rounded-full bg-teal-300/20 blur-xl" />
+      <div className="relative overflow-hidden rounded-3xl border border-action-border/50 bg-gradient-to-r from-[#F2EDFF] via-[#FAF8FF] to-[#EEE7FF] px-5 py-7 text-ink shadow-card sm:px-8 sm:py-9">
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-action-light blur-2xl" />
+        <div className="pointer-events-none absolute bottom-0 right-28 h-24 w-24 rounded-full bg-[#D5C6FF] blur-xl" />
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-indigo-50 backdrop-blur">
+            <div className="mb-2 inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-action">
               <TrendingUp size={13} />
               <span>PORTFOLIO INTELLIGENCE</span>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
               Dashboard &amp; Analytics
             </h1>
-            <p className="mt-2 max-w-xl text-sm text-indigo-100">
+            <p className="mt-2 max-w-xl text-base text-muted">
               Unified view of applications, demat accounts, and tracked IPOs.
             </p>
           </div>
@@ -238,7 +238,7 @@ export function DashboardPage() {
               type="button"
               variant="outline"
               size="sm"
-              className="gap-2 border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15 hover:text-white"
+              className="gap-2 border-action-border bg-white text-action hover:border-action hover:bg-action-light"
               onClick={() => {
                 setDraftFilters(filters);
                 setFiltersOpen(true);
@@ -251,7 +251,7 @@ export function DashboardPage() {
               type="button"
               variant="outline"
               size="sm"
-              className="gap-2 border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15 hover:text-white"
+              className="gap-2 border-action-border bg-white text-action hover:border-action hover:bg-action-light"
               disabled={exportMutation.isPending || !analytics}
               onClick={() => exportMutation.mutate("csv")}
             >
@@ -261,7 +261,7 @@ export function DashboardPage() {
             <Button
               type="button"
               size="sm"
-              className="gap-2 border border-white bg-white text-indigo-950 shadow-md hover:bg-indigo-50"
+              className="gap-2 border border-action bg-action text-white shadow-card hover:bg-action-hover"
               disabled={exportMutation.isPending || !analytics}
               onClick={() => exportMutation.mutate("xlsx")}
             >
@@ -877,19 +877,19 @@ function MetricCard({
   accent?: "indigo" | "teal" | "amber" | "violet";
 }) {
   const accentClasses = {
-    indigo: "bg-indigo-50 text-indigo-600 ring-indigo-100",
-    teal: "bg-teal-50 text-teal-600 ring-teal-100",
-    amber: "bg-amber-50 text-amber-600 ring-amber-100",
-    violet: "bg-violet-50 text-violet-600 ring-violet-100",
+    indigo: "bg-action-light text-action ring-action-border/50",
+    teal: "bg-action-light text-action ring-action-border/50",
+    amber: "bg-action-light text-action ring-action-border/50",
+    violet: "bg-action-light text-action ring-action-border/50",
   };
   return (
     <Card
       hoverable
-      className="group overflow-hidden border-border/80 bg-gradient-to-br from-white to-slate-50/70"
+      className="group overflow-hidden border-action-border/60 bg-gradient-to-br from-white to-[#F6F2FF]"
     >
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted">{label}</span>
+          <span className="text-sm font-semibold text-ink">{label}</span>
           {icon && (
             <span
               className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ${accentClasses[accent]} transition-transform duration-200 group-hover:scale-105`}

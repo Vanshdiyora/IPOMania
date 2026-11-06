@@ -39,10 +39,10 @@ function NavItem({
         onClick={onClick}
         aria-current={sectionActive ? "page" : undefined}
         className={cn(
-          "flex min-h-touch items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
+          "flex min-h-touch items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium",
           "transition-colors duration-150",
           sectionActive
-            ? "border border-action-border bg-action-light text-action font-semibold shadow-sm"
+            ? "bg-action-light text-action font-semibold"
             : "text-muted hover:bg-canvas hover:text-ink",
         )}
       >
@@ -62,10 +62,10 @@ function NavItem({
       aria-current={sectionActive ? "page" : undefined}
       className={({ isActive }) =>
         cn(
-          "flex min-h-touch items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
+          "flex min-h-touch items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium",
           "transition-colors duration-150",
           isActive || sectionActive
-            ? "border border-action-border bg-action-light text-action font-semibold shadow-sm"
+            ? "bg-action-light text-action font-semibold"
             : "text-muted hover:bg-canvas hover:text-ink",
         )
       }
@@ -128,13 +128,13 @@ export function Sidebar({
           ? "fixed inset-y-0 left-0 z-50 flex w-[min(20rem,85vw)] animate-slide-in-left"
           : "hidden",
         // Desktop: fixed sidebar
-        "min-w-0 shrink-0 flex-col overflow-hidden border-r border-indigo-100/80 bg-white/95 shadow-[8px_0_30px_-28px_rgba(49,46,129,0.55)] backdrop-blur",
-        "px-3 py-4",
-        "md:fixed md:inset-y-0 md:left-0 md:z-auto md:flex md:h-screen md:w-64",
+        "min-w-0 shrink-0 flex-col overflow-hidden border-r border-border bg-white shadow-[8px_0_30px_-28px_rgba(49,31,129,0.3)]",
+        "px-3 py-5",
+        "md:fixed md:inset-y-0 md:left-0 md:z-auto md:flex md:h-screen md:w-72",
       )}
     >
       {/* Logo */}
-      <div className="mb-4 flex shrink-0 items-center justify-between px-2">
+      <div className="mb-6 flex shrink-0 items-center justify-between px-2">
         <Link to="/" className="flex items-center gap-2.5 min-h-touch">
           <img src="/logo.png" alt="" className="h-9 w-9 rounded-xl object-contain shadow-sm" />
           <span className="text-base font-bold tracking-tight text-navy">IPO Mania</span>

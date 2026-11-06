@@ -22,7 +22,12 @@ export function ListToolbar({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col gap-3 sm:flex-row sm:items-center", className)}>
+    <div
+      className={cn(
+        "flex flex-col gap-3 rounded-2xl border border-action-border bg-[#FBFAFF] p-4 shadow-card sm:flex-row sm:items-center",
+        className,
+      )}
+    >
       <label className="relative min-w-0 flex-1 sm:max-w-xl">
         <span className="sr-only">{searchLabel ?? searchPlaceholder}</span>
         <Search
@@ -34,7 +39,7 @@ export function ListToolbar({
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder={searchPlaceholder}
-          className="min-h-touch w-full rounded-xl border border-border bg-white py-2 pr-10 pl-10 text-base text-ink placeholder:text-muted shadow-sm shadow-indigo-950/[0.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus focus-visible:border-border-focus"
+          className="min-h-touch w-full rounded-xl border border-action-border bg-white py-2 pr-10 pl-10 text-base text-ink placeholder:text-muted shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus focus-visible:border-border-focus"
         />
         {search ? (
           <button

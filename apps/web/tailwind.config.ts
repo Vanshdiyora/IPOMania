@@ -17,33 +17,33 @@ const config: Config = {
       },
       colors: {
         // ── Core brand ──────────────────────────────────────────────────────
-        navy: "#172554",
-        "navy-secondary": "#312E81",
-        "navy-light": "#4338CA",
+        navy: "#101338",
+        "navy-secondary": "#29265C",
+        "navy-light": "#4B2CB8",
 
         // ── Primary interactive ──────────────────────────────────────────────
-        action: "#4F46E5",
-        "action-hover": "#4338CA",
-        "action-light": "#EEF2FF",
-        "action-border": "#C7D2FE",
+        action: "#4B0FE8",
+        "action-hover": "#3909BB",
+        "action-light": "#F0EBFF",
+        "action-border": "#D8C9FF",
         "action-emerald": "#0D9488",
 
         // ── Backgrounds ──────────────────────────────────────────────────────
-        canvas: "#F5F7FB",
+        canvas: "#F8F7FF",
         surface: "#FFFFFF",
         "surface-elevated": "#FFFFFF",
-        "surface-subtle": "#F1F5F9",
+        "surface-subtle": "#F4F1FF",
 
         // ── Text ─────────────────────────────────────────────────────────────
-        ink: "#0F172A",
-        "ink-secondary": "#334155",
-        muted: "#475569",
-        subtle: "#94A3B8",
+        ink: "#101338",
+        "ink-secondary": "#343A66",
+        muted: "#555D83",
+        subtle: "#7D82A6",
 
         // ── Borders ──────────────────────────────────────────────────────────
-        border: "#E6E9F2",
-        "border-strong": "#C7CCDA",
-        "border-focus": "#6366F1",
+        border: "#E5E1F5",
+        "border-strong": "#C9BDEB",
+        "border-focus": "#713CFF",
 
         // ── Semantic ─────────────────────────────────────────────────────────
         success: "#15803D",
@@ -62,16 +62,16 @@ const config: Config = {
         "info-bg": "#F0F9FF",
         "info-border": "#BAE6FD",
         listed: "#6D28D9",
-        "listed-bg": "#F5F3FF",
+        "listed-bg": "#EEE4FF",
         "listed-border": "#DDD6FE",
 
         // ── Chart palette ────────────────────────────────────────────────────
-        "chart-1": "#4F46E5",
-        "chart-2": "#0D9488",
-        "chart-3": "#F59E0B",
-        "chart-4": "#F43F5E",
-        "chart-5": "#8B5CF6",
-        "chart-6": "#06B6D4",
+        "chart-1": "#4B0FE8",
+        "chart-2": "#7B4DFF",
+        "chart-3": "#B095FF",
+        "chart-4": "#D6C8FF",
+        "chart-5": "#6D28D9",
+        "chart-6": "#AA83FF",
       },
 
       // ── Spacing ─────────────────────────────────────────────────────────────
@@ -91,8 +91,8 @@ const config: Config = {
 
       // ── Box shadow ────────────────────────────────────────────────────────────
       boxShadow: {
-        card: "0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04)",
-        "card-hover": "0 4px 12px 0 rgb(0 0 0 / 0.08), 0 2px 4px -1px rgb(0 0 0 / 0.04)",
+        card: "0 8px 24px -15px rgb(52 31 123 / 0.25), 0 2px 6px rgb(52 31 123 / 0.05)",
+        "card-hover": "0 16px 34px -18px rgb(52 31 123 / 0.28), 0 4px 12px rgb(52 31 123 / 0.08)",
         dropdown: "0 4px 20px 0 rgb(0 0 0 / 0.1), 0 2px 8px -2px rgb(0 0 0 / 0.06)",
         button: "0 1px 2px 0 rgb(0 0 0 / 0.08)",
         modal: "0 20px 60px -10px rgb(0 0 0 / 0.2), 0 8px 24px -6px rgb(0 0 0 / 0.1)",

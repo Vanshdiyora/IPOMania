@@ -5,7 +5,7 @@ import { cn } from "../../lib/utils";
 
 const buttonStyles = cva(
   [
-    "inline-flex min-h-touch items-center justify-center gap-2 rounded-lg px-5 py-2",
+    "inline-flex min-h-touch items-center justify-center gap-2 rounded-xl px-5 py-2",
     "text-base font-semibold tracking-tight",
     "transition-all duration-150 ease-smooth",
     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus",
@@ -22,7 +22,7 @@ const buttonStyles = cva(
         ],
         secondary: [
           "bg-action-light text-action border border-action-border",
-          "hover:bg-blue-100 hover:border-action",
+          "hover:bg-[#E6DCFF] hover:border-action",
           "active:scale-[0.98]",
         ],
         outline: [

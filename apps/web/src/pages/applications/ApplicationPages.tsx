@@ -318,9 +318,12 @@ export function ApplicationDashboardPage() {
   ];
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <header className="flex flex-wrap items-end justify-between gap-4 rounded-3xl border border-action-border/50 bg-gradient-to-r from-[#F2EDFF] via-[#FAF8FF] to-[#EEE7FF] p-6 shadow-card sm:p-8">
         <div>
-          <h1 className="text-3xl font-bold text-navy">Application manager</h1>
+          <p className="text-sm font-bold uppercase tracking-wider text-action">
+            Workspace overview
+          </p>
+          <h1 className="mt-1 text-3xl font-bold text-ink sm:text-4xl">Application manager</h1>
           <p className="mt-2 text-lg text-muted">
             Track your IPO applications across your demat accounts.
           </p>
@@ -352,8 +355,11 @@ export function ApplicationDashboardPage() {
           </>
         ) : (
           totals.map(([label, value]) => (
-            <Card key={label}>
-              <p className="text-base font-semibold text-muted">{label}</p>
+            <Card
+              key={label}
+              className="border-action-border/60 bg-gradient-to-br from-white to-[#F6F2FF]"
+            >
+              <p className="text-sm font-semibold text-ink">{label}</p>
               <p className="mt-2 text-3xl font-bold text-navy">{error ? "—" : (value ?? 0)}</p>
             </Card>
           ))
@@ -2421,7 +2427,7 @@ function ApplicationDetail({
 
 function SummaryMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-xl border border-border/80 bg-white/80 p-3 sm:min-w-32 sm:p-4">
+    <div className="min-w-0 rounded-xl border border-action-border/60 bg-gradient-to-br from-white to-[#F6F2FF] p-3 sm:min-w-32 sm:p-4">
       <div className="flex items-center gap-2 text-action">
         {icon}
         <span className="text-xs font-semibold text-muted">{label}</span>

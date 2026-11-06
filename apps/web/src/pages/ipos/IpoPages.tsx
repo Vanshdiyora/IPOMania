@@ -1,7 +1,7 @@
 import { userQueryKey } from "../../lib/queryKeys";
 import { queryKeys } from "../../lib/queryKeys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
   DematAccount,
@@ -42,6 +42,7 @@ import { applicationDrawerPath } from "../../lib/applicationDrawer";
 import { toIsoDateTime, toLocalDateTime } from "../../lib/formValues";
 import { defaultPageSize, parsePageSize } from "../../lib/pagination";
 import { DataTable } from "../../components/ui/DataTable";
+import { CalendarDays, ChartNoAxesColumn, Layers3, Search, Zap } from "lucide-react";
 
 type IpoListResponse<T = IpoRecord> = {
   data: {
@@ -194,109 +195,167 @@ function IpoListContent() {
   const ipos = data?.data.ipos ?? [];
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        eyebrow="Market overview"
-        title="IPO catalog"
-        description="Browse upcoming and open public issues, with key dates and pricing in one place."
-        compact
-        className="border-action/15 bg-gradient-to-r from-white via-white to-indigo-50/60"
-      />
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="IPO totals">
-        <Card className="px-4 py-3 sm:p-4">
-          <p className="text-sm font-semibold text-muted">Total IPOs</p>
-          <p className="mt-1 text-2xl font-bold text-navy">
-            {isLoading ? "Loading…" : error ? "Unavailable" : (data?.data.pagination.total ?? 0)}
-          </p>
-        </Card>
-        {(
-          [
-            ["Open", "open"],
-            ["Upcoming", "upcoming"],
-            ["Listed", "listed"],
-          ] as const
-        ).map(([title, status]) => (
-          <Card key={status} className="px-4 py-3 sm:p-4">
-            <p className="text-sm font-semibold text-muted">{title} IPOs</p>
-            <p className="mt-1 text-2xl font-bold text-navy">
-              {isLoading
-                ? "Loading…"
-                : error || !data?.data.status_counts
-                  ? "Unavailable"
-                  : data.data.status_counts[status]}
-            </p>
-          </Card>
-        ))}
-      </section>
-      <Card className="overflow-hidden">
-        <div className="flex flex-col gap-3">
-          <label className="block min-w-0 text-sm font-semibold text-ink">
-            Search company or exact symbol
-            <Input
-              aria-label="Search company or exact symbol"
-              className={inputClass}
-              placeholder="Search company or exact symbol..."
-              value={search}
-              onChange={(event) => {
-                updateListParams({ search: event.target.value, page: null }, true);
-              }}
+    <div className="space-y-7">
+      <section
+        className="relative overflow-hidden rounded-3xl border border-action-border/50 bg-gradient-to-r from-[#F2EDFF] via-[#FAF8FF] to-[#EEE7FF] px-5 py-7 shadow-card sm:px-8 lg:px-10"
+        aria-label="IPO market overview"
+      >
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 w-1/4 opacity-50"
+          aria-hidden="true"
+        >
+          <svg
+            className="h-full w-full"
+            viewBox="0 0 360 220"
+            preserveAspectRatio="xMidYMax slice"
+            fill="none"
+          >
+            <path d="M0 215C80 204 93 154 155 147S254 193 360 25V220H0Z" fill="#CFBEFF" />
+            <path
+              d="M60 184l54-28 44 9 49-57 40 14 43-57 44-20"
+              stroke="#7A4DFF"
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
-          </label>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="min-w-0 flex-1" role="group" aria-label="Filter IPOs by status">
-              <span className="mb-1.5 block text-sm font-semibold text-ink">Filter IPOs</span>
-              <div className="flex flex-wrap gap-2">
-                {availableStatuses.map((status) => {
-                  const isSelected = selectedStatuses.includes(status);
-                  return (
-                    <button
-                      key={status}
-                      type="button"
-                      aria-pressed={isSelected}
-                      onClick={() =>
-                        updateListParams(
-                          {
-                            status: isSelected
-                              ? selectedStatuses.filter((selected) => selected !== status)
-                              : [...selectedStatuses, status],
-                            page: null,
-                          },
-                          true,
+            <path
+              d="M130 180v-35h25v35m20 0v-55h25v55m20 0V98h25v82m20 0V71h25v109m20 0v-95h25v95"
+              fill="#9A73FF"
+              fillOpacity=".7"
+            />
+          </svg>
+        </div>
+        <div className="relative grid gap-8 xl:grid-cols-[minmax(250px,1fr)_minmax(0,1.7fr)] xl:items-center">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-wider text-action">
+              Market overview
+            </p>
+            <h1 className="mt-2 text-4xl font-bold tracking-tight text-ink sm:text-5xl">
+              IPO catalog
+            </h1>
+            <p className="mt-2 max-w-md text-base text-muted sm:text-lg">
+              Browse upcoming and open public issues, with key dates and pricing in one place.
+            </p>
+          </div>
+          <div
+            className="grid grid-cols-2 gap-y-5 sm:grid-cols-4"
+            aria-label="IPO totals"
+            aria-busy={isLoading}
+          >
+            <CatalogMetric
+              icon={<Layers3 size={22} />}
+              label="Total IPOs"
+              value={
+                isLoading
+                  ? "…"
+                  : error
+                    ? "—"
+                    : data?.data.status_counts
+                      ? Object.values(data.data.status_counts).reduce(
+                          (sum, count) => sum + count,
+                          0,
                         )
-                      }
-                      className={`min-h-touch rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy ${
-                        isSelected
-                          ? "border-action bg-action-light text-action"
-                          : "border-border bg-white text-ink hover:bg-canvas"
-                      }`}
-                    >
-                      {label(status)}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <label className="block w-full shrink-0 text-sm font-semibold text-ink sm:w-64">
-              Sort IPOs
-              <CustomSelect
-                aria-label="Sort IPOs"
-                value={sort}
-                searchable={false}
-                clearable={false}
-                onChange={(event) =>
-                  updateListParams({ sort: event.target.value, page: null }, true)
-                }
-              >
-                {ipoSortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </CustomSelect>
-            </label>
+                      : (data?.data.pagination.total ?? 0)
+              }
+            />
+            <CatalogMetric
+              icon={<Zap size={22} />}
+              label="Open IPOs"
+              value={isLoading ? "…" : error ? "—" : (data?.data.status_counts?.open ?? 0)}
+            />
+            <CatalogMetric
+              icon={<CalendarDays size={22} />}
+              label="Upcoming IPOs"
+              value={isLoading ? "…" : error ? "—" : (data?.data.status_counts?.upcoming ?? 0)}
+            />
+            <CatalogMetric
+              icon={<ChartNoAxesColumn size={22} />}
+              label="Listed IPOs"
+              value={isLoading ? "…" : error ? "—" : (data?.data.status_counts?.listed ?? 0)}
+            />
           </div>
         </div>
-      </Card>
+      </section>
+      <section
+        className="rounded-3xl border border-[#A87DFF] bg-[#FBFAFF] p-4 shadow-[0_7px_22px_rgba(86,35,221,0.18)] sm:p-5"
+        aria-label="IPO catalog controls"
+      >
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:gap-6">
+          <label className="relative block min-w-0 flex-1 xl:max-w-[34rem]">
+            <span className="sr-only">Search company or exact symbol</span>
+            <Search
+              size={20}
+              className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-action"
+              aria-hidden="true"
+            />
+            <Input
+              aria-label="Search company or exact symbol"
+              className="min-h-14 rounded-xl border-action-border bg-white pl-12 text-base shadow-card placeholder:text-muted"
+              placeholder="Search company or exact symbol..."
+              value={search}
+              onChange={(event) =>
+                updateListParams({ search: event.target.value, page: null }, true)
+              }
+            />
+          </label>
+          <div
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-2 border-action-border/80 xl:border-l xl:pl-6"
+            role="group"
+            aria-label="Filter IPOs by status"
+          >
+            <span className="mr-1 text-sm font-semibold text-muted">Filter:</span>
+            <button
+              type="button"
+              aria-pressed={selectedStatuses.length === 0}
+              onClick={() => updateListParams({ status: null, page: null }, true)}
+              className={`min-h-touch rounded-full border px-4 text-sm font-semibold transition-colors ${selectedStatuses.length === 0 ? "border-action bg-action text-white" : "border-action-border bg-white text-ink hover:bg-action-light"}`}
+            >
+              All
+            </button>
+            {availableStatuses.map((status) => {
+              const isSelected = selectedStatuses.includes(status);
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() =>
+                    updateListParams(
+                      {
+                        status: isSelected
+                          ? selectedStatuses.filter((selected) => selected !== status)
+                          : [...selectedStatuses, status],
+                        page: null,
+                      },
+                      true,
+                    )
+                  }
+                  className={`min-h-touch rounded-full border px-4 text-sm font-semibold transition-colors ${isSelected ? "border-action bg-action text-white" : "border-action-border bg-white text-ink hover:bg-action-light"}`}
+                >
+                  {label(status)}
+                </button>
+              );
+            })}
+          </div>
+          <label className="flex w-full shrink-0 items-center gap-3 border-action-border/80 text-sm font-semibold text-muted sm:w-auto xl:border-l xl:pl-6">
+            Sort by:
+            <CustomSelect
+              aria-label="Sort IPOs"
+              className="min-h-14 min-w-[12rem] rounded-xl border-action-border bg-white font-semibold text-ink shadow-card"
+              value={sort}
+              searchable={false}
+              clearable={false}
+              onChange={(event) => updateListParams({ sort: event.target.value, page: null }, true)}
+            >
+              {ipoSortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </CustomSelect>
+          </label>
+        </div>
+      </section>
       {error ? <ErrorNotice error={error} onRetry={() => void refetch()} /> : null}
       {isLoading ? (
         <SkeletonPage label="Loading IPO records">
@@ -318,7 +377,7 @@ function IpoListContent() {
       {!isLoading && !error && ipos.length > 0 ? (
         <DataTable minWidth="1000px">
           <thead>
-            <tr className="border-b border-border bg-canvas text-xs uppercase tracking-wide text-muted">
+            <tr className="border-b border-border bg-[#F0EBFF] text-xs uppercase tracking-wide text-muted">
               <th className="p-4 text-left">IPO</th>
               <th className="p-4 text-left">Exchange</th>
               <th className="p-4 text-left">Price band</th>
@@ -374,6 +433,29 @@ function IpoListContent() {
           onPageChange={(next) => updateListParams({ page: String(next) })}
         />
       ) : null}
+    </div>
+  );
+}
+
+function CatalogMetric({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="border-l border-action-border/80 px-4 sm:px-5">
+      <span
+        className="flex size-11 items-center justify-center rounded-xl bg-action-light text-action"
+        aria-hidden="true"
+      >
+        {icon}
+      </span>
+      <p className="mt-2 whitespace-nowrap text-sm font-semibold text-ink">{label}</p>
+      <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight text-ink">{value}</p>
     </div>
   );
 }

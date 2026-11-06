@@ -258,12 +258,14 @@ export function AccountDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="relative overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-br from-white via-white to-indigo-50/80 p-5 shadow-card sm:flex sm:items-end sm:justify-between sm:p-6">
+      <header className="relative overflow-hidden rounded-3xl border border-action-border/50 bg-gradient-to-r from-[#F2EDFF] via-[#FAF8FF] to-[#EEE7FF] p-6 shadow-card sm:flex sm:items-end sm:justify-between sm:p-8">
         <div className="relative min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-action">
             Portfolio setup
           </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-navy">Demat accounts</h1>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-ink sm:text-4xl">
+            Demat accounts
+          </h1>
           <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted">
             Manage the accounts associated with your profile.
           </p>
@@ -1554,10 +1556,9 @@ function SummaryCard({
   icon: React.ReactNode;
 }) {
   return (
-    <Card className="relative overflow-hidden border-indigo-100 bg-gradient-to-br from-white to-indigo-50/60 p-4 sm:p-5">
-      <span className="absolute inset-y-0 left-0 w-1 bg-action" aria-hidden="true" />
+    <Card className="relative overflow-hidden border-action-border/60 bg-gradient-to-br from-white to-[#F6F2FF] p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-semibold text-muted">{label}</p>
+        <p className="text-sm font-semibold text-ink">{label}</p>
         <span className="flex size-9 items-center justify-center rounded-xl bg-action-light text-action ring-1 ring-action-border">
           {icon}
         </span>

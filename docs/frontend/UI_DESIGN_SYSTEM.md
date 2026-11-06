@@ -4,17 +4,22 @@
 
 | Token          | Value     | Use                        |
 | -------------- | --------- | -------------------------- |
-| Primary navy   | `#101828` | Headings and primary brand |
-| Secondary navy | `#1D2D44` | Secondary brand            |
-| Background     | `#F8FAFC` | Application canvas         |
+| Primary navy   | `#101338` | Headings and primary brand |
+| Secondary navy | `#29265C` | Secondary brand            |
+| Background     | `#F8F7FF` | Application canvas         |
 | Cards          | `#FFFFFF` | Surfaces                   |
-| Primary text   | `#0F172A` | Body text                  |
-| Secondary text | `#475569` | Supporting text            |
-| Borders        | `#E2E8F0` | Dividers and outlines      |
-| Primary action | `#1D4ED8` | Interactive actions        |
+| Primary text   | `#101338` | Body text                  |
+| Secondary text | `#555D83` | Supporting text            |
+| Borders        | `#E5E1F5` | Dividers and outlines      |
+| Primary action | `#4B0FE8` | Interactive actions        |
 | Success        | `#15803D` | Positive state             |
 | Warning        | `#B45309` | Warning state              |
 | Danger         | `#DC2626` | Error/destructive state    |
+
+The catalog reference sets the visual pattern for the application: a white sidebar, pale violet
+page headers, purple icon tiles and actions, rounded filter surfaces, and lavender table headers.
+Dashboard and other page metrics use the same pale violet card treatment. Values are always sourced
+from API data; the decorative chart in the catalog header is illustrative only.
 
 ## Accessibility and behavior
 

@@ -13,7 +13,7 @@ export function DataTable({
   return (
     <div
       className={cn(
-        "w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-surface shadow-card",
+        "w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-surface shadow-card [&_thead]:bg-[#F0EBFF] [&_thead]:text-[#424A70] [&_thead_th]:font-bold [&_tbody_tr]:border-b [&_tbody_tr]:border-border/80 [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-[#FAF8FF]",
       )}
       tabIndex={0}
       role="region"
