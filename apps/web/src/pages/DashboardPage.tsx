@@ -247,6 +247,7 @@ export function DashboardPage() {
               variant="outline"
               size="sm"
               className="gap-2 border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15 hover:text-white"
+              loading={exportMutation.isPending}
               disabled={exportMutation.isPending || !analytics}
               onClick={() => exportMutation.mutate("csv")}
             >
@@ -257,6 +258,7 @@ export function DashboardPage() {
               type="button"
               size="sm"
               className="gap-2 border border-white bg-white text-indigo-950 shadow-md hover:bg-indigo-50"
+              loading={exportMutation.isPending}
               disabled={exportMutation.isPending || !analytics}
               onClick={() => exportMutation.mutate("xlsx")}
             >
@@ -954,7 +956,7 @@ function AnalyticsStateMessage({
   loading: boolean;
   error?: unknown;
 }) {
-  if (loading) return <LoadingState label="Loading analytics…" inline />;
+  if (loading) return <LoadingState label="Loading analytics" inline />;
   if (error)
     return <EmptyMessage label={sectionErrorMessage(error, "Analytics section unavailable")} />;
   return <EmptyMessage label={label} />;

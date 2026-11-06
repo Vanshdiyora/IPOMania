@@ -55,7 +55,7 @@ export function ConfirmButton({
             )}
           </>
         }
-        confirmLabel={busy ? "Processing…" : confirmLabel}
+        confirmLabel={busy ? "Processing" : confirmLabel}
         busy={busy}
         danger={danger}
         onCancel={() => setOpen(false)}

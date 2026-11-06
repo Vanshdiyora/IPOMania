@@ -32,6 +32,7 @@ import { Pagination as PaginationControls } from "../../components/ui/Pagination
 import { ApiRequestError, apiRequest } from "../../lib/api";
 import { defaultPageSize } from "../../lib/pagination";
 import { EmptyState } from "../../components/ui/States";
+import { LoadingState } from "../../components/LoadingState";
 import {
   SkeletonCard,
   SkeletonDetailsPage,
@@ -199,8 +200,13 @@ export function MandateDetailsPage() {
                 <Button variant="outline" disabled={update.isPending} onClick={requestClose}>
                   Cancel
                 </Button>
-                <Button type="submit" form="edit-mandate-form" disabled={update.isPending}>
-                  {update.isPending ? "Saving…" : "Save changes"}
+                <Button
+                  type="submit"
+                  form="edit-mandate-form"
+                  loading={update.isPending}
+                  disabled={update.isPending}
+                >
+                  {update.isPending ? "Saving" : "Save changes"}
                 </Button>
               </div>
             )}
@@ -376,8 +382,13 @@ export function AllotmentDetailsPage() {
                 <Button variant="outline" disabled={update.isPending} onClick={requestClose}>
                   Cancel
                 </Button>
-                <Button type="submit" form="edit-allotment-form" disabled={update.isPending}>
-                  {update.isPending ? "Saving…" : "Save changes"}
+                <Button
+                  type="submit"
+                  form="edit-allotment-form"
+                  loading={update.isPending}
+                  disabled={update.isPending}
+                >
+                  {update.isPending ? "Saving" : "Save changes"}
                 </Button>
               </div>
             )}
@@ -522,9 +533,7 @@ export function CreateMandatePage() {
               disabled={applications.isLoading || Boolean(applications.error)}
               onChange={(event) => setApplicationId(event.target.value)}
             >
-              <option value="">
-                {applications.isLoading ? "Loading applications…" : "Choose an application"}
-              </option>
+              <option value="">Choose an application</option>
               {(applications.data?.data.applications ?? []).map((application) => (
                 <option key={application.id} value={application.id}>
                   {applicationTitle(application)} ·{" "}
@@ -532,6 +541,7 @@ export function CreateMandatePage() {
                 </option>
               ))}
             </FormSelect>
+            {applications.isLoading ? <LoadingState label="Loading applications" inline /> : null}
             <FormInput
               label="UPI mandate reference"
               error={validation.errors.mandate_reference}
@@ -630,15 +640,14 @@ export function CreateAllotmentPage() {
               disabled={applications.isLoading || Boolean(applications.error)}
               onChange={(event) => setApplicationId(event.target.value)}
             >
-              <option value="">
-                {applications.isLoading ? "Loading applications…" : "Choose an application"}
-              </option>
+              <option value="">Choose an application</option>
               {(applications.data?.data.applications ?? []).map((application) => (
                 <option key={application.id} value={application.id}>
                   {applicationTitle(application)} · {application.shares} shares requested
                 </option>
               ))}
             </FormSelect>
+            {applications.isLoading ? <LoadingState label="Loading applications" inline /> : null}
             <FormSelect
               label="Allotment status"
               error={validation.errors.allotment_status}
@@ -735,7 +744,7 @@ export function CapitalTrackerPage() {
       ) : null}
       {summaryQuery.isLoading ? (
         <div role="status" aria-label="Loading capital summary" aria-busy="true">
-          <span className="sr-only">Loading capital summary…</span>
+          <span className="sr-only">Loading capital summary</span>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, index) => (
               <SkeletonStatCard key={index} />
@@ -856,7 +865,7 @@ export function FinancialTransactionHistoryPage() {
         <h2 className="text-xl font-bold text-ink">Ledger events</h2>
         {ledgerQuery.isLoading ? (
           <div role="status" aria-label="Loading ledger events" aria-busy="true" className="mt-4">
-            <span className="sr-only">Loading ledger events…</span>
+            <span className="sr-only">Loading ledger events</span>
             <SkeletonTable rows={5} cols={4} />
           </div>
         ) : ledgerQuery.error && !ledgerQuery.data ? null : rows.length === 0 ? (
@@ -1055,7 +1064,7 @@ function MandateList({ showAll }: { showAll: boolean }) {
         <div className="mt-4 divide-y divide-border">
           {mandatesQuery.isLoading ? (
             <div role="status" aria-label="Loading mandates" aria-busy="true" className="space-y-3">
-              <span className="sr-only">Loading mandates…</span>
+              <span className="sr-only">Loading mandates</span>
               <SkeletonCard />
               <SkeletonCard />
               <SkeletonCard />
@@ -1154,7 +1163,7 @@ function AllotmentList({ showAll }: { showAll: boolean }) {
               aria-busy="true"
               className="space-y-3"
             >
-              <span className="sr-only">Loading allotments…</span>
+              <span className="sr-only">Loading allotments</span>
               <SkeletonCard />
               <SkeletonCard />
               <SkeletonCard />
@@ -1281,8 +1290,13 @@ function LedgerEventForm() {
             <Button variant="outline" disabled={create.isPending} onClick={requestClose}>
               Cancel
             </Button>
-            <Button type="submit" form="ledger-event-form" disabled={create.isPending}>
-              {create.isPending ? "Saving…" : "Record event"}
+            <Button
+              type="submit"
+              form="ledger-event-form"
+              loading={create.isPending}
+              disabled={create.isPending}
+            >
+              {create.isPending ? "Saving" : "Record event"}
             </Button>
           </div>
         )}
@@ -1306,15 +1320,14 @@ function LedgerEventForm() {
               disabled={applications.isLoading || Boolean(applications.error)}
               onChange={(event) => setApplicationId(event.target.value)}
             >
-              <option value="">
-                {applications.isLoading ? "Loading applications…" : "Choose application"}
-              </option>
+              <option value="">Choose application</option>
               {(applications.data?.data.applications ?? []).map((application) => (
                 <option key={application.id} value={application.id}>
                   {applicationTitle(application)}
                 </option>
               ))}
             </FormSelect>
+            {applications.isLoading ? <LoadingState label="Loading applications" inline /> : null}
             <FormSelect
               label="Transaction type"
               error={validation.errors.transaction_type}
@@ -1428,15 +1441,14 @@ function FinancialFilters({
             disabled={ipos.isLoading || Boolean(ipos.error)}
             onChange={(event) => onChange({ ...filters, ipo_id: event.target.value })}
           >
-            <option value="">
-              {ipos.isLoading ? "Loading IPOs…" : ipos.error ? "IPO list unavailable" : "All IPOs"}
-            </option>
+            <option value="">{ipos.error ? "IPO list unavailable" : "All IPOs"}</option>
             {(ipos.data?.data.ipos ?? []).map((ipo) => (
               <option key={ipo.id} value={ipo.id}>
                 {ipo.company_name}
               </option>
             ))}
           </CustomSelect>
+          {ipos.isLoading ? <LoadingState label="Loading IPOs" inline /> : null}
         </label>
         <label className="text-sm font-semibold text-ink">
           Demat account
@@ -1446,19 +1458,14 @@ function FinancialFilters({
             disabled={accounts.isLoading || Boolean(accounts.error)}
             onChange={(event) => onChange({ ...filters, account_id: event.target.value })}
           >
-            <option value="">
-              {accounts.isLoading
-                ? "Loading accounts…"
-                : accounts.error
-                  ? "Account list unavailable"
-                  : "All accounts"}
-            </option>
+            <option value="">{accounts.error ? "Account list unavailable" : "All accounts"}</option>
             {(accounts.data?.data.accounts ?? []).map((account) => (
               <option key={account.id} value={account.id}>
                 {account.holder_name}
               </option>
             ))}
           </CustomSelect>
+          {accounts.isLoading ? <LoadingState label="Loading accounts" inline /> : null}
         </label>
         <label className="text-sm font-semibold text-ink">
           Category

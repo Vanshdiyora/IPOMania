@@ -10,7 +10,7 @@ export function ConfirmEmailPage() {
   const { notify } = useToast();
   const startedRef = useRef(false);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("Verifying your email address…");
+  const [message, setMessage] = useState("Verifying your email address");
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
