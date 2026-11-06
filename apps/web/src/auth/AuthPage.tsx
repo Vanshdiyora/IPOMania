@@ -19,20 +19,20 @@ export function AuthPage({
   return (
     <div className="flex min-h-screen bg-canvas">
       {/* Left decorative panel */}
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-indigo-950 via-indigo-900 to-teal-800 p-10 lg:flex">
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden border-r border-action-border/60 bg-gradient-to-br from-[#F1EBFF] via-[#FAF8FF] to-[#E8DEFF] p-10 lg:flex">
         {/* Background pattern */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-action/10" />
-          <div className="absolute -bottom-20 -left-20 h-80 w-80 rounded-full bg-action/8" />
-          <div className="absolute left-1/3 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/4" />
+          <div className="absolute -bottom-20 -left-20 h-80 w-80 rounded-full bg-action/10" />
+          <div className="absolute left-1/3 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/50" />
           {/* Grid lines */}
           <svg
-            className="absolute inset-0 h-full w-full opacity-5"
+            className="absolute inset-0 h-full w-full opacity-20"
             xmlns="http://www.w3.org/2000/svg"
           >
             <defs>
               <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="1" />
+                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#B99FFF" strokeWidth="1" />
               </pattern>
             </defs>
             <rect width="100%" height="100%" fill="url(#grid)" />
@@ -42,19 +42,19 @@ export function AuthPage({
         {/* Logo */}
         <Link to="/" className="relative flex items-center gap-3 w-fit">
           <img src="/logo.png" alt="" className="h-10 w-10 rounded-xl object-contain" />
-          <span className="text-lg font-bold text-white">IPO Mania</span>
+          <span className="text-lg font-bold text-ink">IPO Mania</span>
         </Link>
 
         {/* Testimonial / Brand copy */}
         <div className="relative space-y-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-action/20">
-            <TrendingUp className="text-white" size={24} />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-action-light">
+            <TrendingUp className="text-action" size={24} />
           </div>
           <blockquote className="space-y-3">
-            <p className="text-2xl font-semibold leading-snug text-white">
+            <p className="text-3xl font-semibold leading-snug text-ink">
               Your complete IPO intelligence platform.
             </p>
-            <p className="text-base text-white/60 leading-relaxed">
+            <p className="text-base text-muted leading-relaxed">
               Track applications and demat accounts in one private, secure dashboard.
             </p>
           </blockquote>
@@ -67,7 +67,7 @@ export function AuthPage({
               "Issue-specific quota calculator",
               "Application activity insights",
             ].map((feature) => (
-              <li key={feature} className="flex items-center gap-3 text-sm text-white/70">
+              <li key={feature} className="flex items-center gap-3 text-sm text-muted">
                 <div className="h-1.5 w-1.5 rounded-full bg-action flex-shrink-0" />
                 {feature}
               </li>
@@ -75,20 +75,20 @@ export function AuthPage({
           </ul>
         </div>
 
-        <p className="relative text-xs text-white/30">
+        <p className="relative text-xs text-muted">
           © {new Date().getFullYear()} IPO Mania. All rights reserved.
         </p>
       </div>
 
       {/* Right form panel */}
-      <div className="flex flex-1 flex-col items-center justify-center p-6 sm:p-10">
+      <div className="flex flex-1 flex-col items-center justify-center bg-white p-6 sm:p-10">
         {/* Mobile logo */}
         <Link to="/" className="mb-8 flex items-center gap-2.5 lg:hidden">
           <img src="/logo.png" alt="" className="h-9 w-9 rounded-xl object-contain" />
           <span className="text-base font-bold text-ink">IPO Mania</span>
         </Link>
 
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm rounded-3xl border border-action-border/60 bg-white p-5 shadow-card sm:p-7">
           {/* Form header */}
           <div className="mb-7">
             <h1 className="text-2xl font-bold tracking-tight text-ink">{title}</h1>

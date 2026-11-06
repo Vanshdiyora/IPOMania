@@ -97,7 +97,7 @@ export function AdminLayout() {
   }, [open]);
   const sidebar = (
     <div className="flex h-full flex-col">
-      <div className="flex h-16 items-center px-5 text-lg font-bold text-white">
+      <div className="flex h-16 items-center px-5 text-lg font-bold text-ink">
         <img src="/logo.png" alt="" className="mr-2 h-9 w-9 rounded-xl object-contain" />
         IPO Mania
       </div>
@@ -108,7 +108,7 @@ export function AdminLayout() {
             to={path}
             onClick={() => setOpen(false)}
             aria-current={location.pathname === path ? "page" : undefined}
-            className={`flex min-h-touch items-center rounded-lg px-3 text-sm font-medium transition-colors ${location.pathname === path ? "bg-white text-navy" : "text-slate-200 hover:bg-navy-light hover:text-white"}`}
+            className={`flex min-h-touch items-center rounded-xl px-3 text-sm font-medium transition-colors ${location.pathname === path ? "bg-action-light font-semibold text-action" : "text-muted hover:bg-action-light hover:text-action"}`}
           >
             <Icon className="mr-3 h-4 w-4" />
             {label}
@@ -121,7 +121,7 @@ export function AdminLayout() {
             .then(() => notify({ title: "Signed out", tone: "success" }))
             .catch(() => notify({ title: "Sign out failed", tone: "error" }))
         }
-        className="mx-3 mb-5 flex min-h-touch items-center rounded-lg px-3 text-sm font-medium text-slate-200 hover:bg-navy-light"
+        className="mx-3 mb-5 flex min-h-touch items-center rounded-lg px-3 text-sm font-medium text-muted hover:bg-action-light hover:text-action"
       >
         <LogOut className="mr-3 h-4 w-4" />
         Sign out
@@ -130,7 +130,9 @@ export function AdminLayout() {
   );
   return (
     <div className="min-h-screen bg-canvas text-ink lg:flex">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 bg-navy lg:block">{sidebar}</aside>
+      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-border bg-white lg:block">
+        {sidebar}
+      </aside>
       {open &&
         createPortal(
           <div className="fixed inset-0 z-50" role="presentation">
@@ -145,14 +147,14 @@ export function AdminLayout() {
               role="dialog"
               aria-modal="true"
               aria-label="Admin navigation"
-              className="relative h-dvh w-64 bg-navy shadow-xl"
+              className="relative h-dvh w-72 bg-white shadow-xl"
             >
               {sidebar}
               <button
                 data-navigation-close
                 aria-label="Close navigation"
                 onClick={() => setOpen(false)}
-                className="absolute right-2 top-2 grid min-h-touch min-w-touch place-items-center rounded-lg text-white"
+                className="absolute right-2 top-2 grid min-h-touch min-w-touch place-items-center rounded-lg text-ink"
               >
                 <X />
               </button>
@@ -160,7 +162,7 @@ export function AdminLayout() {
           </div>,
           document.body,
         )}
-      <div className="min-w-0 flex-1 lg:ml-64">
+      <div className="min-w-0 flex-1 lg:ml-72">
         {!open && (
           <button
             ref={menuButtonRef}
@@ -685,7 +687,7 @@ export function AdminIposPage() {
               )}
             </div>
             <DataTable minWidth="820px" className="hidden text-left text-sm md:table">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <thead className="bg-[#F0EBFF] text-xs uppercase text-muted">
                 <tr>
                   <th scope="col" className="px-4 py-3 text-left">
                     Company
@@ -702,7 +704,7 @@ export function AdminIposPage() {
                   <th scope="col" className="px-4 py-3 text-center">
                     Listing date
                   </th>
-                  <th scope="col" className="sticky right-0 bg-slate-50 px-4 py-3 text-right">
+                  <th scope="col" className="sticky right-0 bg-[#F0EBFF] px-4 py-3 text-right">
                     Actions
                   </th>
                 </tr>
@@ -1056,7 +1058,7 @@ export function AdminHistoryPage() {
           </div>
           <div className="hidden overflow-x-auto rounded-xl border bg-white md:block">
             <DataTable minWidth="720px">
-              <thead className="bg-slate-50">
+              <thead className="bg-[#F0EBFF]">
                 <tr>
                   {["Started", "Trigger", "Provider", "Status"].map((label) => (
                     <th

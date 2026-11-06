@@ -239,6 +239,20 @@ describe("user IPO catalog", () => {
         expect.objectContaining({ signal: expect.any(AbortSignal) }),
       ),
     );
+    fireEvent.click(screen.getByRole("button", { name: "All", exact: true }));
+    expect(screen.getByRole("button", { name: "All", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await waitFor(() =>
+      expect(apiRequestMock).toHaveBeenCalledWith(
+        "/api/ipos/catalog?page=1&page_size=10&sort=price_desc",
+        expect.anything(),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Open", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Closed", exact: true }));
     fireEvent.change(screen.getByRole("textbox", { name: "Search company or exact symbol" }), {
       target: { value: "Catalog" },
     });

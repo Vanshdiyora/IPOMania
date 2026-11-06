@@ -30,8 +30,8 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "rounded-2xl border border-border bg-surface shadow-card",
-        compact ? "px-4 py-3 sm:px-5" : "px-4 py-5 sm:px-6",
+        "relative overflow-hidden rounded-3xl border border-action-border/50 bg-gradient-to-r from-[#F2EDFF] via-[#FAF8FF] to-[#EEE7FF] shadow-card",
+        compact ? "px-5 py-5 sm:px-7" : "px-5 py-7 sm:px-8 sm:py-9",
         className,
       )}
     >
@@ -39,7 +39,7 @@ export function PageHeader({
       {eyebrow && (
         <p
           className={cn(
-            "text-xs font-semibold uppercase tracking-widest text-action",
+            "text-xs font-bold uppercase tracking-[0.12em] text-action",
             compact && "mb-0.5",
           )}
         >
@@ -49,7 +49,7 @@ export function PageHeader({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <h1
-            className={cn("text-2xl font-bold tracking-tight text-ink", !compact && "sm:text-3xl")}
+            className={cn("text-3xl font-bold tracking-tight text-ink", !compact && "sm:text-4xl")}
           >
             {title}
           </h1>
@@ -149,15 +149,15 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border/90 bg-gradient-to-br from-white to-indigo-50/30 p-5 shadow-card",
+        "rounded-2xl border border-action-border/60 bg-gradient-to-br from-white to-[#F6F2FF] p-5 shadow-card",
         "transition-all duration-200 hover:shadow-card-hover",
         className,
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-muted">{label}</p>
+        <p className="text-sm font-semibold text-ink">{label}</p>
         {icon && (
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-action-light to-teal-50 text-action ring-1 ring-indigo-100">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-action-light text-action ring-1 ring-action-border/50">
             {icon}
           </div>
         )}

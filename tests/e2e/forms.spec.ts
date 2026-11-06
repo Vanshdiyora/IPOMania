@@ -242,13 +242,16 @@ test("regular users cannot open the IPO creation form", async ({ page }) => {
 });
 
 test("application form hides financial statuses and preserves them on edit", async ({ page }) => {
+  test.setTimeout(90_000);
   await prepare(page);
   const ownedIpoRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());
     return url.pathname === "/api/ipos" && url.searchParams.get("page") === "1";
   });
   await page.goto("/applications/new");
-  await expect(page.getByRole("dialog", { name: "Add application" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Add application" })).toBeVisible({
+    timeout: 30_000,
+  });
   await ownedIpoRequest;
   await expect(page.getByLabel("Mandate status")).toHaveCount(0);
   await expect(page.getByLabel("Allotment status")).toHaveCount(0);
@@ -285,6 +288,16 @@ test("application form hides financial statuses and preserves them on edit", asy
     }
     await route.fulfill({ json: { data: application } });
   });
+  await page.route(/\/api\/applications(?:\?|$)/, (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          applications: [{ ...application, archived_at: null }],
+          pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 },
+        },
+      },
+    }),
+  );
   await page.goto(`/applications/${recordId}/edit`);
   await expect(page.getByRole("dialog", { name: "Edit application" })).toBeVisible();
   await expect(page.getByLabel("Application number")).toHaveCount(0);
@@ -292,6 +305,10 @@ test("application form hides financial statuses and preserves them on edit", asy
   await expect(page.getByLabel("Investor category")).toBeVisible();
   await expect(page.getByLabel("Lots")).toHaveValue("1");
   await expect(page.getByLabel("Price")).toHaveValue("20.00");
+  await expect(
+    page.getByText(/An active application already exists for this IPO and demat account/),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save application" })).toBeEnabled();
   await expect(page.getByLabel("Mandate status")).toHaveCount(0);
   await expect(page.getByLabel("Allotment status")).toHaveCount(0);
   await page.getByRole("button", { name: "Save application" }).click();

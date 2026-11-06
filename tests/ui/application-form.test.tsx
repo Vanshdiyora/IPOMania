@@ -3,7 +3,7 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type * as ApiModule from "../../apps/web/src/lib/api";
 import { ToastProvider } from "../../apps/web/src/components/ui/Toast";
@@ -46,7 +46,13 @@ function renderForm(initialEntry = "/applications/new") {
     <ToastProvider>
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={[initialEntry]}>
-          <ApplicationFormPage />
+          <Routes>
+            <Route path="/applications/new" element={<ApplicationFormPage />} />
+            <Route
+              path="/applications/:applicationId/edit"
+              element={<ApplicationFormPage editing />}
+            />
+          </Routes>
         </MemoryRouter>
       </QueryClientProvider>
     </ToastProvider>,
@@ -62,6 +68,105 @@ async function chooseIpo(name: string) {
 }
 
 describe("application form IPO selection", () => {
+  it("does not report the edited application as a duplicate and loads its IPO beyond the first page", async () => {
+    const applicationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const ipoId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const accountId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const oldRuleId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const newRuleId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const rule = {
+      category: "RETAIL",
+      default_lots: 1,
+      lot_limit_status: "NO_PUBLISHED_LIMIT",
+      minimum_lots: 1,
+      maximum_lots: null,
+      lot_increment: 1,
+      investment_limit_status: "NO_PUBLISHED_LIMIT",
+      minimum_investment: null,
+      maximum_investment: null,
+      allowed_price_types: ["BID"],
+    };
+    apiRequestMock.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/ipos?"))
+        return { data: { ipos: [], pagination: { page: 1, total_pages: 1 } } };
+      if (path === `/api/ipos/${ipoId}`)
+        return {
+          data: { id: ipoId, company_name: "Older IPO", lot_size: 1200, issue_price_max: "120" },
+        };
+      if (path === `/api/ipos/${ipoId}/categories`)
+        return {
+          data: {
+            configurations: [
+              { ...rule, id: oldRuleId, rule_version: 1 },
+              { ...rule, id: newRuleId, rule_version: 2 },
+            ],
+          },
+        };
+      if (path.startsWith("/api/accounts?"))
+        return {
+          data: {
+            accounts: [
+              {
+                id: accountId,
+                holder_name: "Current holder",
+                bank_name: "Current bank",
+                username: "holder",
+                account_status: "active",
+                archived_at: null,
+              },
+            ],
+            pagination: { page: 1, totalPages: 1 },
+          },
+        };
+      if (path.startsWith("/api/applications?"))
+        return {
+          data: {
+            applications: [
+              {
+                id: applicationId,
+                ipo_id: ipoId,
+                demat_account_id: accountId,
+                archived_at: null,
+                application_status: "DRAFT",
+              },
+            ],
+            pagination: { page: 1, total_pages: 1 },
+          },
+        };
+      if (path === `/api/applications/${applicationId}`)
+        return {
+          data: {
+            id: applicationId,
+            ipo_id: ipoId,
+            demat_account_id: accountId,
+            category_id: oldRuleId,
+            category_code: "RETAIL",
+            lots: 1,
+            total_shares: 1200,
+            application_amount: "144000",
+            calculation_snapshot: { calculation_input: { price: "120" } },
+          },
+        };
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    const { container } = renderForm(`/applications/${applicationId}/edit`);
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "IPO" })).toHaveTextContent("Older IPO"),
+    );
+    const category = container.querySelector<HTMLSelectElement>("select");
+    await waitFor(() => expect(category).toHaveValue(oldRuleId));
+    expect(category?.querySelector(`option[value="${oldRuleId}"]`)).toHaveTextContent(
+      "Retail (recorded rule v1)",
+    );
+    expect(
+      screen.queryByText(/An active application already exists for this IPO and demat account/),
+    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Save application" })).toBeEnabled(),
+    );
+  });
+
   it("preselects an imported shared IPO and shows its copied category rules", async () => {
     const ipoId = "88888888-8888-4888-8888-888888888888";
     apiRequestMock.mockImplementation(async (path: string) => {

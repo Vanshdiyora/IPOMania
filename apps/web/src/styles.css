@@ -8,13 +8,13 @@
     sans-serif;
 
   /* Design tokens as CSS custom properties for use outside Tailwind */
-  --color-navy: #172554;
-  --color-action: #4f46e5;
-  --color-canvas: #f5f7fb;
+  --color-navy: #101338;
+  --color-action: #4b0fe8;
+  --color-canvas: #f8f7ff;
   --color-surface: #ffffff;
-  --color-border: #e6e9f2;
-  --color-ink: #0f172a;
-  --color-muted: #475569;
+  --color-border: #e5e1f5;
+  --color-ink: #101338;
+  --color-muted: #555d83;
   --color-success: #15803d;
   --color-danger: #dc2626;
   --color-warning: #b45309;
@@ -27,8 +27,8 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #172554;
-  background: #f5f7fb;
+  color: #101338;
+  background: #f8f7ff;
 }
 
 /* ─── Reset ──────────────────────────────────────────────────────────────── */
@@ -40,7 +40,7 @@
 
 html {
   min-width: 320px;
-  background: #f5f7fb;
+  background: #f8f7ff;
   scroll-behavior: smooth;
 }
 
@@ -53,13 +53,12 @@ body {
 }
 
 body {
-  background: radial-gradient(circle at 100% 0, rgba(79, 70, 229, 0.045), transparent 30rem),
-    #f5f7fb;
+  background: radial-gradient(circle at 88% 0, rgba(111, 64, 255, 0.08), transparent 36rem), #f8f7ff;
 }
 
 ::selection {
-  color: #172554;
-  background: #c7d2fe;
+  color: #101338;
+  background: #d8c9ff;
 }
 
 /* ─── Typography ─────────────────────────────────────────────────────────── */
@@ -164,7 +163,7 @@ a {
 /* ─── Text selection ─────────────────────────────────────────────────────── */
 ::selection {
   color: #ffffff;
-  background: #2563eb;
+  background: #4b0fe8;
 }
 
 /* ─── Scrollbar styling (webkit) ─────────────────────────────────────────── */
@@ -186,7 +185,7 @@ a {
 
 /* ─── Focus visible ──────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid #713cff;
   outline-offset: 2px;
   border-radius: 4px;
 }

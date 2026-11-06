@@ -221,6 +221,18 @@ test("catalog search and sorting reach the shared endpoint", async ({ page }) =>
   await page.getByRole("combobox", { name: "Sort IPOs" }).click();
   await page.getByRole("option", { name: "Price · high to low" }).click();
   await sorted;
+  const filtered = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname === "/api/ipos/catalog" && url.searchParams.get("status") === "OPEN";
+  });
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await filtered;
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await expect(page).toHaveURL(/\/ipos\?search=Catalog&sort=price_desc$/);
+  await expect(page.getByRole("button", { name: "All", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(page.getByRole("link", { name: catalogIpo.company_name })).toBeVisible();
   await page.getByRole("link", { name: catalogIpo.company_name }).click();
   await page.getByRole("link", { name: "Back to IPOs" }).click();

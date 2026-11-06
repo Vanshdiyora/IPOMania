@@ -319,9 +319,12 @@ export function ApplicationDashboardPage() {
   ];
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <header className="flex flex-wrap items-end justify-between gap-4 rounded-3xl border border-action-border/50 bg-gradient-to-r from-[#F2EDFF] via-[#FAF8FF] to-[#EEE7FF] p-6 shadow-card sm:p-8">
         <div>
-          <h1 className="text-3xl font-bold text-navy">Application manager</h1>
+          <p className="text-sm font-bold uppercase tracking-wider text-action">
+            Workspace overview
+          </p>
+          <h1 className="mt-1 text-3xl font-bold text-ink sm:text-4xl">Application manager</h1>
           <p className="mt-2 text-lg text-muted">
             Track your IPO applications across your demat accounts.
           </p>
@@ -353,8 +356,11 @@ export function ApplicationDashboardPage() {
           </>
         ) : (
           totals.map(([label, value]) => (
-            <Card key={label}>
-              <p className="text-base font-semibold text-muted">{label}</p>
+            <Card
+              key={label}
+              className="border-action-border/60 bg-gradient-to-br from-white to-[#F6F2FF]"
+            >
+              <p className="text-sm font-semibold text-ink">{label}</p>
               <p className="mt-2 text-3xl font-bold text-navy">{error ? "—" : (value ?? 0)}</p>
             </Card>
           ))
@@ -767,6 +773,11 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
     queryFn: ({ signal }) =>
       apiRequest<IpoResponse>(`/api/ipos/${preselectedIpoId}`, session!, { signal }),
   });
+  const editingIpo = useQuery({
+    queryKey: userQueryKey(session?.user?.id, ["ipo", ipoId]),
+    enabled: Boolean(session && editing && ipoId),
+    queryFn: ({ signal }) => apiRequest<IpoResponse>(`/api/ipos/${ipoId}`, session!, { signal }),
+  });
   const catalogIpos = useInfiniteQuery({
     queryKey: userQueryKey(session?.user?.id, ["ipo-catalog", "application-options"]),
     enabled: Boolean(session && !editing),
@@ -808,12 +819,23 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       return latest;
     }, new Map<IpoCategoryConfiguration["category"], ApplicationCategoryConfiguration>()),
   ).map(([, configuration]) => configuration);
-  const activeCategory = categories.find((category) => category.id === categoryId);
+  // Keep the recorded rule selectable while editing an application created with
+  // an older immutable version. New applications only offer current versions.
+  const activeCategory = categoryConfigurations.find((category) => category.id === categoryId);
+  const recordedCategory =
+    editing && activeCategory && !categories.some((category) => category.id === categoryId)
+      ? activeCategory
+      : null;
   const personalIpos = lists.ipos.filter((item) => !item.source_catalog_id);
   const preselectedOwnedIpo =
     preselectedIpo.data?.data.id === preselectedIpoId ? preselectedIpo.data.data : null;
   const selectableIpos = editing
-    ? lists.ipos
+    ? [
+        ...lists.ipos,
+        ...(editingIpo.data?.data && !lists.ipos.some((item) => item.id === editingIpo.data.data.id)
+          ? [editingIpo.data.data]
+          : []),
+      ]
     : [
         ...personalIpos,
         ...(preselectedOwnedIpo && !personalIpos.some((item) => item.id === preselectedOwnedIpo.id)
@@ -824,9 +846,10 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
   const selectedIpo =
     selectedCatalogIpo ??
     lists.ipos.find((item) => item.id === ipoId) ??
+    (editingIpo.data?.data.id === ipoId ? editingIpo.data.data : null) ??
     (preselectedIpo.data?.data.id === ipoId ? preselectedIpo.data.data : null);
   const selectedAccountAlreadyApplied = Boolean(
-    ipoId && accountId && lists.activeAccountIdsByIpoId.get(ipoId)?.has(accountId),
+    !editing && ipoId && accountId && lists.activeAccountIdsByIpoId.get(ipoId)?.has(accountId),
   );
   const enteredLots = Number(lots);
   const lotBounds = getApplicationLotBounds(
@@ -1010,7 +1033,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
       busy={mutation.isPending}
       dirty={dirty}
       disabled={
-        Boolean(detail.error || lists.error) ||
+        Boolean(detail.error || lists.error || editingIpo.error) ||
         (editing && !application) ||
         !ipoId ||
         !accountId ||
@@ -1020,7 +1043,7 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
         !price ||
         !localCalculation ||
         !validLotSelection ||
-        (!editing && selectedAccountAlreadyApplied)
+        selectedAccountAlreadyApplied
       }
     >
       <form
@@ -1044,6 +1067,14 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
         ) : null}
         <div hidden={editing && (detail.isLoading || Boolean(detail.error))}>
           {lists.error ? <ErrorMessage error={lists.error} /> : null}
+          {editingIpo.error ? (
+            <div className="mb-4 space-y-2">
+              <ErrorMessage error={editingIpo.error} />
+              <Button variant="outline" onClick={() => void editingIpo.refetch()}>
+                Retry IPO details
+              </Button>
+            </div>
+          ) : null}
           {preselectedIpo.error ? <ErrorMessage error={preselectedIpo.error} /> : null}
           {preselectedIpo.error ? (
             <Button
@@ -1218,6 +1249,12 @@ export function ApplicationFormPage({ editing = false }: { editing?: boolean }) 
                       {formatCategory(item.category)}
                     </option>
                   ))}
+                {recordedCategory ? (
+                  <option value={recordedCategory.id}>
+                    {formatCategory(recordedCategory.category)} (recorded rule v
+                    {recordedCategory.rule_version})
+                  </option>
+                ) : null}
               </FormSelect>
               {categoriesQuery.isLoading ? (
                 <LoadingState label="Loading categories" inline />
@@ -2400,7 +2437,7 @@ function ApplicationDetail({
 
 function SummaryMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-xl border border-border/80 bg-white/80 p-3 sm:min-w-32 sm:p-4">
+    <div className="min-w-0 rounded-xl border border-action-border/60 bg-gradient-to-br from-white to-[#F6F2FF] p-3 sm:min-w-32 sm:p-4">
       <div className="flex items-center gap-2 text-action">
         {icon}
         <span className="text-xs font-semibold text-muted">{label}</span>

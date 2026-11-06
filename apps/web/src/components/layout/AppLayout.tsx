@@ -138,7 +138,7 @@ export function AppLayout() {
         />
 
         {/* Main content */}
-        <div ref={pageContentRef} className="flex min-w-0 flex-1 flex-col md:ml-64">
+        <div ref={pageContentRef} className="flex min-w-0 flex-1 flex-col md:ml-72">
           <main
             id="main-content"
             className="relative w-full min-w-0 flex-1 overflow-x-hidden p-4 pt-20 sm:p-6 sm:pt-6 lg:p-8 animate-fade-in"

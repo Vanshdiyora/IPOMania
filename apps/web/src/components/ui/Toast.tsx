@@ -76,18 +76,25 @@ export function Toast({
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
-      className="pointer-events-auto relative isolate w-full overflow-hidden rounded-2xl border border-border bg-surface p-3 pr-2 shadow-[0_18px_42px_-20px_rgba(15,23,42,0.35)] animate-fade-in"
+      className="pointer-events-auto relative isolate w-full overflow-hidden rounded-xl border border-border bg-surface px-3 py-2 shadow-[0_18px_42px_-20px_rgba(15,23,42,0.35)] animate-fade-in sm:rounded-2xl sm:p-3 sm:pr-2"
     >
-      <span className={`absolute inset-y-0 left-0 w-1 ${toneStyles.accent}`} aria-hidden="true" />
-      <div className="flex items-center gap-3 pl-1">
+      <span
+        className={`absolute inset-y-0 left-0 hidden w-1 sm:block ${toneStyles.accent}`}
+        aria-hidden="true"
+      />
+      <div className="flex items-center gap-2 sm:gap-3 sm:pl-1">
         <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${toneStyles.icon}`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border sm:h-9 sm:w-9 ${toneStyles.icon}`}
         >
-          <Icon className="h-5 w-5" aria-hidden="true" />
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold leading-5 text-ink">{title}</p>
-          {description && <div className="mt-1 text-sm leading-5 text-muted">{description}</div>}
+          <p className="text-sm font-semibold leading-5 text-ink sm:text-[15px]">{title}</p>
+          {description && (
+            <div className="text-xs leading-4 text-muted sm:mt-1 sm:text-sm sm:leading-5">
+              {description}
+            </div>
+          )}
         </div>
         <button
           type="button"
@@ -112,7 +119,7 @@ export function ToastViewport({ children }: { children: ReactNode }) {
   if (typeof document === "undefined") return null;
   return createPortal(
     <div
-      className="pointer-events-none fixed inset-x-3 top-3 z-[70] flex flex-col gap-3 sm:left-auto sm:right-5 sm:top-4 sm:w-full sm:max-w-[25rem]"
+      className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[70] flex flex-col-reverse gap-2 sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-4 sm:w-full sm:max-w-[25rem] sm:flex-col sm:gap-3"
       aria-live="polite"
     >
       {children}
